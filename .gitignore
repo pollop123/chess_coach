@@ -1,0 +1,25 @@
+# Python 產生的暫存檔
+__pycache__/
+*.py[cod]
+
+# 環境變數與虛擬環境 (如果未來有)
+.env
+venv/
+.venv/
+
+# IDE 設定檔 (VS Code / JetBrains)
+.vscode/
+.idea/
+
+# Mac 系統檔案
+.DS_Store
+
+# Frontend
+node_modules/
+dist/
+
+# Backend / RAG
+chroma_db/
+backend/.env
+**/*.sqlite
+**/*.db

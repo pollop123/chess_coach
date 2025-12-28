@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./backend/.env
+    volumes:
+      - ./backend:/app
+    command: python -m uvicorn api:app --host 0.0.0.0 --port 8000 --reload
+
+  frontend:
+    image: node:22-alpine # <--- 這裡一定要是 22
+    working_dir: /app
+    volumes:
+      - ./frontend:/app
+    ports:
+      - "5173:5173"
+    # 這裡確保每次啟動都檢查依賴
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"

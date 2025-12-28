@@ -1,0 +1,7 @@
+chess
+fastapi
+uvicorn
+sqlalchemy
+google-genai
+chromadb
+berserk
