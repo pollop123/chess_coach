@@ -114,7 +114,7 @@ def analyze_full_game(request: AnalysisRequest):
         return v if persp == "white" else -v
 
     # 初始局面評分
-    start_eval = chess_engine.minimax(board, max(1, request.depth), -math.inf, math.inf, board.turn == chess.WHITE)
+    start_eval, _ = chess_engine.minimax(board, max(1, request.depth), -math.inf, math.inf, board.turn == chess.WHITE)
     evaluations.append({
         "move_number": 0,
         "fen": board.fen(),
@@ -134,14 +134,14 @@ def analyze_full_game(request: AnalysisRequest):
         if best_move:
             board.push(best_move)
             # 算出最佳步的分數
-            best_eval = chess_engine.minimax(board, max(1, request.depth - 1), -math.inf, math.inf, board.turn == chess.WHITE)
+            best_eval, _ = chess_engine.minimax(board, max(1, request.depth - 1), -math.inf, math.inf, board.turn == chess.WHITE)
             board.pop()
         else:
             best_eval = chess_engine.evaluate_board(board)
 
         # 2. 執行「實際走的那一步」
         board.push(move)
-        move_eval = chess_engine.minimax(board, max(1, request.depth - 1), -math.inf, math.inf, board.turn == chess.WHITE)
+        move_eval, _ = chess_engine.minimax(board, max(1, request.depth - 1), -math.inf, math.inf, board.turn == chess.WHITE)
         fen_after = board.fen()
 
         # 3. 計算損失 (CP Loss)

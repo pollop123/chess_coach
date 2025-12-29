@@ -95,10 +95,15 @@ def make_move(game_id, board):
     
     if best_move:
         print(f"🚀 下出: {best_move.uci()}")
-        try:
-            client.bots.make_move(game_id, best_move.uci())
-        except Exception as e:
-            print(f"❌ 走棋失敗: {e}")
+        # 增加重試機制 (Retry Logic)
+        for attempt in range(3):
+            try:
+                client.bots.make_move(game_id, best_move.uci())
+                return # 成功就離開
+            except Exception as e:
+                print(f"⚠️ 走棋失敗 (嘗試 {attempt+1}/3): {e}")
+                time.sleep(1) # 等一秒再試
+        print("❌ 放棄走棋 (重試 3 次失敗)")
     else:
         print("❌ 算不出棋步 (可能被將死了或 Bug)")
 

@@ -206,6 +206,9 @@ class ChessRAG:
         except Exception as e:
             print(f"Tactical Analysis Error: {e}")
 
+        # 🔥 判斷當前輪次
+        turn_name = "白方 (White)" if board.turn == chess.WHITE else "黑方 (Black)"
+
         final_prompt = f"""
         {role_play}
         
@@ -214,16 +217,17 @@ class ChessRAG:
         請特別關注雙方的開局選擇與中局計畫。
         
         [當前盤面 (FEN)]: {fen}
+        [當前輪次 (Current Turn)]: {turn_name}
         
-        [合法走法列表 (Legal Moves)]: 
+        [{turn_name} 合法走法列表 (Legal Moves)]: 
         {legal_moves_text}
         (⚠️ 請注意：你建議的任何走法，都必須在這個列表內，否則就是違規！)
 
-        [高風險走法 (Risky Moves - 慎選)]:
+        [{turn_name} 高風險走法 (Risky Moves - 慎選)]:
         {risky_moves_text}
         (⚠️ 這些走法可能會導致丟子，除非你有明確的戰術理由，否則請避免建議這些步法。)
         
-        [引擎推薦 (Engine Suggestion)]:
+        [{turn_name} 引擎推薦 (Engine Suggestion)]:
         {engine_best_move_text}
         (💡 這是電腦計算出的最佳步，請優先考慮分析這一步的優點。)
         
@@ -239,6 +243,7 @@ class ChessRAG:
         [玩家問題]: {user_question}
         
         [🔥 重要指令 - 絕對遵守]:
+        0. **視角確認**：現在是 **{turn_name}** 的回合。請務必站在 **{turn_name}** 的視角進行分析，不要搞錯攻守方。
         1. **合法性檢查**：在建議任何一步棋之前，請先檢查它是否在 [合法走法列表] 中。如果不在，絕對不要建議。
         2. **雙重驗證**：判斷「開局名稱」與「歷史走法」請以 [PGN] 為準；判斷「當前棋子位置」與「戰術威脅」請以 [FEN] 為準。
         3. **戰術優先**：在分析戰略前，先檢查是否有立即的戰術威脅（如：將軍、捉雙、抽后、無根子）。如果有，請優先警告玩家。
@@ -246,6 +251,7 @@ class ChessRAG:
         5. **具體計算 (Exchange Sequence)**：如果你提到某步棋是「高風險」或「壞棋」，你必須列出具體的交換序列來證明（例如：「白方走 Nxc7，黑方回應 Qxc7，白方損失馬(3分) 換得兵(1分)，淨虧 2 分」）。不要只說「暴露弱點」這種空話。
         6. **糾正幻覺**：如果 [資料庫檢索結果] 與當前盤面衝突，請**直接忽略並保持沉默**，不要在回答中提到「因為不符所以忽略」或「資料庫說...」。
         7. **誠實回答**：如果不確定某個術語或開局，請直說「我不確定」，不要編造不存在的棋理。
+        8. **提煉心法 (Key Principle)**：請為這步棋總結一個「一句話心法」，例如「控制中心」、「騎士前哨站」、「破壞兵型」等，讓玩家能學到通用的觀念。
         
         請開始分析：
         """
