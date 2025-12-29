@@ -6,6 +6,7 @@ import chess
 import chess.pgn
 import io
 import time # 用來做延遲重試
+import chess_engine # 匯入我們剛拆分出來的引擎
 
 # 取得 API Key
 api_key = os.getenv("GOOGLE_API_KEY")
@@ -104,11 +105,22 @@ class ChessRAG:
     def get_advice(self, fen, move_history, user_question):
         if not self.client: return "錯誤：API Key 未設定"
 
-        # --- A. 搜尋相似規則 ---
-        rule_results = self.rule_collection.query(query_texts=["General chess strategy"], n_results=1)
-        rule_text = rule_results['documents'][0][0] if (rule_results['documents'] and rule_results['documents'][0]) else ""
+        # --- 0. 解析歷史紀錄 (Context Awareness) ---
+        pgn_text = "無 (開局)"
+        if move_history:
+            pgn_text = move_history # 直接使用完整的 PGN
+
+        # --- A. 動態檢索規則 (Dynamic Retrieval) ---
+        # 如果使用者有問具體問題，就用問題去搜；否則搜通用策略
+        search_query = user_question if (user_question and len(user_question) > 3) else "General chess strategy"
+        print(f"🔍 RAG 檢索關鍵字: {search_query}")
+        
+        rule_results = self.rule_collection.query(query_texts=[search_query], n_results=1)
+        rule_text = rule_results['documents'][0][0] if (rule_results['documents'] and rule_results['documents'][0]) else "無相關規則"
 
         # --- B. 搜尋相似棋譜 ---
+        # 檢索還是得用 FEN，因為我們要找的是「相似的局面」
+        # 如果用 PGN 搜，必須要完全一樣的走法才能搜到，這樣命中率太低
         game_results = self.game_collection.query(query_texts=[fen], n_results=1)
         
         similar_game_info = "無相似歷史對局。"
@@ -132,39 +144,108 @@ class ChessRAG:
                     source_type = "master"
                     similar_game_info = f"[歷史名局] {white} vs {black}, 大師走了 {move}"
 
-        # --- C. 決定語氣 (合併式 Prompt，更適合 Gemma) ---
-        
+        # --- C. 決定語氣 ---
         role_play = "你是一位專業的西洋棋教練。"
         if source_type == "lichess":
             role_play = """
-            你是一位親切的西洋棋 YouTuber。
-            你發現這局面曾出現在 Eric Rosen 等高手的對局中。
-            請用「分享冷知識」的口吻，解釋高手的意圖。
-            **重要**：如果這是正常開局 (如 Nf6)，請解釋其戰略價值，不要為了戲劇效果把它說成是陷阱或壞棋。
+            你是一位專業的西洋棋教練。
+            你發現這局面曾出現在 Lichess 高手的對局中。
+            請用「教學」的口吻，解釋高手的意圖，並指導學生如何學習這個走法。
             """
         elif source_type == "master":
             role_play = "你是一位特級大師，請引用歷史名局進行深度戰略分析。"
+
+        # --- D. 計算合法走法與戰術風險 (防止幻覺與送子) ---
+        legal_moves_text = "無"
+        risky_moves_text = "無"
+        engine_best_move_text = "無"
+        
+        try:
+            board = chess.Board(fen)
+            legal_moves = []
+            risky_moves = []
+            
+            # 簡單的子力價值表
+            piece_values = {chess.PAWN: 1, chess.KNIGHT: 3, chess.BISHOP: 3, chess.ROOK: 5, chess.QUEEN: 9, chess.KING: 0}
+
+            for move in board.legal_moves:
+                san = board.san(move)
+                legal_moves.append(san)
+                
+                # 檢查是否為送子 (Risky Capture)
+                # 邏輯：如果目標格有對手防守，且我方攻擊子力價值 > 被吃掉的子力價值 (虧本交易)
+                if board.is_capture(move):
+                    target_square = move.to_square
+                    attacker_piece = board.piece_at(move.from_square)
+                    attacker_value = piece_values.get(attacker_piece.piece_type, 0)
+                    
+                    # 取得被吃掉的棋子價值 (處理 En Passant)
+                    if board.is_en_passant(move):
+                        captured_value = 1
+                    else:
+                        captured_p = board.piece_at(target_square)
+                        captured_value = piece_values.get(captured_p.piece_type, 0) if captured_p else 0
+
+                    # 檢查對手是否有防守該格
+                    defenders = board.attackers(not board.turn, target_square)
+                    if defenders:
+                        # 如果我方價值 > 被吃子力價值，且有防守，視為高風險
+                        # 例如：馬(3) 吃 兵(1)，有防守 -> 虧 2 分 -> 警告
+                        if attacker_value > captured_value:
+                            risky_moves.append(f"{san} (丟子風險: 損失 {attacker_value} vs 獲利 {captured_value})")
+
+            legal_moves_text = ", ".join(legal_moves)
+            if risky_moves:
+                risky_moves_text = ", ".join(risky_moves)
+            
+            # 🔥 計算引擎最佳步 (Depth=3, 快速計算)
+            best_move = chess_engine.get_best_move(board, depth=3)
+            if best_move:
+                engine_best_move_text = board.san(best_move)
+                
+        except Exception as e:
+            print(f"Tactical Analysis Error: {e}")
 
         final_prompt = f"""
         {role_play}
         
         [任務目標]:
-        你必須根據 [當前盤面] 提供準確的分析。
+        你必須根據 [完整棋譜 (PGN)] 與 [當前盤面] 提供準確的分析。
+        請特別關注雙方的開局選擇與中局計畫。
         
         [當前盤面 (FEN)]: {fen}
+        
+        [合法走法列表 (Legal Moves)]: 
+        {legal_moves_text}
+        (⚠️ 請注意：你建議的任何走法，都必須在這個列表內，否則就是違規！)
+
+        [高風險走法 (Risky Moves - 慎選)]:
+        {risky_moves_text}
+        (⚠️ 這些走法可能會導致丟子，除非你有明確的戰術理由，否則請避免建議這些步法。)
+        
+        [引擎推薦 (Engine Suggestion)]:
+        {engine_best_move_text}
+        (💡 這是電腦計算出的最佳步，請優先考慮分析這一步的優點。)
+        
+        [完整棋譜 (PGN)]: 
+        {pgn_text}
         
         [資料庫檢索結果 (僅供參考)]: 
         {similar_game_info}
         
-        [通用原則]: {rule_text}
+        [相關戰術規則 ({search_query})]: 
+        {rule_text}
         
         [玩家問題]: {user_question}
         
         [🔥 重要指令 - 絕對遵守]:
-        1. **FEN 是唯一的真理**：請先仔細閱讀 FEN 字串確認兵與棋子的實際位置。
-        2. **糾正幻覺**：如果 [資料庫檢索結果] 提到的開局（例如西西里防禦 c5）與當前 FEN 不符（例如 FEN 顯示 c 兵在 c7），**請直接忽略檢索結果**，並依據 FEN 判斷正確的開局名稱（例如 Alekhine's Defense）。
-        3. **不要瞎掰**：不要分析盤面上不存在的棋步（例如不要說「黑方走了 c5」如果 c 兵根本沒動）。
-        4. **不要編造粉絲名稱**。
+        1. **合法性檢查**：在建議任何一步棋之前，請先檢查它是否在 [合法走法列表] 中。如果不在，絕對不要建議。
+        2. **雙重驗證**：判斷「開局名稱」與「歷史走法」請以 [PGN] 為準；判斷「當前棋子位置」與「戰術威脅」請以 [FEN] 為準。
+        3. **戰術優先**：在分析戰略前，先檢查是否有立即的戰術威脅（如：將軍、捉雙、抽后、無根子）。如果有，請優先警告玩家。
+        4. **戰術交換檢查**：在建議吃子之前，務必檢查目標格是否有對手防守。若我方子力價值較高（如馬吃兵）且有防守，這是送子 (Blunder)，絕對不要建議。
+        5. **具體計算 (Exchange Sequence)**：如果你提到某步棋是「高風險」或「壞棋」，你必須列出具體的交換序列來證明（例如：「白方走 Nxc7，黑方回應 Qxc7，白方損失馬(3分) 換得兵(1分)，淨虧 2 分」）。不要只說「暴露弱點」這種空話。
+        6. **糾正幻覺**：如果 [資料庫檢索結果] 與當前盤面衝突，請**直接忽略並保持沉默**，不要在回答中提到「因為不符所以忽略」或「資料庫說...」。
+        7. **誠實回答**：如果不確定某個術語或開局，請直說「我不確定」，不要編造不存在的棋理。
         
         請開始分析：
         """

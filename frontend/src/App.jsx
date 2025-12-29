@@ -91,10 +91,16 @@ function App() {
         depth: 2
       });
 
-      const processedData = res.data.map(d => ({
-        ...d,
-        displayScore: (d.score_for !== undefined ? d.score_for : d.score)
-      }));
+      const processedData = res.data.map(d => {
+        const rawScore = (d.score_for !== undefined ? d.score_for : d.score);
+        // 限制分數範圍在 [-2000, 2000] 之間，避免 Checkmate (99999) 把圖表拉平
+        const clampedScore = Math.max(-2000, Math.min(2000, rawScore));
+        return {
+          ...d,
+          displayScore: clampedScore,
+          rawScore: rawScore // 保留原始分數供 Tooltip 顯示 (如果需要)
+        };
+      });
 
       setAnalysisData(processedData);
       setStatus("✅ 分析完成！");

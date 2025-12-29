@@ -11,7 +11,7 @@ import math
 import os
 
 # 匯入你的核心引擎
-import main
+import chess_engine  # Import the new engine module
 # 匯入資料庫模組
 from database import SessionLocal, Game
 
@@ -86,7 +86,7 @@ def analyze_game(request: BoardRequest):
     if board.is_game_over():
         return {"game_over": True, "result": board.result()}
 
-    best_move = main.get_best_move(board, depth=request.depth)
+    best_move = chess_engine.get_best_move(board, depth=request.depth)
 
     return {
         "best_move": best_move.uci() if best_move else None,
@@ -114,7 +114,7 @@ def analyze_full_game(request: AnalysisRequest):
         return v if persp == "white" else -v
 
     # 初始局面評分
-    start_eval = main.minimax(board, max(1, request.depth), -math.inf, math.inf, board.turn == chess.WHITE)
+    start_eval = chess_engine.minimax(board, max(1, request.depth), -math.inf, math.inf, board.turn == chess.WHITE)
     evaluations.append({
         "move_number": 0,
         "fen": board.fen(),
@@ -129,19 +129,19 @@ def analyze_full_game(request: AnalysisRequest):
         
         # 1. 計算這一步之前的「最佳建議」
         # 注意：這裡會呼叫 Minimax，如果整盤棋很長，這一步驟會花很多時間
-        best_move = main.get_best_move(board, depth=request.depth)
+        best_move = chess_engine.get_best_move(board, depth=request.depth)
         
         if best_move:
             board.push(best_move)
             # 算出最佳步的分數
-            best_eval = main.minimax(board, max(1, request.depth - 1), -math.inf, math.inf, board.turn == chess.WHITE)
+            best_eval = chess_engine.minimax(board, max(1, request.depth - 1), -math.inf, math.inf, board.turn == chess.WHITE)
             board.pop()
         else:
-            best_eval = main.evaluate_board(board)
+            best_eval = chess_engine.evaluate_board(board)
 
         # 2. 執行「實際走的那一步」
         board.push(move)
-        move_eval = main.minimax(board, max(1, request.depth - 1), -math.inf, math.inf, board.turn == chess.WHITE)
+        move_eval = chess_engine.minimax(board, max(1, request.depth - 1), -math.inf, math.inf, board.turn == chess.WHITE)
         fen_after = board.fen()
 
         # 3. 計算損失 (CP Loss)
