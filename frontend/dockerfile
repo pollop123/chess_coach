@@ -1,0 +1,30 @@
+# --- 第一階段：打包 (Builder) ---
+FROM node:22-alpine AS builder
+
+WORKDIR /app
+
+# [cite_start]複製 package 設定檔 [cite: 7]
+COPY package.json package-lock.json ./
+RUN npm install
+
+# 複製前端程式碼
+COPY . .
+
+# 🔥 設定後端 API 網址 (這會在部署時由平台注入，或者預設)
+ARG VITE_API_URL
+ENV VITE_API_URL=${VITE_API_URL}
+
+# [cite_start]執行 Vite 打包 (會產生 dist 資料夾) [cite: 7]
+RUN npm run build
+
+# --- 第二階段：執行 (Runner) ---
+# 使用 Nginx 來伺服靜態網頁，輕量又快
+FROM nginx:alpine
+
+# 將打包好的 dist 資料夾複製到 Nginx 預設目錄
+COPY --from=builder /app/dist /usr/share/nginx/html
+
+# 讓 Nginx 監聽 80 port
+EXPOSE 80
+
+CMD ["nginx", "-g", "daemon off;"]

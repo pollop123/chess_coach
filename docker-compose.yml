@@ -2,21 +2,24 @@ version: '3.8'
 
 services:
   backend:
-    build: ./backend
+    # 指向後端資料夾，使用我們剛剛改好的 Dockerfile
+    build:
+      context: ./backend
     ports:
       - "8000:8000"
-    env_file:
-      - ./backend/.env
-    volumes:
-      - ./backend:/app
-    command: python -m uvicorn api:app --host 0.0.0.0 --port 8000 --reload
+    environment:
+      # API Key 不要寫死，要在雲端平台的變數設定中填寫
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
 
   frontend:
-    image: node:22-alpine # <--- 這裡一定要是 22
-    working_dir: /app
-    volumes:
-      - ./frontend:/app
+    # 指向前端資料夾，使用我們剛剛新增的 Dockerfile
+    build:
+      context: ./frontend
+      args:
+        # 這裡的變數是為了讓 Vite 打包時知道後端在哪
+        # 如果是 Zeabur 內部連線，有時可以直接用 http://backend:8000，但前端通常是在瀏覽器跑，所以通常需要填公開網址
+        - VITE_API_URL=${VITE_API_URL}
     ports:
-      - "5173:5173"
-    # 這裡確保每次啟動都檢查依賴
-    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+      - "80:80" # 前端通常對外開放 80 port
+    depends_on:
+      - backend
