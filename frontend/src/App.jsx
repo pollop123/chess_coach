@@ -3,7 +3,7 @@ import { Chess } from "chess.js";
 import { Chessboard } from "react-chessboard";
 import axios from "axios";
 // 引入圖表套件
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine, ReferenceDot } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine, ReferenceDot, Area } from 'recharts';
 
 // 自動判斷 API 網址
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
@@ -341,16 +341,18 @@ function App() {
       <div style={{ display: "flex", gap: "30px", alignItems: "flex-start", flexWrap: "wrap", justifyContent: "center" }}>
 
         {/* 勝率條 - 只在賽後分析時顯示 */}
-        {analysisData.length > 0 && currentMoveIndex >= 0 && (
+        {analysisData.length > 0 && (
           <EvaluationBar 
             winningChance={
-              analysisData[currentMoveIndex]?.score_for 
-                ? (analysisData[currentMoveIndex].score_for > 0 ? 50 + Math.min(analysisData[currentMoveIndex].score_for / 50, 50) : 50 + Math.max(analysisData[currentMoveIndex].score_for / 50, -50))
+              currentMoveIndex >= 0 && analysisData[currentMoveIndex]?.score_for 
+                ? (analysisData[currentMoveIndex].score_for > 0 
+                    ? 50 + Math.min(analysisData[currentMoveIndex].score_for / 50, 50) 
+                    : 50 + Math.max(analysisData[currentMoveIndex].score_for / 50, -50))
                 : 50
             }
             evalDisplay={
-              analysisData[currentMoveIndex]?.score_for 
-                ? (analysisData[currentMoveIndex].score_for / 100).toFixed(2)
+              currentMoveIndex >= 0 && analysisData[currentMoveIndex]?.score_for 
+                ? (analysisData[currentMoveIndex].score_for > 0 ? "+" : "") + (analysisData[currentMoveIndex].score_for / 100).toFixed(2)
                 : "+0.00"
             }
           />
@@ -467,19 +469,65 @@ function App() {
           {analysisData.length > 0 && (
             <div style={{
               backgroundColor: "white", padding: "10px", borderRadius: "10px", boxShadow: "0 2px 10px rgba(0,0,0,0.1)",
-              height: "200px"
+              height: "250px"
             }}>
-              <h4 style={{ margin: "0 0 10px 0", color: "#666", textAlign: "center" }}>📊 局勢走勢</h4>
+              <h4 style={{ margin: "0 0 10px 0", color: "#333", textAlign: "center" }}>📊 局勢走勢</h4>
               <ResponsiveContainer width="100%" height="85%">
                 <LineChart data={analysisData} onClick={(e) => { if (e && e.activePayload) setCurrentMoveIndex(e.activePayload[0].payload.move_number); }}>
-                  <CartesianGrid strokeDasharray="3 3" />
+                  <defs>
+                    {/* 白方優勢區域填充 (正分) */}
+                    <linearGradient id="whiteArea" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#f0f0f0" stopOpacity={0.9}/>
+                      <stop offset="100%" stopColor="#ffffff" stopOpacity={0.3}/>
+                    </linearGradient>
+                    {/* 黑方優勢區域填充 (負分) */}
+                    <linearGradient id="blackArea" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#666666" stopOpacity={0.3}/>
+                      <stop offset="100%" stopColor="#1a1a1a" stopOpacity={0.9}/>
+                    </linearGradient>
+                  </defs>
+                  
+                  <CartesianGrid strokeDasharray="3 3" stroke="#ccc" />
                   <XAxis dataKey="move_number" hide />
                   <YAxis hide domain={['auto', 'auto']} />
-                  <Tooltip />
-                  <ReferenceLine y={0} stroke="red" strokeDasharray="3 3" />
-                  <Line type="monotone" dataKey="displayScore" stroke="#8884d8" dot={false} strokeWidth={2} />
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: '#fff', border: '2px solid #333' }}
+                    labelFormatter={(label) => `第 ${label} 步`}
+                    formatter={(value) => [(value / 100).toFixed(2), '評分']}
+                  />
+                  
+                  {/* 中線 (0分線) */}
+                  <ReferenceLine y={0} stroke="#ff4444" strokeWidth={2} strokeDasharray="5 5" />
+                  
+                  {/* 白方優勢填充區域 (0以上) */}
+                  <Area 
+                    type="monotone" 
+                    dataKey="displayScore" 
+                    stroke="none"
+                    fill="url(#whiteArea)"
+                    fillOpacity={1}
+                    isAnimationActive={false}
+                  />
+                  
+                  {/* 折線 */}
+                  <Line 
+                    type="monotone" 
+                    dataKey="displayScore" 
+                    stroke="#2563eb"
+                    dot={false} 
+                    strokeWidth={3}
+                  />
+                  
+                  {/* 當前位置標記 */}
                   {currentMoveIndex !== -1 && analysisData[currentMoveIndex] && (
-                    <ReferenceDot x={analysisData[currentMoveIndex].move_number} y={analysisData[currentMoveIndex].displayScore} r={4} fill="red" stroke="none" />
+                    <ReferenceDot 
+                      x={analysisData[currentMoveIndex].move_number} 
+                      y={analysisData[currentMoveIndex].displayScore} 
+                      r={6} 
+                      fill="#ff4d4f" 
+                      stroke="#fff"
+                      strokeWidth={2}
+                    />
                   )}
                 </LineChart>
               </ResponsiveContainer>
