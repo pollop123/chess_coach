@@ -200,12 +200,36 @@ def read_games(skip: int = 0, limit: int = 10, db: Session = Depends(get_db)):
 class ExplainRequest(BaseModel):
     fen: str
     history: str = ""
-    question: Optional[str] = None  # <--- 新增這個欄位
+    question: Optional[str] = None
+    depth: int = 5  # 新增：引擎分析深度
 
 @app.post("/explain")
 def explain_position(request: ExplainRequest):
+    if not rag_engine:
+        return {"advice": "❌ RAG 引擎未啟動，請檢查 API Key 設定"}
+    
     # 如果使用者沒問問題，就用預設的 Prompt (總評)
     user_question = request.question or "請評估目前局勢並給出建議"
     
-    advice = rag_engine.get_advice(request.fen, request.history, user_question)
+    # 🔥 計算引擎的預測變例 (PV Line)
+    pv_line = None
+    pv_score = None
+    try:
+        board = chess.Board(request.fen)
+        if not board.is_game_over():
+            best_move, score, pv = chess_engine.get_analysis(board, depth=request.depth)
+            if pv and len(pv) > 0:
+                pv_line = pv
+                pv_score = score
+                print(f"🎯 PV Line 已計算: {pv} (評分: {score})")
+    except Exception as e:
+        print(f"⚠️ PV 計算失敗: {e}")
+    
+    advice = rag_engine.get_advice(
+        request.fen, 
+        request.history, 
+        user_question,
+        pv_line=pv_line,
+        pv_score=pv_score
+    )
     return {"advice": advice}

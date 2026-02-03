@@ -102,7 +102,7 @@ class ChessRAG:
         
         return "❌ 所有 AI 教練都去喝咖啡了 (Quota Exceeded)。請稍後再試。"
 
-    def get_advice(self, fen, move_history, user_question):
+    def get_advice(self, fen, move_history, user_question, pv_line=None, pv_score=None):
         if not self.client: return "錯誤：API Key 未設定"
 
         # --- 0. 解析歷史紀錄 (Context Awareness) ---
@@ -209,12 +209,48 @@ class ChessRAG:
         # 🔥 判斷當前輪次
         turn_name = "白方 (White)" if board.turn == chess.WHITE else "黑方 (Black)"
 
+        # 🔥 PV Line 轉換為可讀的 SAN 格式
+        pv_analysis = ""
+        if pv_line and len(pv_line) > 0:
+            try:
+                temp_board = board.copy()
+                san_moves = []
+                for i, uci_move in enumerate(pv_line):
+                    move = chess.Move.from_uci(uci_move)
+                    if move in temp_board.legal_moves:
+                        san = temp_board.san(move)
+                        move_num = temp_board.fullmove_number
+                        if temp_board.turn == chess.WHITE:
+                            san_moves.append(f"{move_num}. {san}")
+                        else:
+                            san_moves.append(f"{move_num}...{san}")
+                        temp_board.push(move)
+                    else:
+                        break
+                
+                pv_text = " ".join(san_moves)
+                score_text = f" (評分: {pv_score/100:+.2f})" if pv_score is not None else ""
+                pv_analysis = f"""
+                [🎯 引擎預測最佳變例 (Principal Variation)]:
+                {pv_text}{score_text}
+                
+                這是電腦深度計算後的最佳路徑預測。請仔細分析這個變例：
+                1. 為什麼這個序列對當前方有利？
+                2. 這個變例體現了什麼戰術或戰略思想？
+                3. 如果對手不按這個變例走，可能會有什麼陷阱或機會？
+                4. 請用人類能理解的語言，逐步拆解這個變例的關鍵轉折點。
+                """
+            except Exception as e:
+                print(f"PV Line 解析錯誤: {e}")
+                pv_analysis = ""
+
         final_prompt = f"""
         {role_play}
         
         [任務目標]:
         你必須根據 [完整棋譜 (PGN)] 與 [當前盤面] 提供準確的分析。
         請特別關注雙方的開局選擇與中局計畫。
+        {pv_analysis}
         
         [當前盤面 (FEN)]: {fen}
         [當前輪次 (Current Turn)]: {turn_name}
@@ -245,13 +281,17 @@ class ChessRAG:
         [🔥 重要指令 - 絕對遵守]:
         0. **視角確認**：現在是 **{turn_name}** 的回合。請務必站在 **{turn_name}** 的視角進行分析，不要搞錯攻守方。
         1. **合法性檢查**：在建議任何一步棋之前，請先檢查它是否在 [合法走法列表] 中。如果不在，絕對不要建議。
-        2. **雙重驗證**：判斷「開局名稱」與「歷史走法」請以 [PGN] 為準；判斷「當前棋子位置」與「戰術威脅」請以 [FEN] 為準。
-        3. **戰術優先**：在分析戰略前，先檢查是否有立即的戰術威脅（如：將軍、捉雙、抽后、無根子）。如果有，請優先警告玩家。
-        4. **戰術交換檢查**：在建議吃子之前，務必檢查目標格是否有對手防守。若我方子力價值較高（如馬吃兵）且有防守，這是送子 (Blunder)，絕對不要建議。
-        5. **具體計算 (Exchange Sequence)**：如果你提到某步棋是「高風險」或「壞棋」，你必須列出具體的交換序列來證明（例如：「白方走 Nxc7，黑方回應 Qxc7，白方損失馬(3分) 換得兵(1分)，淨虧 2 分」）。不要只說「暴露弱點」這種空話。
-        6. **糾正幻覺**：如果 [資料庫檢索結果] 與當前盤面衝突，請**直接忽略並保持沉默**，不要在回答中提到「因為不符所以忽略」或「資料庫說...」。
-        7. **誠實回答**：如果不確定某個術語或開局，請直說「我不確定」，不要編造不存在的棋理。
-        8. **提煉心法 (Key Principle)**：請為這步棋總結一個「一句話心法」，例如「控制中心」、「騎士前哨站」、「破壞兵型」等，讓玩家能學到通用的觀念。
+        2. **PV Line 優先分析**：如果提供了 [引擎預測最佳變例]，你必須優先解釋這個變例。不要只說「這是好棋」，而要具體說明：
+           - 這個變例的前 2-3 步達成了什麼戰術目標？（控制中心、捉雙、牽制、棄子攻擊等）
+           - 為什麼這條路徑比其他走法更優？對比分析至少一個次佳選擇。
+           - 如果對手偏離這條路線，會發生什麼？是否有陷阱？
+        3. **雙重驗證**：判斷「開局名稱」與「歷史走法」請以 [PGN] 為準；判斷「當前棋子位置」與「戰術威脅」請以 [FEN] 為準。
+        4. **戰術優先**：在分析戰略前，先檢查是否有立即的戰術威脅（如：將軍、捉雙、抽后、無根子）。如果有，請優先警告玩家。
+        5. **戰術交換檢查**：在建議吃子之前，務必檢查目標格是否有對手防守。若我方子力價值較高（如馬吃兵）且有防守，這是送子 (Blunder)，絕對不要建議。
+        6. **具體計算 (Exchange Sequence)**：如果你提到某步棋是「高風險」或「壞棋」，你必須列出具體的交換序列來證明（例如：「白方走 Nxc7，黑方回應 Qxc7，白方損失馬(3分) 換得兵(1分)，淨虧 2 分」）。不要只說「暴露弱點」這種空話。
+        7. **糾正幻覺**：如果 [資料庫檢索結果] 與當前盤面衝突，請**直接忽略並保持沉默**，不要在回答中提到「因為不符所以忽略」或「資料庫說...」。
+        8. **誠實回答**：如果不確定某個術語或開局，請直說「我不確定」，不要編造不存在的棋理。
+        9. **提煉心法 (Key Principle)**：請為這步棋總結一個「一句話心法」，例如「控制中心」、「騎士前哨站」、「破壞兵型」等，讓玩家能學到通用的觀念。
         
         請開始分析：
         """
