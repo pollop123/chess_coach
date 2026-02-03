@@ -106,10 +106,10 @@ def make_move(request: MakeMoveRequest):
             "fen": request.fen
         }
 
-    # 使用時限搜尋，確保快速回應
+    # 使用時限搜尋，確保快速回應（輕量級版本）
     analysis = chess_engine.get_analysis(
         board, 
-        depth=6,
+        depth=5,
         time_limit=request.time_limit
     )
 
@@ -123,12 +123,7 @@ def make_move(request: MakeMoveRequest):
         "best_move": analysis['best_move'].uci(),
         "fen": board.fen(),
         "is_game_over": board.is_game_over(),
-        "result": board.result() if board.is_game_over() else None,
-        "evaluation_score": analysis['score'],
-        "evaluation_display": analysis['eval_display'],
-        "winning_chance": analysis['winning_chance'],
-        "pv": analysis['pv'][:5] if analysis['pv'] else [],
-        "depth_reached": analysis['depth']
+        "result": board.result() if board.is_game_over() else None
     }
 
 # 2. 深度分析端點 (用於分析與教練建議)

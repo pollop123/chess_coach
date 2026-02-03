@@ -21,13 +21,6 @@ function App() {
   const [userInput, setUserInput] = useState(""); // 玩家輸入的問題
   const [isCoachThinking, setIsCoachThinking] = useState(false); // 教練思考中狀態
 
-  // 儲存當前評估數據
-  const [currentEvaluation, setCurrentEvaluation] = useState({
-    score: 0,
-    display: "+0.00",
-    winning_chance: 50
-  });
-
   const [analysisData, setAnalysisData] = useState([]);
   const [currentMoveIndex, setCurrentMoveIndex] = useState(-1);
   const [humanColor, setHumanColor] = useState("white");
@@ -231,19 +224,10 @@ function App() {
     try {
       const response = await axios.post(`${API_URL}/make_move`, { 
         fen: currentFen, 
-        time_limit: 2.0 
+        time_limit: 1.5
       });
       
       const bestMoveUci = response.data.best_move;
-      
-      // 更新評估數據
-      if (response.data.evaluation_score !== undefined) {
-        setCurrentEvaluation({
-          score: response.data.evaluation_score,
-          display: response.data.evaluation_display || "+0.00",
-          winning_chance: response.data.winning_chance || 50
-        });
-      }
       
       if (bestMoveUci) {
         const from = bestMoveUci.substring(0, 2);
@@ -356,11 +340,21 @@ function App() {
 
       <div style={{ display: "flex", gap: "30px", alignItems: "flex-start", flexWrap: "wrap", justifyContent: "center" }}>
 
-        {/* 勝率條 */}
-        <EvaluationBar 
-          winningChance={currentEvaluation.winning_chance} 
-          evalDisplay={currentEvaluation.display} 
-        />
+        {/* 勝率條 - 只在賽後分析時顯示 */}
+        {analysisData.length > 0 && currentMoveIndex >= 0 && (
+          <EvaluationBar 
+            winningChance={
+              analysisData[currentMoveIndex]?.score_for 
+                ? (analysisData[currentMoveIndex].score_for > 0 ? 50 + Math.min(analysisData[currentMoveIndex].score_for / 50, 50) : 50 + Math.max(analysisData[currentMoveIndex].score_for / 50, -50))
+                : 50
+            }
+            evalDisplay={
+              analysisData[currentMoveIndex]?.score_for 
+                ? (analysisData[currentMoveIndex].score_for / 100).toFixed(2)
+                : "+0.00"
+            }
+          />
+        )}
 
         {/* 左側：棋盤區 */}
         <div style={{ width: "480px" }}>
