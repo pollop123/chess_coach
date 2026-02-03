@@ -124,7 +124,10 @@ def make_move(request: MakeMoveRequest):
         "fen": board.fen(),
         "is_game_over": board.is_game_over(),
         "result": board.result() if board.is_game_over() else None,
+        "evaluation_score": analysis['score'],
         "evaluation_display": analysis['eval_display'],
+        "winning_chance": analysis['winning_chance'],
+        "pv": analysis['pv'][:5] if analysis['pv'] else [],
         "depth_reached": analysis['depth']
     }
 

@@ -21,6 +21,13 @@ function App() {
   const [userInput, setUserInput] = useState(""); // 玩家輸入的問題
   const [isCoachThinking, setIsCoachThinking] = useState(false); // 教練思考中狀態
 
+  // 儲存當前評估數據
+  const [currentEvaluation, setCurrentEvaluation] = useState({
+    score: 0,
+    display: "+0.00",
+    winning_chance: 50
+  });
+
   const [analysisData, setAnalysisData] = useState([]);
   const [currentMoveIndex, setCurrentMoveIndex] = useState(-1);
   const [humanColor, setHumanColor] = useState("white");
@@ -222,8 +229,22 @@ function App() {
 
   async function makeAIMove(currentFen) {
     try {
-      const response = await axios.post(`${API_URL}/analyze`, { fen: currentFen, depth: 3 });
+      const response = await axios.post(`${API_URL}/make_move`, { 
+        fen: currentFen, 
+        time_limit: 2.0 
+      });
+      
       const bestMoveUci = response.data.best_move;
+      
+      // 更新評估數據
+      if (response.data.evaluation_score !== undefined) {
+        setCurrentEvaluation({
+          score: response.data.evaluation_score,
+          display: response.data.evaluation_display || "+0.00",
+          winning_chance: response.data.winning_chance || 50
+        });
+      }
+      
       if (bestMoveUci) {
         const from = bestMoveUci.substring(0, 2);
         const to = bestMoveUci.substring(2, 4);
@@ -250,6 +271,82 @@ function App() {
     document.body.removeChild(element);
   }
 
+  // 勝率條組件
+  function EvaluationBar({ winningChance, evalDisplay }) {
+    const whiteHeight = winningChance;
+    const blackHeight = 100 - winningChance;
+
+    return (
+      <div style={{ 
+        display: "flex", 
+        flexDirection: "column", 
+        alignItems: "center",
+        width: "40px"
+      }}>
+        <div style={{
+          width: "100%",
+          height: "480px",
+          backgroundColor: "#ddd",
+          borderRadius: "5px",
+          overflow: "hidden",
+          display: "flex",
+          flexDirection: "column-reverse",
+          position: "relative",
+          boxShadow: "0 2px 5px rgba(0,0,0,0.2)"
+        }}>
+          {/* 白方區域 */}
+          <div style={{
+            height: `${whiteHeight}%`,
+            backgroundColor: "#f0f0f0",
+            transition: "height 0.3s ease",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center"
+          }}>
+          </div>
+          
+          {/* 黑方區域 */}
+          <div style={{
+            height: `${blackHeight}%`,
+            backgroundColor: "#333",
+            transition: "height 0.3s ease"
+          }}>
+          </div>
+
+          {/* 中間線 */}
+          <div style={{
+            position: "absolute",
+            top: "50%",
+            left: "0",
+            right: "0",
+            height: "2px",
+            backgroundColor: "#999",
+            transform: "translateY(-50%)"
+          }}></div>
+        </div>
+
+        {/* 評分顯示 */}
+        <div style={{
+          marginTop: "10px",
+          fontSize: "14px",
+          fontWeight: "bold",
+          color: evalDisplay.startsWith("+") ? "#52c41a" : evalDisplay.startsWith("-") ? "#ff4d4f" : "#666",
+          textAlign: "center"
+        }}>
+          {evalDisplay}
+        </div>
+        
+        <div style={{
+          fontSize: "12px",
+          color: "#999",
+          marginTop: "5px"
+        }}>
+          {winningChance.toFixed(1)}%
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{
       display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
@@ -258,6 +355,12 @@ function App() {
       <h1 style={{ color: "#333", marginBottom: "20px" }}>♟️ 我的西洋棋 AI 平台</h1>
 
       <div style={{ display: "flex", gap: "30px", alignItems: "flex-start", flexWrap: "wrap", justifyContent: "center" }}>
+
+        {/* 勝率條 */}
+        <EvaluationBar 
+          winningChance={currentEvaluation.winning_chance} 
+          evalDisplay={currentEvaluation.display} 
+        />
 
         {/* 左側：棋盤區 */}
         <div style={{ width: "480px" }}>
