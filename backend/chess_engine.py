@@ -2,9 +2,35 @@ import chess
 import math
 import chess.polyglot
 import os
+import time
 
 # Transposition table
 transposition_table = {}
+
+# --- 評估體系常數 ---
+MATE_SCORE = 20000
+MATE_THRESHOLD = 15000
+
+def format_evaluation(score):
+    """將 centipawn 分數格式化為用戶友好的顯示"""
+    if abs(score) > MATE_THRESHOLD:
+        # 將死局面：計算步數
+        moves_to_mate = (MATE_SCORE - abs(score))
+        return f"M{moves_to_mate}" if score > 0 else f"-M{moves_to_mate}"
+    else:
+        # 一般局面：轉換為兵值
+        return f"{score/100:+.2f}"
+
+def calculate_winning_chance(score):
+    """使用 Sigmoid 函數計算勝率 (0-100%)"""
+    if abs(score) > MATE_THRESHOLD:
+        return 100.0 if score > 0 else 0.0
+    # Sigmoid: 1 / (1 + e^(-0.00368 * cp))
+    try:
+        win_prob = 1.0 / (1.0 + math.exp(-0.00368 * score))
+        return round(win_prob * 100, 1)
+    except OverflowError:
+        return 100.0 if score > 0 else 0.0
 
 # --- 1. 定義棋子價值 ---
 piece_values = {
@@ -284,29 +310,84 @@ def get_pv_line(board, depth):
             break
     return pv_line
 
-def get_analysis(board, depth=3):
+def get_analysis(board, depth=3, time_limit=None):
+    """
+    深度分析棋盤局面
+    
+    Args:
+        board: 棋盤狀態
+        depth: 搜尋深度
+        time_limit: 時間限制（秒），None 則使用固定深度
+    
+    Returns:
+        dict: {
+            'best_move': 最佳走法,
+            'score': 分數 (centipawns),
+            'eval_display': 格式化分數,
+            'winning_chance': 勝率百分比,
+            'pv': PV Line,
+            'depth': 實際搜尋深度,
+            'nodes': 搜尋節點數
+        }
+    """
     transposition_table.clear()
     is_maximizing = board.turn == chess.WHITE
-    score, best_move = minimax(board, depth, -math.inf, math.inf, is_maximizing)
-    pv_line = get_pv_line(board, depth)
-    return best_move, score, pv_line
-
-def get_best_move(board, depth):
-    book_path = "books/gm2001.bin"
-    if os.path.exists(book_path):
-        try:
-            with chess.polyglot.open_reader(book_path) as reader:
-                entry = reader.weighted_choice(board)
-                if entry:
-                    print(f"📖 Book Move: {entry.move}")
-                    return entry.move
-        except Exception:
-            pass
-
-    total_pieces = len(board.piece_map())
-    if total_pieces < 6: depth = 8
-    elif total_pieces < 12: depth = 6
-    elif total_pieces < 16: depth = 5
     
-    best_move, score, pv = get_analysis(board, depth)
-    return best_move
+    # 根據子力數量動態調整基礎深度
+    total_pieces = len(board.piece_map())
+    if total_pieces < 6:
+        depth = max(depth, 8)  # 殘局加深
+    elif total_pieces < 12:
+        depth = max(depth, 6)
+    
+    best_move = None
+    best_score = -math.inf
+    nodes_searched = 0
+    final_depth = depth
+    
+    # 迭代加深搜尋 (Iterative Deepening)
+    if time_limit:
+        start_time = time.time()
+        for current_depth in range(1, depth + 1):
+            if time.time() - start_time > time_limit:
+                break
+            score, move = minimax(board, current_depth, -math.inf, math.inf, is_maximizing)
+            best_move = move
+            best_score = score
+            final_depth = current_depth
+            nodes_searched = len(transposition_table)
+    else:
+        # 固定深度搜尋
+        best_score, best_move = minimax(board, depth, -math.inf, math.inf, is_maximizing)
+        nodes_searched = len(transposition_table)
+    
+    # 提取 PV Line
+    pv_line = get_pv_line(board, final_depth)
+    
+    return {
+        'best_move': best_move,
+        'score': best_score,
+        'eval_display': format_evaluation(best_score),
+        'winning_chance': calculate_winning_chance(best_score),
+        'pv': pv_line,
+        'depth': final_depth,
+        'nodes': nodes_searched
+    }
+
+def get_best_move(board, depth=5):
+    """簡化版：只返回最佳走法"""
+    result = get_analysis(board, depth)
+    return result['best_move']
+
+def detect_game_phase(board):
+    """檢測當前遊戲階段"""
+    total_pieces = len(board.piece_map())
+    white_queens = len(board.pieces(chess.QUEEN, chess.WHITE))
+    black_queens = len(board.pieces(chess.QUEEN, chess.BLACK))
+    
+    if total_pieces <= 6:
+        return "endgame"
+    elif total_pieces >= 20 and (white_queens > 0 or black_queens > 0):
+        return "opening"
+    else:
+        return "middle_game"

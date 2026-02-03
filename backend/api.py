@@ -86,11 +86,19 @@ def analyze_game(request: BoardRequest):
     if board.is_game_over():
         return {"game_over": True, "result": board.result()}
 
-    best_move = chess_engine.get_best_move(board, depth=request.depth)
+    # 使用新的分析引擎
+    analysis = chess_engine.get_analysis(board, depth=request.depth)
+    game_phase = chess_engine.detect_game_phase(board)
 
     return {
-        "best_move": best_move.uci() if best_move else None,
-        "evaluation": "N/A"
+        "best_move": analysis['best_move'].uci() if analysis['best_move'] else None,
+        "evaluation_score": analysis['score'],
+        "evaluation_display": analysis['eval_display'],
+        "winning_chance": analysis['winning_chance'],
+        "depth_reached": analysis['depth'],
+        "pv": analysis['pv'],
+        "game_state": game_phase,
+        "nodes_searched": analysis['nodes']
     }
 
 # 2. 🔥 完整賽局分析 (你的新功能，適合賽後復盤)
@@ -196,35 +204,57 @@ def read_games(skip: int = 0, limit: int = 10, db: Session = Depends(get_db)):
     games = db.query(Game).order_by(Game.date.desc()).offset(skip).limit(limit).all()
     return games
 
-# 5. RAG AI 解說
+# 5. RAG AI 解說（升級版）
 class ExplainRequest(BaseModel):
     fen: str
     history: str = ""
     question: Optional[str] = None
-    depth: int = 5  # 新增：引擎分析深度
+    depth: int = 5
+    max_question_length: int = 200  # 安全限制
 
 @app.post("/explain")
 def explain_position(request: ExplainRequest):
     if not rag_engine:
         return {"advice": "❌ RAG 引擎未啟動，請檢查 API Key 設定"}
     
-    # 如果使用者沒問問題，就用預設的 Prompt (總評)
+    # 安全防禦：清洗用戶輸入
     user_question = request.question or "請評估目前局勢並給出建議"
     
-    # 🔥 計算引擎的預測變例 (PV Line)
+    # 限制問題長度
+    if len(user_question) > request.max_question_length:
+        user_question = user_question[:request.max_question_length]
+    
+    # 過濾敏感字眼（防止 Prompt Injection）
+    forbidden_keywords = [
+        "ignore", "disregard", "forget", "system", "override",
+        "忽略", "無視", "覆蓋", "系統指令"
+    ]
+    user_question_lower = user_question.lower()
+    if any(keyword in user_question_lower for keyword in forbidden_keywords):
+        return {"advice": "⚠️ 問題包含不允許的內容，請重新輸入"}
+    
+    # 計算引擎分析
     pv_line = None
     pv_score = None
+    eval_change = None
+    
     try:
         board = chess.Board(request.fen)
         if not board.is_game_over():
-            best_move, score, pv = chess_engine.get_analysis(board, depth=request.depth)
-            if pv and len(pv) > 0:
-                pv_line = pv
-                pv_score = score
-                print(f"🎯 PV Line 已計算: {pv} (評分: {score})")
+            analysis = chess_engine.get_analysis(board, depth=request.depth)
+            pv_line = analysis['pv']
+            pv_score = analysis['score']
+            
+            # 如果有歷史，計算分數變化（用於判斷 Blunder）
+            if request.history:
+                # 這裡可以擴展：解析歷史最後一步，計算前後分數差
+                pass
+                
+            print(f"🎯 PV Line: {pv_line} | Score: {analysis['eval_display']} | Win%: {analysis['winning_chance']}%")
     except Exception as e:
-        print(f"⚠️ PV 計算失敗: {e}")
+        print(f"⚠️ 引擎分析失敗: {e}")
     
+    # 傳遞給 RAG 教練
     advice = rag_engine.get_advice(
         request.fen, 
         request.history, 
@@ -232,4 +262,5 @@ def explain_position(request: ExplainRequest):
         pv_line=pv_line,
         pv_score=pv_score
     )
+    
     return {"advice": advice}
