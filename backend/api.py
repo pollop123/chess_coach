@@ -179,7 +179,8 @@ def get_analysis_endpoint(request: GetAnalysisRequest):
                     request.history,
                     user_question,
                     pv_line=analysis['pv'],
-                    pv_score=analysis['score']
+                    pv_score=analysis['score'],
+                    analysis_result=analysis  # 🔥 傳遞完整分析結果（包含 from_book）
                 )
             except Exception as e:
                 print(f"RAG 分析失敗: {e}")
@@ -373,6 +374,7 @@ def explain_position(request: ExplainRequest):
     # 計算引擎分析
     pv_line = None
     pv_score = None
+    analysis = None
     
     try:
         board = chess.Board(request.fen)
@@ -384,7 +386,7 @@ def explain_position(request: ExplainRequest):
             )
             pv_line = analysis['pv']
             pv_score = analysis['score']
-            print(f"PV Line: {pv_line} | Score: {analysis['eval_display']} | Win%: {analysis['winning_chance']}%")
+            print(f"PV Line: {pv_line} | Score: {analysis['eval_display']} | Win%: {analysis['winning_chance']}% | From Book: {analysis.get('from_book', False)}")
     except Exception as e:
         print(f"引擎分析失敗: {e}")
     
@@ -394,7 +396,8 @@ def explain_position(request: ExplainRequest):
         request.history, 
         user_question,
         pv_line=pv_line,
-        pv_score=pv_score
+        pv_score=pv_score,
+        analysis_result=analysis  # 🔥 傳遞完整分析結果
     )
     
     return {"advice": advice}

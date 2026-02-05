@@ -147,7 +147,7 @@ class ChessRAG:
         
         return "❌ 所有 AI 教練都去喝咖啡了 (Quota Exceeded)。請稍後再試。"
 
-    def get_advice(self, fen, move_history, user_question, pv_line=None, pv_score=None):
+    def get_advice(self, fen, move_history, user_question, pv_line=None, pv_score=None, analysis_result=None):
         if not self.client: return "錯誤：API Key 未設定"
 
         # --- 0. 解析歷史紀錄 (Context Awareness) ---
@@ -204,6 +204,7 @@ class ChessRAG:
         legal_moves_text = "無"
         risky_moves_text = "無"
         engine_best_move_text = "無"
+        from_opening_book = False
         
         try:
             board = chess.Board(fen)
@@ -243,10 +244,19 @@ class ChessRAG:
             if risky_moves:
                 risky_moves_text = ", ".join(risky_moves)
             
-            # 🔥 計算引擎最佳步 (Depth=6, 更準確的計算)
-            best_move = chess_engine.get_best_move(board, depth=6)
-            if best_move:
-                engine_best_move_text = board.san(best_move)
+            # 🔥 優先使用外部傳入的分析結果（避免重複計算）
+            if analysis_result and 'best_move' in analysis_result:
+                best_move = analysis_result['best_move']
+                from_opening_book = analysis_result.get('from_book', False)
+                if best_move:
+                    engine_best_move_text = board.san(best_move)
+            else:
+                # 如果沒有傳入，才自己計算
+                engine_analysis = chess_engine.get_analysis(board, depth=6)
+                best_move = engine_analysis['best_move']
+                from_opening_book = engine_analysis.get('from_book', False)
+                if best_move:
+                    engine_best_move_text = board.san(best_move)
                 
         except Exception as e:
             print(f"Tactical Analysis Error: {e}")
@@ -289,6 +299,22 @@ class ChessRAG:
                 print(f"PV Line 解析錯誤: {e}")
                 pv_analysis = ""
 
+        # 🔥 構建開局庫提示（如果適用）
+        opening_book_hint = ""
+        if from_opening_book:
+            opening_book_hint = f"""
+⚠️ **重要提示**：引擎推薦的走法 [{engine_best_move_text}] 來自**大師開局庫 (GM Opening Book)**，
+這是經過數千場高水平對局驗證的經典開局走法。
+
+請優先解釋：
+1. 這個開局走法的經典戰略意圖
+2. 它控制了哪些關鍵格子或開啟了什麼發展空間
+3. 這是什麼開局體系的一部分（如果能識別）
+4. 黑方/白方常見的應對方式
+
+不要質疑這個走法，它是經過驗證的最佳開局選擇。
+"""
+
         final_prompt = f"""
 [當前局面 (FEN)]: {fen}
 [當前輪次]: {turn_name}
@@ -296,6 +322,8 @@ class ChessRAG:
 [{turn_name} 合法走法]: {legal_moves_text}
 [{turn_name} 引擎推薦]: {engine_best_move_text}
 [高風險走法]: {risky_moves_text}
+
+{opening_book_hint}
 
 {pv_analysis}
 
