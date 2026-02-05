@@ -103,15 +103,28 @@ class ChessRAG:
     def call_gemini_with_fallback(self, prompt, system_instruction=SYSTEM_INSTRUCTION):
         for model in self.backup_models:
             try:
-                response = self.client.models.generate_content(
-                    model=model,
-                    contents=prompt,
-                    config=types.GenerateContentConfig(
-                        system_instruction=system_instruction,
-                        temperature=0.7,
-                        max_output_tokens=1024
+                # 🔥 Gemma 模型不支援 system_instruction，需要把指令融入 prompt
+                if "gemma" in model.lower():
+                    combined_prompt = f"{system_instruction}\n\n---\n\n{prompt}"
+                    response = self.client.models.generate_content(
+                        model=model,
+                        contents=combined_prompt,
+                        config=types.GenerateContentConfig(
+                            temperature=0.7,
+                            max_output_tokens=1024
+                        )
                     )
-                )
+                else:
+                    # Gemini 系列支援 system_instruction
+                    response = self.client.models.generate_content(
+                        model=model,
+                        contents=prompt,
+                        config=types.GenerateContentConfig(
+                            system_instruction=system_instruction,
+                            temperature=0.7,
+                            max_output_tokens=1024
+                        )
+                    )
                 return response.text
             except Exception as e:
                 error_msg = str(e)
@@ -121,6 +134,9 @@ class ChessRAG:
                     continue
                 elif "404" in error_msg or "NOT_FOUND" in error_msg:
                     print(f"⚠️ 找不到模型 {model}，跳過...")
+                    continue
+                elif "INVALID_ARGUMENT" in error_msg and "system_instruction" in error_msg.lower():
+                    print(f"⚠️ 模型 {model} 不支援 system_instruction，跳過...")
                     continue
                 else:
                     print(f"⚠️ 錯誤 ({model}): {error_msg}")
