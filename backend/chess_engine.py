@@ -330,6 +330,27 @@ def get_analysis(board, depth=3, time_limit=None):
             'nodes': 搜尋節點數
         }
     """
+    # 🔥 優先使用開局庫（開局階段）
+    if len(board.move_stack) < 10:  # 前 10 手使用開局庫
+        try:
+            with chess.polyglot.open_reader("books/gm2001.bin") as reader:
+                entry = reader.weighted_choice(board)
+                if entry:
+                    # 從開局庫找到走法，直接返回
+                    return {
+                        'best_move': entry.move,
+                        'score': 15,  # 開局庫走法給予小優勢評分
+                        'eval_display': '+0.15',
+                        'winning_chance': 52,
+                        'pv': [entry.move.uci()],
+                        'depth': 0,  # 來自開局庫
+                        'nodes': 0,
+                        'from_book': True
+                    }
+        except Exception as e:
+            # 開局庫讀取失敗，繼續使用引擎計算
+            print(f"Opening book not available: {e}")
+    
     transposition_table.clear()
     is_maximizing = board.turn == chess.WHITE
     
@@ -371,7 +392,8 @@ def get_analysis(board, depth=3, time_limit=None):
         'winning_chance': calculate_winning_chance(best_score),
         'pv': pv_line,
         'depth': final_depth,
-        'nodes': nodes_searched
+        'nodes': nodes_searched,
+        'from_book': False
     }
 
 def get_best_move(board, depth=5):
