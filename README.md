@@ -61,7 +61,7 @@
 - [Google Gemini API Key](https://aistudio.google.com/)
 - [Lichess API Token](https://lichess.org/account/oauth/token)（選填）
 
-### 安裝步驟
+### 方式一：使用 Docker（推薦用於生產環境）
 
 1. **Clone 專案**
    ```bash
@@ -70,21 +70,125 @@
    ```
 
 2. **設定環境變數**
-   在 `backend/` 目錄下建立 `.env` 檔案：
+   
+   在專案根目錄建立 `.env` 檔案（用於 Docker Compose）：
+   ```bash
+   # .env
+   GOOGLE_API_KEY=你的_google_api_key
+   VITE_API_URL=http://localhost:8000  # 本地測試
+   ```
+   
+   同時在 `backend/` 目錄下也建立 `.env` 檔案：
    ```bash
    # backend/.env
    GOOGLE_API_KEY=你的_google_api_key
-   LICHESS_API_TOKEN=你的_lichess_token # 選填
+   LICHESS_API_TOKEN=你的_lichess_token  # 選填
    ```
 
 3. **使用 Docker Compose 啟動**
    ```bash
+   # 啟動所有服務（前端 + 後端）
    docker-compose up --build
+   
+   # 背景執行
+   docker-compose up -d --build
+   
+   # 查看日誌
+   docker-compose logs -f
+   
+   # 停止服務
+   docker-compose down
    ```
 
-   啟動後即可訪問：
+4. **訪問服務**
    - **前端介面**: http://localhost
-   - **後端 API**: http://localhost:8000/docs
+   - **後端 API 文檔**: http://localhost:8000/docs
+   - **後端健康檢查**: http://localhost:8000
+
+### 方式二：本地開發環境
+
+1. **Clone 專案**
+   ```bash
+   git clone https://github.com/pollop123/chess_coach.git
+   cd chess_coach
+   ```
+
+2. **設定環境變數**
+   ```bash
+   # backend/.env
+   GOOGLE_API_KEY=你的_google_api_key
+   LICHESS_API_TOKEN=你的_lichess_token  # 選填
+   ```
+   
+   ```bash
+   # frontend/.env.local
+   VITE_API_URL=http://localhost:8000
+   ```
+
+3. **啟動後端**
+   ```bash
+   cd backend
+   pip install -r requirements.txt
+   python3 main.py
+   # 或使用 uvicorn api:app --reload
+   ```
+
+4. **啟動前端**（另開終端）
+   ```bash
+   cd frontend
+   npm install
+   npm run dev
+   ```
+
+5. **快速啟動腳本**
+   ```bash
+   # 在專案根目錄執行
+   ./start_local.sh
+   ```
+
+### Docker 相關指令
+
+```bash
+# 重新建置映像檔
+docker-compose build
+
+# 只啟動後端
+docker-compose up backend
+
+# 只啟動前端
+docker-compose up frontend
+
+# 進入容器內部
+docker-compose exec backend bash
+docker-compose exec frontend sh
+
+# 查看容器狀態
+docker-compose ps
+
+# 清除所有容器與映像
+docker-compose down --rmi all --volumes
+```
+
+### 部署到雲端（Zeabur / Render / Railway）
+
+1. **設定環境變數**
+   - `GOOGLE_API_KEY`: 你的 Google Gemini API Key
+   - `VITE_API_URL`: 你的後端公開網址（如 `https://your-backend.zeabur.app`）
+
+2. **自動部署**
+   - 平台會自動偵測 `docker-compose.yml` 並建置
+   - 前端會在建置時將 `VITE_API_URL` 打包進去
+
+3. **手動建置**
+   ```bash
+   # 後端
+   cd backend
+   docker build -t chess-backend .
+   
+   # 前端
+   cd frontend
+   docker build -t chess-frontend --build-arg VITE_API_URL=https://your-backend-url .
+   ```
 
 ## API 使用範例
 
