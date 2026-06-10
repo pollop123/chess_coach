@@ -9,7 +9,7 @@ services:
       - "8000:8000"
     environment:
       # API Key 不要寫死，要在雲端平台的變數設定中填寫
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
 
   frontend:
     # 指向前端資料夾，使用我們剛剛新增的 Dockerfile

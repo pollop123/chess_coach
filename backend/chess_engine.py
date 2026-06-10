@@ -145,6 +145,33 @@ def order_moves(board, tt_best_move=None):
 
     return sorted(moves, key=score_move, reverse=True)
 
+def choose_book_entry(reader, board):
+    """Return the highest-weight Polyglot entry for deterministic book play."""
+    entries = list(reader.find_all(board))
+    if not entries:
+        return None
+    return max(entries, key=lambda entry: entry.weight)
+
+def build_book_line(reader, board, first_move, max_plies=6):
+    """Build a short SAN book line from the current position."""
+    line = []
+    current = board.copy()
+
+    if first_move not in current.legal_moves:
+        return line
+
+    line.append(current.san(first_move))
+    current.push(first_move)
+
+    for _ in range(max_plies - 1):
+        entry = choose_book_entry(reader, current)
+        if not entry or entry.move not in current.legal_moves:
+            break
+        line.append(current.san(entry.move))
+        current.push(entry.move)
+
+    return line
+
 def get_piece_square_value(piece_type, square, color, is_endgame):
     if color == chess.WHITE:
         square = chess.square_mirror(square)
@@ -350,8 +377,9 @@ def get_analysis(board, depth=3, time_limit=None):
     if len(board.move_stack) < 10:  # 前 10 手使用開局庫
         try:
             with chess.polyglot.open_reader(BOOK_PATH) as reader:
-                entry = reader.weighted_choice(board)
+                entry = choose_book_entry(reader, board)
                 if entry:
+                    book_line = build_book_line(reader, board, entry.move)
                     # 從開局庫找到走法，直接返回
                     return {
                         'best_move': entry.move,
@@ -359,6 +387,7 @@ def get_analysis(board, depth=3, time_limit=None):
                         'eval_display': '+0.15',
                         'winning_chance': 52,
                         'pv': [entry.move.uci()],
+                        'book_line': book_line,
                         'depth': 0,  # 來自開局庫
                         'nodes': 0,
                         'from_book': True
@@ -407,6 +436,7 @@ def get_analysis(board, depth=3, time_limit=None):
         'eval_display': format_evaluation(best_score),
         'winning_chance': calculate_winning_chance(best_score),
         'pv': pv_line,
+        'book_line': [],
         'depth': final_depth,
         'nodes': nodes_searched,
         'from_book': False
