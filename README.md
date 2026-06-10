@@ -75,7 +75,6 @@
    ```bash
    # .env
    GOOGLE_API_KEY=你的_google_api_key
-   VITE_API_URL=http://localhost:8000  # 本地測試
    ```
    
    同時在 `backend/` 目錄下也建立 `.env` 檔案：
@@ -120,10 +119,7 @@
    LICHESS_API_TOKEN=你的_lichess_token  # 選填
    ```
    
-   ```bash
-   # frontend/.env.local
-   VITE_API_URL=http://localhost:8000
-   ```
+   前端本地開發預設呼叫 `/api`，Vite 會代理到 `http://localhost:8000`，通常不需要額外設定 `frontend/.env.local`。
 
 3. **啟動後端**
    ```bash
@@ -174,11 +170,12 @@ docker-compose down --rmi all --volumes
 
 1. **設定環境變數**
    - `GOOGLE_API_KEY`: 你的 Google Gemini API Key
-   - `VITE_API_URL`: 你的後端公開網址（如 `https://your-backend.zeabur.app`）
+   - `DATABASE_URL`: 資料庫連線字串（選填；Docker Compose 預設使用 `/data/games.db` volume）
+   - `VITE_API_URL`: 分離部署前後端時才需要填公開後端 URL；同一個 Docker Compose 專案不要設，預設走 `/api`
 
 2. **自動部署**
    - 平台會自動偵測 `docker-compose.yml` 並建置
-   - 前端會在建置時將 `VITE_API_URL` 打包進去
+   - 前端預設以同網域 `/api` 呼叫後端，Nginx 會 proxy 到 backend 服務
 
 3. **手動建置**
    ```bash
@@ -188,6 +185,9 @@ docker-compose down --rmi all --volumes
    
    # 前端
    cd frontend
+   docker build -t chess-frontend .
+   
+   # 如果前後端分離部署，才需要指定 API URL
    docker build -t chess-frontend --build-arg VITE_API_URL=https://your-backend-url .
    ```
 

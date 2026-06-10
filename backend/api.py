@@ -255,8 +255,18 @@ def analyze_full_game(request: AnalysisRequest):
     def orient(v):
         return v if persp == "white" else -v
 
+    def search_position(search_board, search_depth):
+        depth = max(1, search_depth)
+        return chess_engine.minimax(
+            search_board,
+            depth,
+            -math.inf,
+            math.inf,
+            search_board.turn == chess.WHITE,
+        )
+
     # 初始局面評分
-    start_eval, _ = chess_engine.minimax(board, max(1, request.depth), -math.inf, math.inf, board.turn == chess.WHITE)
+    start_eval, _ = search_position(board, request.depth)
     evaluations.append({
         "move_number": 0,
         "fen": board.fen(),
@@ -270,26 +280,19 @@ def analyze_full_game(request: AnalysisRequest):
         side = "white" if board.turn == chess.WHITE else "black"
         
         # 1. 計算這一步之前的「最佳建議」
-        # 注意：這裡會呼叫 Minimax，如果整盤棋很長，這一步驟會花很多時間
-        best_move = chess_engine.get_best_move(board, depth=request.depth)
-        
-        if best_move:
-            board.push(best_move)
-            # 算出最佳步的分數
-            best_eval, _ = chess_engine.minimax(board, max(1, request.depth - 1), -math.inf, math.inf, board.turn == chess.WHITE)
-            board.pop()
-        else:
-            best_eval = chess_engine.evaluate_board(board)
+        # 賽後趨勢用純搜尋，不使用開局庫的固定 +0.15，避免圖表前段失真。
+        best_eval, best_move = search_position(board, request.depth)
 
         # 2. 執行「實際走的那一步」
         board.push(move)
-        move_eval, _ = chess_engine.minimax(board, max(1, request.depth - 1), -math.inf, math.inf, board.turn == chess.WHITE)
+        move_eval, _ = search_position(board, request.depth - 1)
         fen_after = board.fen()
 
         # 3. 計算損失 (CP Loss)
         # 如果是白方走，loss = 最佳分 - 實際分
         # 如果是黑方走，loss = 實際分 - 最佳分 (因為黑方希望分數越小越好)
-        cp_loss = best_eval - move_eval if side == "white" else move_eval - best_eval
+        raw_cp_loss = best_eval - move_eval if side == "white" else move_eval - best_eval
+        cp_loss = max(0, raw_cp_loss)
         
         # 4. 判斷好壞棋
         if cp_loss < 50: classification = "good"
@@ -297,7 +300,7 @@ def analyze_full_game(request: AnalysisRequest):
         elif cp_loss < 300: classification = "mistake"
         else: classification = "blunder"
 
-        mate_threat = abs(move_eval) > 90000 or abs(best_eval) > 90000
+        mate_threat = abs(move_eval) > chess_engine.MATE_THRESHOLD or abs(best_eval) > chess_engine.MATE_THRESHOLD
 
         evaluations.append({
             "move_number": move_count,
@@ -308,6 +311,7 @@ def analyze_full_game(request: AnalysisRequest):
             "score": move_eval,
             "score_for": orient(move_eval),
             "best_eval_for": orient(best_eval),
+            "raw_cp_loss": int(raw_cp_loss),
             "cp_loss": int(cp_loss),
             "classification": classification,
             "mate_threat": mate_threat,

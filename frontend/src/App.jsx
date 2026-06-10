@@ -3,10 +3,10 @@ import { Chess } from "chess.js";
 import { Chessboard } from "react-chessboard";
 import axios from "axios";
 // 引入圖表套件
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine, ReferenceDot, Area } from 'recharts';
+import { ComposedChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine, ReferenceDot, ReferenceArea, Area, Scatter } from 'recharts';
 
-// 自動判斷 API 網址
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+// 預設走同網域 /api，由 Vite/Nginx 代理到後端；分離部署時可用 VITE_API_URL 覆蓋。
+const API_URL = import.meta.env.VITE_API_URL || "/api";
 
 function App() {
   const [game, setGame] = useState(new Chess());
@@ -92,13 +92,15 @@ function App() {
       });
 
       const processedData = res.data.map(d => {
-        const rawScore = (d.score_for !== undefined ? d.score_for : d.score);
-        // 限制分數範圍在 [-2000, 2000] 之間，避免 Checkmate (99999) 把圖表拉平
-        const clampedScore = Math.max(-2000, Math.min(2000, rawScore));
+        const rawScore = d.score ?? 0;
+        const playerScore = d.score_for ?? rawScore;
+        // 限制分數範圍在圖表內，避免將死分數把點擠到邊界。
+        const clampedScore = Math.max(-900, Math.min(900, rawScore));
         return {
           ...d,
           displayScore: clampedScore,
-          rawScore: rawScore // 保留原始分數供 Tooltip 顯示 (如果需要)
+          rawScore: rawScore, // 白方視角，供局勢走勢圖使用
+          playerScore: playerScore // 玩家視角，供側邊評估條使用
         };
       });
 
@@ -331,6 +333,28 @@ function App() {
     );
   }
 
+  function getMoveDotColor(classification) {
+    if (classification === "blunder") return "#ef4444";
+    if (classification === "mistake") return "#ff7f50";
+    if (classification === "inaccuracy") return "#f4a259";
+    return null;
+  }
+
+  function renderEvalDot({ cx, cy, payload }) {
+    const color = getMoveDotColor(payload?.classification);
+    if (!payload?.move || !color) return null;
+    return (
+      <circle
+        cx={cx}
+        cy={cy}
+        r={payload.classification === "blunder" ? 7 : 6}
+        fill={color}
+        stroke="#ffffff"
+        strokeWidth={payload.classification === "blunder" ? 2 : 1}
+      />
+    );
+  }
+
   return (
     <div style={{
       display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
@@ -344,15 +368,15 @@ function App() {
         {analysisData.length > 0 && (
           <EvaluationBar 
             winningChance={
-              currentMoveIndex >= 0 && analysisData[currentMoveIndex]?.score_for 
-                ? (analysisData[currentMoveIndex].score_for > 0 
-                    ? 50 + Math.min(analysisData[currentMoveIndex].score_for / 50, 50) 
-                    : 50 + Math.max(analysisData[currentMoveIndex].score_for / 50, -50))
+              currentMoveIndex >= 0 && analysisData[currentMoveIndex]
+                ? (analysisData[currentMoveIndex].playerScore > 0 
+                    ? 50 + Math.min(analysisData[currentMoveIndex].playerScore / 50, 50) 
+                    : 50 + Math.max(analysisData[currentMoveIndex].playerScore / 50, -50))
                 : 50
             }
             evalDisplay={
-              currentMoveIndex >= 0 && analysisData[currentMoveIndex]?.score_for 
-                ? (analysisData[currentMoveIndex].score_for > 0 ? "+" : "") + (analysisData[currentMoveIndex].score_for / 100).toFixed(2)
+              currentMoveIndex >= 0 && analysisData[currentMoveIndex]
+                ? (analysisData[currentMoveIndex].playerScore > 0 ? "+" : "") + (analysisData[currentMoveIndex].playerScore / 100).toFixed(2)
                 : "+0.00"
             }
           />
@@ -411,7 +435,7 @@ function App() {
               <button
                 onClick={() => askCoach()}
                 disabled={isCoachThinking}
-                style={{ ...buttonStyle("white"), color: "#722ed1", padding: "5px 10px", fontSize: "0.8rem" }}
+                style={{ ...buttonStyle("#ffffff"), color: "#4c1d95", padding: "5px 10px", fontSize: "0.8rem", border: "1px solid rgba(255,255,255,0.65)" }}
               >
                 ⚡ 一鍵分析
               </button>
@@ -468,54 +492,86 @@ function App() {
           {/* 📊 分析圖表 (如果有數據) */}
           {analysisData.length > 0 && (
             <div style={{
-              backgroundColor: "white", padding: "10px", borderRadius: "10px", boxShadow: "0 2px 10px rgba(0,0,0,0.1)",
-              height: "250px"
+              backgroundColor: "#f7f6f3",
+              borderRadius: "8px",
+              boxShadow: "0 2px 10px rgba(0,0,0,0.1)",
+              height: "170px",
+              overflow: "hidden",
+              border: "1px solid #e6e1dc"
             }}>
-              <h4 style={{ margin: "0 0 10px 0", color: "#333", textAlign: "center" }}>📊 局勢走勢</h4>
-              <ResponsiveContainer width="100%" height="85%">
-                <LineChart data={analysisData} onClick={(e) => { if (e && e.activePayload) setCurrentMoveIndex(e.activePayload[0].payload.move_number); }}>
+              <div style={{
+                height: "28px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "0 12px",
+                color: "#282622",
+                fontSize: "0.78rem",
+                fontWeight: 700
+              }}>
+                <span>局勢走勢（白方視角）</span>
+                <span style={{ color: "#5f5a52", fontWeight: 600 }}>0 線</span>
+              </div>
+              <ResponsiveContainer width="100%" height={142}>
+                <ComposedChart
+                  data={analysisData}
+                  margin={{ top: 8, right: 10, bottom: 8, left: 10 }}
+                  onClick={(e) => { if (e && e.activePayload) setCurrentMoveIndex(e.activePayload[0].payload.move_number); }}
+                >
                   <defs>
-                    {/* 白方優勢區域填充 (正分) */}
-                    <linearGradient id="whiteArea" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#f0f0f0" stopOpacity={0.9}/>
-                      <stop offset="100%" stopColor="#ffffff" stopOpacity={0.3}/>
-                    </linearGradient>
-                    {/* 黑方優勢區域填充 (負分) */}
-                    <linearGradient id="blackArea" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#666666" stopOpacity={0.3}/>
-                      <stop offset="100%" stopColor="#1a1a1a" stopOpacity={0.9}/>
+                    <linearGradient id="blackAdvantageArea" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#33312d" stopOpacity={1}/>
+                      <stop offset="100%" stopColor="#4a4741" stopOpacity={0.96}/>
                     </linearGradient>
                   </defs>
-                  
-                  <CartesianGrid strokeDasharray="3 3" stroke="#ccc" />
                   <XAxis dataKey="move_number" hide />
-                  <YAxis hide domain={['auto', 'auto']} />
+                  <YAxis hide domain={[-1000, 1000]} />
                   <Tooltip 
-                    contentStyle={{ backgroundColor: '#fff', border: '2px solid #333' }}
+                    cursor={{ stroke: "#8f8a83", strokeWidth: 1 }}
+                    contentStyle={{
+                      backgroundColor: "#ffffff",
+                      border: "1px solid #cfc8bf",
+                      borderRadius: "6px",
+                      boxShadow: "0 6px 18px rgba(0,0,0,0.12)"
+                    }}
                     labelFormatter={(label) => `第 ${label} 步`}
-                    formatter={(value) => [(value / 100).toFixed(2), '評分']}
+                    formatter={(value, name, item) => {
+                      const score = item?.payload?.rawScore ?? value;
+                      return [(score / 100).toFixed(2), "白方評分"];
+                    }}
                   />
                   
+                  <ReferenceArea y1={-1000} y2={1000} fill="#3a3833" fillOpacity={1} />
+
                   {/* 中線 (0分線) */}
-                  <ReferenceLine y={0} stroke="#ff4444" strokeWidth={2} strokeDasharray="5 5" />
+                  <ReferenceLine y={0} stroke="#beb9b1" strokeWidth={3} />
                   
-                  {/* 白方優勢填充區域 (0以上) */}
                   <Area 
                     type="monotone" 
                     dataKey="displayScore" 
-                    stroke="none"
-                    fill="url(#whiteArea)"
+                    baseValue={-1000}
+                    stroke="#f7f6f3"
+                    strokeWidth={5}
+                    fill="#f7f6f3"
                     fillOpacity={1}
                     isAnimationActive={false}
                   />
                   
-                  {/* 折線 */}
                   <Line 
                     type="monotone" 
                     dataKey="displayScore" 
-                    stroke="#2563eb"
+                    stroke="#f7f6f3"
                     dot={false} 
-                    strokeWidth={3}
+                    strokeWidth={5}
+                    isAnimationActive={false}
+                    activeDot={{ r: 7, fill: "#ffffff", stroke: "#4a4741", strokeWidth: 2 }}
+                  />
+
+                  <Scatter
+                    data={analysisData.filter((d) => d.move && d.classification !== "good")}
+                    dataKey="displayScore"
+                    shape={renderEvalDot}
+                    isAnimationActive={false}
                   />
                   
                   {/* 當前位置標記 */}
@@ -523,13 +579,13 @@ function App() {
                     <ReferenceDot 
                       x={analysisData[currentMoveIndex].move_number} 
                       y={analysisData[currentMoveIndex].displayScore} 
-                      r={6} 
-                      fill="#ff4d4f" 
-                      stroke="#fff"
-                      strokeWidth={2}
+                      r={8} 
+                      fill="transparent" 
+                      stroke="#ffffff"
+                      strokeWidth={3}
                     />
                   )}
-                </LineChart>
+                </ComposedChart>
               </ResponsiveContainer>
             </div>
           )}

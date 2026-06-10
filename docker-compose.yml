@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   backend:
     # 指向後端資料夾，使用我們剛剛改好的 Dockerfile
@@ -10,16 +8,18 @@ services:
     environment:
       # API Key 不要寫死，要在雲端平台的變數設定中填寫
       - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - DATABASE_URL=sqlite:////data/games.db
+    volumes:
+      - backend_data:/data
 
   frontend:
     # 指向前端資料夾，使用我們剛剛新增的 Dockerfile
     build:
       context: ./frontend
-      args:
-        # 這裡的變數是為了讓 Vite 打包時知道後端在哪
-        # 如果是 Zeabur 內部連線，有時可以直接用 http://backend:8000，但前端通常是在瀏覽器跑，所以通常需要填公開網址
-        - VITE_API_URL=${VITE_API_URL}
     ports:
       - "80:80" # 前端通常對外開放 80 port
     depends_on:
       - backend
+
+volumes:
+  backend_data:
