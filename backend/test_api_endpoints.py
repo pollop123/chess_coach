@@ -166,13 +166,13 @@ except ImportError as e:
     print(f"模組導入失敗: {e}")
     print("\n請確認:")
     print("  1. 已安裝 requests: pip3 install requests")
-    print("  2. 已啟動 API 服務: uvicorn main:app --reload")
+    print("  2. 已啟動 API 服務: uvicorn api:app --reload")
     sys.exit(1)
 except requests.exceptions.ConnectionError:
     print("連線失敗")
     print("\n請確認 API 服務已啟動:")
     print("  cd backend")
-    print("  uvicorn main:app --reload")
+    print("  uvicorn api:app --reload")
     sys.exit(1)
 except Exception as e:
     print(f"執行錯誤: {e}")

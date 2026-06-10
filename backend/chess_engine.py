@@ -6,6 +6,8 @@ import time
 
 # Transposition table
 transposition_table = {}
+ENGINE_DIR = os.path.dirname(os.path.abspath(__file__))
+BOOK_PATH = os.path.join(ENGINE_DIR, "books", "gm2001.bin")
 
 # --- 評估體系常數 ---
 MATE_SCORE = 20000
@@ -14,8 +16,8 @@ MATE_THRESHOLD = 15000
 def format_evaluation(score):
     """將 centipawn 分數格式化為用戶友好的顯示"""
     if abs(score) > MATE_THRESHOLD:
-        # 將死局面：計算步數
-        moves_to_mate = (MATE_SCORE - abs(score))
+        plies_to_mate = max(1, MATE_SCORE - abs(score))
+        moves_to_mate = max(1, math.ceil(plies_to_mate / 2))
         return f"M{moves_to_mate}" if score > 0 else f"-M{moves_to_mate}"
     else:
         # 一般局面：轉換為兵值
@@ -130,16 +132,36 @@ def order_moves(board, tt_best_move=None):
         
         if move.promotion:
             score += piece_values.get(move.promotion, 0)
+
+        if board.gives_check(move):
+            score += 80
+
+        to_file = chess.square_file(move.to_square)
+        to_rank = chess.square_rank(move.to_square)
+        if 2 <= to_file <= 5 and 2 <= to_rank <= 5:
+            score += 20
             
         return score
 
     return sorted(moves, key=score_move, reverse=True)
 
-def evaluate_board(board, depth=0):
+def get_piece_square_value(piece_type, square, color, is_endgame):
+    if color == chess.WHITE:
+        square = chess.square_mirror(square)
+
+    if piece_type == chess.PAWN: return pawntable[square]
+    elif piece_type == chess.KNIGHT: return knightstable[square]
+    elif piece_type == chess.BISHOP: return bishopstable[square]
+    elif piece_type == chess.ROOK: return rookstable[square]
+    elif piece_type == chess.QUEEN: return queenstable[square]
+    elif piece_type == chess.KING:
+        return king_table_endgame[square] if is_endgame else king_table_opening[square]
+    return 0
+
+def evaluate_board(board, ply_from_root=0):
     if board.is_checkmate():
-        score = 20000 + depth
-        if board.turn: return -score
-        else: return score
+        score = MATE_SCORE - ply_from_root
+        return -score if board.turn == chess.WHITE else score
         
     if board.is_stalemate() or board.is_insufficient_material():
         return 0
@@ -158,29 +180,12 @@ def evaluate_board(board, depth=0):
         piece = board.piece_at(square)
         if piece:
             value = piece_values[piece.piece_type]
-            pst_value = 0
-            
-            if piece.piece_type == chess.PAWN: pst_value = pawntable[square]
-            elif piece.piece_type == chess.KNIGHT: pst_value = knightstable[square]
-            elif piece.piece_type == chess.BISHOP: pst_value = bishopstable[square]
-            elif piece.piece_type == chess.ROOK: pst_value = rookstable[square]
-            elif piece.piece_type == chess.QUEEN: pst_value = queenstable[square]
-            elif piece.piece_type == chess.KING:
-                pst_value = king_table_endgame[square] if is_endgame else king_table_opening[square]
+            pst_value = get_piece_square_value(piece.piece_type, square, piece.color, is_endgame)
             
             if piece.color == chess.WHITE:
                 score += value + pst_value
             else:
-                mirror_square = chess.square_mirror(square)
-                pst_value_black = 0
-                if piece.piece_type == chess.PAWN: pst_value_black = pawntable[mirror_square]
-                elif piece.piece_type == chess.KNIGHT: pst_value_black = knightstable[mirror_square]
-                elif piece.piece_type == chess.BISHOP: pst_value_black = bishopstable[mirror_square]
-                elif piece.piece_type == chess.ROOK: pst_value_black = rookstable[mirror_square]
-                elif piece.piece_type == chess.QUEEN: pst_value_black = queenstable[mirror_square]
-                elif piece.piece_type == chess.KING:
-                    pst_value_black = king_table_endgame[mirror_square] if is_endgame else king_table_opening[mirror_square]
-                score -= (value + pst_value_black)
+                score -= (value + pst_value)
 
     if not is_endgame:
         if board.has_castling_rights(chess.WHITE): score += 20
@@ -211,36 +216,46 @@ def evaluate_board(board, depth=0):
 
     return score
 
-# 🔥 修正：這裡一定要加 q_depth=0，不然會 crash
-def quiescence_search(board, alpha, beta, q_depth=0):
+def quiescence_search(board, alpha, beta, q_depth=0, ply_from_root=0):
+    if board.is_game_over():
+        return evaluate_board(board, ply_from_root)
+
     if q_depth > 10:
-        turn_multiplier = 1 if board.turn == chess.WHITE else -1
-        return evaluate_board(board) * turn_multiplier
+        return evaluate_board(board, ply_from_root)
 
-    stand_pat = evaluate_board(board)
-    if board.turn == chess.BLACK:
-        stand_pat = -stand_pat
-    
-    if stand_pat >= beta: return beta
-    if stand_pat > alpha: alpha = stand_pat
-        
-    for move in board.legal_moves:
-        if not board.is_capture(move): continue
+    stand_pat = evaluate_board(board, ply_from_root)
+    capture_moves = [move for move in order_moves(board) if board.is_capture(move)]
+
+    if board.turn == chess.WHITE:
+        if stand_pat >= beta: return beta
+        if stand_pat > alpha: alpha = stand_pat
+
+        for move in capture_moves:
+            board.push(move)
+            score = quiescence_search(board, alpha, beta, q_depth + 1, ply_from_root + 1)
+            board.pop()
+            if score >= beta: return beta
+            if score > alpha: alpha = score
+        return alpha
+
+    if stand_pat <= alpha: return alpha
+    if stand_pat < beta: beta = stand_pat
+
+    for move in capture_moves:
         board.push(move)
-        score = -quiescence_search(board, -beta, -alpha, q_depth + 1)
+        score = quiescence_search(board, alpha, beta, q_depth + 1, ply_from_root + 1)
         board.pop()
-        if score >= beta: return beta
-        if score > alpha: alpha = score
-            
-    return alpha
+        if score <= alpha: return alpha
+        if score < beta: beta = score
+    return beta
 
-def minimax(board, depth, alpha, beta, maximizing_player):
+def minimax(board, depth, alpha, beta, maximizing_player, ply_from_root=0):
     if board.is_repetition(2):
         if depth == 0: 
-             return evaluate_board(board), None
+             return evaluate_board(board, ply_from_root), None
 
     key = chess.polyglot.zobrist_hash(board)
-    tt_entry = transposition_table.get((key, depth, maximizing_player))
+    tt_entry = transposition_table.get((key, depth, maximizing_player, ply_from_root))
     tt_move = None
     
     if tt_entry:
@@ -248,12 +263,11 @@ def minimax(board, depth, alpha, beta, maximizing_player):
 
     if depth == 0 or board.is_game_over():
         if board.is_game_over():
-            val = evaluate_board(board, depth)
+            val = evaluate_board(board, ply_from_root)
         else:
-            qs_val = quiescence_search(board, alpha, beta)
-            val = qs_val if maximizing_player else -qs_val
+            val = quiescence_search(board, alpha, beta, ply_from_root=ply_from_root)
         
-        transposition_table[(key, depth, maximizing_player)] = (val, None)
+        transposition_table[(key, depth, maximizing_player, ply_from_root)] = (val, None)
         return val, None
 
     # 簡單嘗試獲取同一局面但不同深度的 move 來排序 (加速用)
@@ -265,7 +279,7 @@ def minimax(board, depth, alpha, beta, maximizing_player):
         max_eval = -math.inf
         for move in moves:
             board.push(move)
-            eval_score, _ = minimax(board, depth - 1, alpha, beta, False)
+            eval_score, _ = minimax(board, depth - 1, alpha, beta, False, ply_from_root + 1)
             board.pop()
             
             if eval_score > max_eval:
@@ -273,13 +287,13 @@ def minimax(board, depth, alpha, beta, maximizing_player):
                 best_move = move
             alpha = max(alpha, eval_score)
             if beta <= alpha: break 
-        transposition_table[(key, depth, maximizing_player)] = (max_eval, best_move)
+        transposition_table[(key, depth, maximizing_player, ply_from_root)] = (max_eval, best_move)
         return max_eval, best_move
     else:
         min_eval = math.inf
         for move in moves:
             board.push(move)
-            eval_score, _ = minimax(board, depth - 1, alpha, beta, True)
+            eval_score, _ = minimax(board, depth - 1, alpha, beta, True, ply_from_root + 1)
             board.pop()
             
             if eval_score < min_eval:
@@ -287,7 +301,7 @@ def minimax(board, depth, alpha, beta, maximizing_player):
                 best_move = move
             beta = min(beta, eval_score)
             if beta <= alpha: break
-        transposition_table[(key, depth, maximizing_player)] = (min_eval, best_move)
+        transposition_table[(key, depth, maximizing_player, ply_from_root)] = (min_eval, best_move)
         return min_eval, best_move
 
 # 🔥 補上：你漏掉了這個函式
@@ -296,16 +310,18 @@ def get_pv_line(board, depth):
     pv_line = []
     curr_board = board.copy()
     is_maximizing = curr_board.turn == chess.WHITE
+    ply_from_root = 0
     
     for d in range(depth, 0, -1):
         key = chess.polyglot.zobrist_hash(curr_board)
-        tt_entry = transposition_table.get((key, d, is_maximizing))
+        tt_entry = transposition_table.get((key, d, is_maximizing, ply_from_root))
         
         if tt_entry and tt_entry[1]:
             move = tt_entry[1]
             pv_line.append(move.uci())
             curr_board.push(move)
             is_maximizing = not is_maximizing
+            ply_from_root += 1
         else:
             break
     return pv_line
@@ -333,7 +349,7 @@ def get_analysis(board, depth=3, time_limit=None):
     # 🔥 優先使用開局庫（開局階段）
     if len(board.move_stack) < 10:  # 前 10 手使用開局庫
         try:
-            with chess.polyglot.open_reader("books/gm2001.bin") as reader:
+            with chess.polyglot.open_reader(BOOK_PATH) as reader:
                 entry = reader.weighted_choice(board)
                 if entry:
                     # 從開局庫找到走法，直接返回
@@ -347,9 +363,9 @@ def get_analysis(board, depth=3, time_limit=None):
                         'nodes': 0,
                         'from_book': True
                     }
-        except Exception as e:
-            # 開局庫讀取失敗，繼續使用引擎計算
-            print(f"Opening book not available: {e}")
+        except Exception:
+            # 開局庫缺局面或檔案不可用時，直接回到引擎計算。
+            pass
     
     transposition_table.clear()
     is_maximizing = board.turn == chess.WHITE
@@ -406,10 +422,23 @@ def detect_game_phase(board):
     total_pieces = len(board.piece_map())
     white_queens = len(board.pieces(chess.QUEEN, chess.WHITE))
     black_queens = len(board.pieces(chess.QUEEN, chess.BLACK))
+    starting_squares = (
+        chess.B1, chess.G1, chess.C1, chess.F1,
+        chess.B8, chess.G8, chess.C8, chess.F8,
+    )
+    undeveloped_minor_pieces = sum(
+        1 for square in starting_squares
+        if (piece := board.piece_at(square)) and piece.piece_type in (chess.KNIGHT, chess.BISHOP)
+    )
     
     if total_pieces <= 6:
         return "endgame"
-    elif total_pieces >= 20 and (white_queens > 0 or black_queens > 0):
+    elif (
+        board.fullmove_number <= 3
+        and total_pieces >= 24
+        and (white_queens > 0 or black_queens > 0)
+        and undeveloped_minor_pieces >= 3
+    ):
         return "opening"
     else:
         return "middle_game"

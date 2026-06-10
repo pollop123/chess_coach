@@ -22,7 +22,10 @@ try:
     print(board)
     print('\n⏳ 正在計算引擎分析 (深度 5)...\n')
     
-    best_move, score, pv_line = chess_engine.get_analysis(board, depth=5)
+    analysis = chess_engine.get_analysis(board, depth=5)
+    best_move = analysis["best_move"]
+    score = analysis["score"]
+    pv_line = analysis["pv"]
     
     print(f'✅ 最佳著法: {board.san(best_move)}')
     print(f'📊 評分: {score/100:+.2f}')

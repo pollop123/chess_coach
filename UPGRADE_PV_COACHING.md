@@ -50,15 +50,15 @@ class ExplainRequest(BaseModel):
 @app.post("/explain")
 def explain_position(request: ExplainRequest):
     # 1. 計算引擎的預測變例
-    best_move, score, pv = chess_engine.get_analysis(board, depth=request.depth)
+    analysis = chess_engine.get_analysis(board, depth=request.depth)
     
     # 2. 將 PV Line 傳遞給 RAG 教練
     advice = rag_engine.get_advice(
         request.fen, 
         request.history, 
         user_question,
-        pv_line=pv,      # 🔥 新增
-        pv_score=score   # 🔥 新增
+        pv_line=analysis["pv"],      # 🔥 新增
+        pv_score=analysis["score"]   # 🔥 新增
     )
 ```
 

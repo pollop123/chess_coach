@@ -25,9 +25,9 @@
   - 時限控制（確保 API 不超時）
 
 - **效能表現**：
-  - 快速走法：< 2 秒
-  - 深度分析：< 5 秒
-  - 節點搜尋：開局 ~15K, 殘局 ~5K
+  - 快速走法：透過時限搜尋控制回應時間
+  - 深度分析：依局面複雜度與設定深度調整
+  - 開局階段優先使用 Polyglot 開局庫，沒有書步時回落到引擎搜尋
 
 ### API 架構
 - **職責分離設計**：
@@ -131,6 +131,7 @@
    pip install -r requirements.txt
    python3 main.py
    # 或使用 uvicorn api:app --reload
+   # uvicorn main:app --reload 也會載入同一個 api:app
    ```
 
 4. **啟動前端**（另開終端）

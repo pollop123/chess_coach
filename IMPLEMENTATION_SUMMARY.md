@@ -140,15 +140,15 @@ def get_advice(self, fen, move_history, user_question, pv_line=None, pv_score=No
 @app.post("/explain")
 def explain_position(request: ExplainRequest):
     # 計算 PV Line
-    best_move, score, pv = chess_engine.get_analysis(board, depth=request.depth)
+    analysis = chess_engine.get_analysis(board, depth=request.depth)
     
     # 傳遞給 RAG
     advice = rag_engine.get_advice(
         request.fen, 
         request.history, 
         user_question,
-        pv_line=pv,
-        pv_score=score
+        pv_line=analysis["pv"],
+        pv_score=analysis["score"]
     )
 ```
 
