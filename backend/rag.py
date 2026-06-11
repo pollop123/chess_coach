@@ -312,4 +312,11 @@ class ChessRAG:
 """
         return self.call_gemini_with_fallback(final_prompt)
 
-rag_engine = ChessRAG()
+_rag_engine = None
+
+
+def get_rag_engine():
+    global _rag_engine
+    if _rag_engine is None:
+        _rag_engine = ChessRAG()
+    return _rag_engine

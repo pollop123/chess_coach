@@ -18,10 +18,10 @@ from database import SessionLocal, Game
 # 嘗試匯入 RAG 引擎
 # 這樣就算 rag.py 有錯或沒 key，伺服器也能啟動其他功能
 try:
-    from rag import rag_engine
+    from rag import get_rag_engine
 except Exception as e:
     print(f"⚠️ Warning: RAG engine failed to start: {e}")
-    rag_engine = None
+    get_rag_engine = None
 
 app = FastAPI()
 
@@ -157,7 +157,7 @@ def get_analysis_endpoint(request: GetAnalysisRequest):
 
     # 準備 AI 教練建議
     coach_advice = None
-    if rag_engine:
+    if get_rag_engine:
         # 安全防禦：清洗用戶輸入
         user_question = request.question or "請評估目前局勢並給出建議"
         
@@ -174,6 +174,7 @@ def get_analysis_endpoint(request: GetAnalysisRequest):
         
         if not any(keyword in user_question_lower for keyword in forbidden_keywords):
             try:
+                rag_engine = get_rag_engine()
                 coach_advice = rag_engine.get_advice(
                     request.fen,
                     request.history,
@@ -356,7 +357,7 @@ def explain_position(request: ExplainRequest):
     相容性端點，提供 AI 教練建議
     建議使用 /get_analysis 替代，功能更完整
     """
-    if not rag_engine:
+    if not get_rag_engine:
         return {"advice": "RAG 引擎未啟動，請檢查 API Key 設定"}
     
     # 安全防禦：清洗用戶輸入
@@ -395,13 +396,18 @@ def explain_position(request: ExplainRequest):
         print(f"引擎分析失敗: {e}")
     
     # 傳遞給 RAG 教練
-    advice = rag_engine.get_advice(
-        request.fen, 
-        request.history, 
-        user_question,
-        pv_line=pv_line,
-        pv_score=pv_score,
-        analysis_result=analysis  # 🔥 傳遞完整分析結果
-    )
+    try:
+        rag_engine = get_rag_engine()
+        advice = rag_engine.get_advice(
+            request.fen,
+            request.history,
+            user_question,
+            pv_line=pv_line,
+            pv_score=pv_score,
+            analysis_result=analysis  # 🔥 傳遞完整分析結果
+        )
+    except Exception as e:
+        print(f"RAG 分析失敗: {e}")
+        advice = "教練分析暫時無法使用"
     
     return {"advice": advice}
