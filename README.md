@@ -166,18 +166,44 @@ docker-compose ps
 docker-compose down --rmi all --volumes
 ```
 
-### 部署到雲端（Zeabur / Render / Railway）
+### 免費部署建議（Vercel + Render + Neon）
 
-1. **設定環境變數**
-   - `GOOGLE_API_KEY`: 你的 Google Gemini API Key
-   - `DATABASE_URL`: 資料庫連線字串（選填；Docker Compose 預設使用 `/data/games.db` volume）
-   - `VITE_API_URL`: 分離部署前後端時才需要填公開後端 URL；同一個 Docker Compose 專案不要設，預設走 `/api`
+這個專案建議使用三個免費服務分工部署：
 
-2. **自動部署**
-   - 平台會自動偵測 `docker-compose.yml` 並建置
-   - 前端預設以同網域 `/api` 呼叫後端，Nginx 會 proxy 到 backend 服務
+- **Neon**：Postgres 資料庫，提供 `DATABASE_URL`
+- **Render**：FastAPI 後端，使用 `render.yaml`
+- **Vercel**：Vite React 前端，使用 `frontend/` 作為專案根目錄
 
-3. **手動建置**
+1. **建立 Neon 資料庫**
+   - 建立一個 Neon Free Postgres 專案
+   - 複製 pooled 或 direct connection string
+   - 將 connection string 作為 Render 的 `DATABASE_URL`
+
+2. **部署 Render 後端**
+   - 在 Render 建立 Blueprint 或 Web Service，連到 GitHub repo
+   - 如果使用 Blueprint，Render 會讀取根目錄的 `render.yaml`
+   - 必填環境變數：
+     - `GOOGLE_API_KEY`: 你的 Google Gemini API Key
+     - `DATABASE_URL`: Neon 提供的 Postgres 連線字串
+   - 選填環境變數：
+     - `LICHESS_API_TOKEN`: Lichess Bot 需要時再填
+   - 部署完成後取得後端網址，例如 `https://chess-coach-api.onrender.com`
+
+3. **部署 Vercel 前端**
+   - Import GitHub repo
+   - Root Directory 設為 `frontend`
+   - Build Command 使用 `npm run build`
+   - Output Directory 使用 `dist`
+   - 必填環境變數：
+     - `VITE_API_URL`: Render 後端公開網址，例如 `https://chess-coach-api.onrender.com`
+
+4. **檢查部署**
+   - 開啟 Render 後端根路徑，應該看到健康檢查回應
+   - 開啟 Vercel 前端，下一步棋與 AI 教練應該會呼叫 Render API
+   - Render Free 服務閒置後會 sleep，第一次請求可能需要約一分鐘喚醒
+
+### Docker 手動建置
+
    ```bash
    # 後端
    cd backend

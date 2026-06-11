@@ -16,7 +16,5 @@ COPY . .
 # 告訴 Docker 我們會用 8000 port
 EXPOSE 8000
 
-# 🚀 生產環境啟動指令：
-# 1. 移除 --reload (生產環境不需要熱重載，且會消耗效能)
-# 2. 確保 app 入口點正確 (你原本寫 api:app)
-CMD ["uvicorn", "api:app", "--host", "0.0.0.0", "--port", "8000"]
+# 🚀 生產環境啟動指令：使用平台提供的 PORT，沒有設定時預設 8000。
+CMD ["sh", "-c", "uvicorn api:app --host 0.0.0.0 --port ${PORT:-8000}"]
