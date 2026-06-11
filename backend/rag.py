@@ -1,5 +1,4 @@
 import os
-import chromadb
 from google import genai
 from google.genai import types
 import chess
@@ -7,9 +6,6 @@ import chess.pgn
 import io
 import time
 import chess_engine
-
-# 取得 API Key
-api_key = os.getenv("GOOGLE_API_KEY")
 
 # 系統指令（與用戶輸入隔離）
 SYSTEM_INSTRUCTION = """
@@ -37,34 +33,99 @@ SYSTEM_INSTRUCTION = """
 - 如果引擎推薦看起來是錯誤的，請誠實指出並建議正常的開局原則（控制中心、發展子力、保護國王）
 """
 
+KNOWLEDGE_DOCUMENTS = [
+    "西西里防禦 (Sicilian Defense): 黑方利用 c 兵控制 d4 中心，創造不對稱局面。",
+    "法蘭西防禦 (French Defense): 結構堅固但黑方白格主教容易被兵鍊擋住。",
+    "義大利開局 (Italian Game): 白方用 Bc4 瞄準 f7，通常搭配 Nf3、c3、d4 或穩健短易位。",
+    "倫敦系統 (London System): 白方通常以 d4、Bf4、Nf3、e3 建立穩定結構，重點是完成發展與避免過早進攻。",
+    "開局原則: 控制中心 (e4, d4, e5, d5)，盡早出動騎士與主教，不要重複走同一隻棋子，並盡快完成王車易位。",
+    "捉雙 (Fork): 一個棋子同時攻擊對手兩個目標，通常由騎士、后或兵發動。",
+    "牽制 (Pin): 利用遠程棋子限制對手棋子移動，因為移動後會暴露後方更有價值的目標。",
+    "閃擊 (Discovered Attack): 移開前方棋子後，讓後方長程棋子產生攻擊，常見於象、車、后。",
+    "誘離 (Deflection): 迫使防守者離開關鍵防守任務，讓主要目標失去保護。",
+    "底線弱點 (Back Rank Weakness): 當國王前的兵沒有移動過，且逃生格不足時，底線被車或后將軍會很危險。",
+    "孤兵 (Isolated Pawn): 沒有鄰兵保護的兵是弱點，但可能控制關鍵格子並提供子力活動空間。",
+    "殘局原則: 王要積極參戰，兵殘局重視對王、通路兵與升變格；車殘局通常要讓車保持活動性。",
+    "攻王原則: 進攻前先確認子力是否足夠、能否打開線路，以及對方國王附近是否缺少防守子。",
+]
+
+
+def _simple_retrieve_rule(search_query):
+    query = (search_query or "").lower()
+    keyword_map = {
+        "sicilian": ["西西里", "sicilian", "c5"],
+        "french": ["法蘭西", "french", "e6"],
+        "italian": ["義大利", "italian", "bc4"],
+        "london": ["倫敦", "london", "bf4"],
+        "opening": ["開局", "中心", "發展", "易位", "opening"],
+        "fork": ["捉雙", "fork", "雙攻"],
+        "pin": ["牽制", "pin"],
+        "discovered": ["閃擊", "discovered"],
+        "deflection": ["誘離", "deflection"],
+        "back_rank": ["底線", "back rank"],
+        "endgame": ["殘局", "endgame", "升變", "通路兵"],
+        "king_attack": ["攻王", "將殺", "king", "mate"],
+    }
+
+    scores = []
+    for index, document in enumerate(KNOWLEDGE_DOCUMENTS):
+        doc_lower = document.lower()
+        score = 0
+        for terms in keyword_map.values():
+            for term in terms:
+                if term in query and term in doc_lower:
+                    score += 3
+        for token in query.replace("/", " ").replace(",", " ").split():
+            if len(token) > 1 and token in doc_lower:
+                score += 1
+        scores.append((score, index, document))
+
+    best = max(scores, key=lambda item: item[0])
+    if best[0] <= 0:
+        return "；".join(KNOWLEDGE_DOCUMENTS[4:6])
+    return best[2]
+
+
 class ChessRAG:
     def __init__(self):
-        # 初始化 ChromaDB
-        self.chroma_client = chromadb.PersistentClient(path="./chroma_db")
-        self.rule_collection = self.chroma_client.get_or_create_collection(name="chess_knowledge")
-        self.game_collection = self.chroma_client.get_or_create_collection(name="chess_games")
-        
+        self.chroma_client = None
+        self.rule_collection = None
+        self.game_collection = None
         self.client = None
-        
-        # 🔥 軍火庫設定：優先使用高額度模型
+
+        # Prefer lightweight text models that are available in Gemini API.
         self.backup_models = [
-            "gemma-3-27b-it",         # 👑 主力：高額度
-            "gemini-2.0-flash",       # 備用：速度快
-            "gemini-2.0-flash-lite-preview-02-05", 
-            "gemini-1.5-flash"
+            "gemini-2.5-flash-lite",
+            "gemini-flash-lite-latest",
+            "gemini-2.0-flash-lite",
+            "gemini-2.5-flash",
+            "gemini-flash-latest",
         ]
-        
+
+        api_key = os.getenv("GOOGLE_API_KEY")
         if api_key:
             try:
                 self.client = genai.Client(api_key=api_key)
             except Exception as e:
                 print(f"RAG Init Error: {e}")
-        
-        # 初始化資料庫 (如果空的才跑)
-        if self.rule_collection.count() == 0:
-            self.add_knowledge()
-        if self.game_collection.count() == 0:
-            self.seed_master_games()
+
+        if os.getenv("ENABLE_CHROMA_RAG", "").lower() in {"1", "true", "yes"}:
+            try:
+                import chromadb
+
+                self.chroma_client = chromadb.PersistentClient(path="./chroma_db")
+                self.rule_collection = self.chroma_client.get_or_create_collection(name="chess_knowledge")
+                self.game_collection = self.chroma_client.get_or_create_collection(name="chess_games")
+
+                if self.rule_collection.count() == 0:
+                    self.add_knowledge()
+                if self.game_collection.count() == 0:
+                    self.seed_master_games()
+            except Exception as e:
+                print(f"Chroma RAG disabled: {e}")
+                self.chroma_client = None
+                self.rule_collection = None
+                self.game_collection = None
 
     def add_knowledge(self):
         """補回戰術規則庫"""
@@ -144,10 +205,48 @@ class ChessRAG:
                     print(f"⚠️ 錯誤 ({model}): {error_msg}")
                     continue
         
-        return "❌ 所有 AI 教練都去喝咖啡了 (Quota Exceeded)。請稍後再試。"
+        return "AI 教練暫時無法連線，請稍後再試。"
+
+    def retrieve_rule(self, search_query):
+        if self.rule_collection:
+            try:
+                rule_results = self.rule_collection.query(query_texts=[search_query], n_results=1)
+                if rule_results["documents"] and rule_results["documents"][0]:
+                    return rule_results["documents"][0][0]
+            except Exception as e:
+                print(f"Chroma rule retrieval failed: {e}")
+        return _simple_retrieve_rule(search_query)
+
+    def retrieve_similar_game(self, fen):
+        if not self.game_collection:
+            return "輕量知識庫模式：目前不查詢相似歷史對局。"
+
+        try:
+            game_results = self.game_collection.query(query_texts=[fen], n_results=1)
+        except Exception as e:
+            print(f"Chroma game retrieval failed: {e}")
+            return "輕量知識庫模式：目前不查詢相似歷史對局。"
+
+        if not (game_results["documents"] and game_results["documents"][0]):
+            return "無相似歷史對局。"
+
+        dist = game_results["distances"][0][0]
+        meta = game_results["metadatas"][0][0]
+        if dist >= 0.6:
+            return "無相似歷史對局。"
+
+        white = meta.get("white", "?")
+        black = meta.get("black", "?")
+        move = meta.get("last_move", "?")
+        source = meta.get("source", "master")
+
+        if "lichess" in source:
+            return f"[Lichess 相似局] {white} vs {black}, 高手走了 {move}"
+        return f"[歷史名局] {white} vs {black}, 大師走了 {move}"
 
     def get_advice(self, fen, move_history, user_question, pv_line=None, pv_score=None, analysis_result=None):
-        if not self.client: return "錯誤：API Key 未設定"
+        if not self.client:
+            return "AI 教練尚未設定 API Key，請確認後端環境變數 GOOGLE_API_KEY。"
 
         # --- 0. 解析歷史紀錄 ---
         pgn_text = "無 (開局)"
@@ -158,29 +257,10 @@ class ChessRAG:
         search_query = user_question if (user_question and len(user_question) > 3) else "General chess strategy"
         print(f"🔍 RAG 檢索關鍵字: {search_query}")
         
-        rule_results = self.rule_collection.query(query_texts=[search_query], n_results=1)
-        rule_text = rule_results['documents'][0][0] if (rule_results['documents'] and rule_results['documents'][0]) else "無相關規則"
+        rule_text = self.retrieve_rule(search_query)
 
         # --- B. 搜尋相似棋譜 ---
-        game_results = self.game_collection.query(query_texts=[fen], n_results=1)
-        similar_game_info = "無相似歷史對局。"
-        source_type = "general" 
-
-        if game_results['documents'] and game_results['documents'][0]:
-            dist = game_results['distances'][0][0]
-            meta = game_results['metadatas'][0][0]
-            if dist < 0.6:
-                white = meta.get('white', '?')
-                black = meta.get('black', '?')
-                move = meta.get('last_move', '?')
-                source = meta.get('source', 'master')
-                
-                if "lichess" in source:
-                    source_type = "lichess"
-                    similar_game_info = f"[Lichess 相似局] {white} vs {black}, 高手走了 {move}"
-                else:
-                    source_type = "master"
-                    similar_game_info = f"[歷史名局] {white} vs {black}, 大師走了 {move}"
+        similar_game_info = self.retrieve_similar_game(fen)
 
         # --- D. 計算合法走法與戰術風險 ---
         board = None

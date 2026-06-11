@@ -11,9 +11,22 @@ fi
 
 # 啟動後端
 echo "📦 啟動後端服務 (http://localhost:8000)..."
+if [ -f ".env" ]; then
+    set -a
+    source .env
+    set +a
+elif [ -f "backend/.env" ]; then
+    set -a
+    source backend/.env
+    set +a
+fi
+
 cd backend
-source .env 2>/dev/null || true
-python3 main.py &
+if [ -x "../.venv/bin/python" ]; then
+    ../.venv/bin/python main.py &
+else
+    python3 main.py &
+fi
 BACKEND_PID=$!
 cd ..
 

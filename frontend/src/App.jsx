@@ -10,13 +10,13 @@ const API_URL = import.meta.env.VITE_API_URL || "/api";
 
 function App() {
   const [game, setGame] = useState(new Chess());
-  const [status, setStatus] = useState("歡迎來到西洋棋 AI 平台！");
+  const [status, setStatus] = useState("準備開始新棋局");
   const [history, setHistory] = useState([]);
 
   // --- 新增/修改狀態 ---
   // chatHistory: 儲存對話紀錄 { role: 'user' | 'model', text: string }
   const [chatHistory, setChatHistory] = useState([
-    { role: "model", text: "👋 你好！我是你的 AI 教練。按「AI 教練解說」讓我分析盤面，或者在下方直接問我問題！" }
+    { role: "model", text: "我是你的 AI 教練。你可以讓我分析目前盤面，或直接提出局面問題。" }
   ]);
   const [userInput, setUserInput] = useState(""); // 玩家輸入的問題
   const [isCoachThinking, setIsCoachThinking] = useState(false); // 教練思考中狀態
@@ -94,13 +94,17 @@ function App() {
       const processedData = res.data.map(d => {
         const rawScore = d.score ?? 0;
         const playerScore = d.score_for ?? rawScore;
-        // 限制分數範圍在圖表內，避免將死分數把點擠到邊界。
-        const clampedScore = Math.max(-900, Math.min(900, rawScore));
+        const isMate = d.is_checkmate || d.mate_threat || Math.abs(rawScore) > 15000;
+        // 將死局面必須貼到圖表頂端/底端，一般局面才以 centipawn 截斷。
+        const chartScore = isMate
+          ? (rawScore >= 0 ? 1000 : -1000)
+          : Math.max(-900, Math.min(900, rawScore));
         return {
           ...d,
-          displayScore: clampedScore,
+          displayScore: chartScore,
           rawScore: rawScore, // 白方視角，供局勢走勢圖使用
-          playerScore: playerScore // 玩家視角，供側邊評估條使用
+          playerScore: playerScore, // 玩家視角，供側邊評估條使用
+          evalLabel: formatChartScore(rawScore, isMate)
         };
       });
 
@@ -355,12 +359,86 @@ function App() {
     );
   }
 
+  function formatChartScore(score, isMate = Math.abs(score) > 15000) {
+    if (isMate) {
+      return score >= 0 ? "白方將死勝勢" : "黑方將死勝勢";
+    }
+    return `白方評分：${(score / 100).toFixed(2)}`;
+  }
+
+  function renderEvalTooltip({ active, payload, label }) {
+    if (!active || !payload || payload.length === 0) return null;
+    const point = payload[0].payload;
+    return (
+      <div style={{
+        backgroundColor: "rgba(255,255,255,0.96)",
+        border: "1px solid #cfc8bf",
+        borderRadius: "6px",
+        boxShadow: "0 8px 20px rgba(0,0,0,0.16)",
+        color: "#111827",
+        padding: "7px 9px",
+        fontSize: "0.78rem",
+        lineHeight: 1.35,
+        minWidth: "112px"
+      }}>
+        <div style={{ color: "#6b6258", fontWeight: 700 }}>第 {label} 步</div>
+        <div style={{ fontWeight: 800 }}>{point.evalLabel}</div>
+      </div>
+    );
+  }
+
   return (
     <div style={{
       display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-      minHeight: "100vh", fontFamily: "Arial, sans-serif", backgroundColor: "#f4f4f4", padding: "20px"
+      minHeight: "100vh",
+      fontFamily: "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+      background: "linear-gradient(180deg, #eef0ed 0%, #f8f6f1 46%, #ebe7de 100%)",
+      padding: "28px 20px",
+      color: "#1f2933"
     }}>
-      <h1 style={{ color: "#333", marginBottom: "20px" }}>♟️ 我的西洋棋 AI 平台</h1>
+      <header style={{
+        width: "100%",
+        maxWidth: "980px",
+        display: "flex",
+        alignItems: "flex-end",
+        justifyContent: "space-between",
+        gap: "18px",
+        marginBottom: "22px"
+      }}>
+        <div>
+          <div style={{
+            color: "#6b5d43",
+            fontSize: "0.76rem",
+            fontWeight: 800,
+            letterSpacing: "0.08em",
+            textTransform: "uppercase",
+            marginBottom: "4px"
+          }}>
+            棋局分析工作台
+          </div>
+          <h1 style={{
+            color: "#111827",
+            margin: 0,
+            fontSize: "2.1rem",
+            lineHeight: 1.05,
+            fontWeight: 850,
+            letterSpacing: 0
+          }}>
+            Chess Coach AI
+          </h1>
+        </div>
+        <div style={{
+          padding: "8px 12px",
+          borderRadius: "999px",
+          backgroundColor: "rgba(17,24,39,0.08)",
+          color: "#374151",
+          fontSize: "0.85rem",
+          fontWeight: 700,
+          border: "1px solid rgba(17,24,39,0.10)"
+        }}>
+          訪客模式
+        </div>
+      </header>
 
       <div style={{ display: "flex", gap: "30px", alignItems: "flex-start", flexWrap: "wrap", justifyContent: "center" }}>
 
@@ -385,36 +463,53 @@ function App() {
         {/* 左側：棋盤區 */}
         <div style={{ width: "480px" }}>
           <div style={{
-            height: "480px", marginBottom: "20px",
-            boxShadow: "0 4px 10px rgba(0,0,0,0.2)", position: "relative"
+            marginBottom: "18px"
+          }}>
+            <div style={{
+            height: "480px",
+            boxShadow: "0 18px 42px rgba(17,24,39,0.18)",
+            position: "relative",
+            border: "1px solid rgba(17,24,39,0.12)"
           }}>
             <Chessboard position={displayFen} onPieceDrop={onDrop} boardOrientation={humanColor} />
+            </div>
 
             {/* 導航按鈕 */}
             {analysisData.length > 0 && (
               <div style={{
-                position: "absolute", bottom: "-40px", left: "0", width: "100%",
-                display: "flex", justifyContent: "center", gap: "10px"
+                minHeight: "38px",
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+                gap: "10px",
+                marginTop: "10px"
               }}>
-                <button onClick={() => navigateMove(-1)} style={navButtonStyle}>⬅️ 上一步</button>
-                <span style={{ fontWeight: "bold", alignSelf: "center" }}>{currentMoveIndex === -1 ? "最終局" : `第 ${currentMoveIndex} 步`}</span>
-                <button onClick={() => navigateMove(1)} style={navButtonStyle}>下一步 ➡️</button>
+                <button onClick={() => navigateMove(-1)} style={navButtonStyle}>上一步</button>
+                <span style={{ fontWeight: 800, alignSelf: "center", color: "#374151", minWidth: "68px", textAlign: "center" }}>{currentMoveIndex === -1 ? "最終局" : `第 ${currentMoveIndex} 步`}</span>
+                <button onClick={() => navigateMove(1)} style={navButtonStyle}>下一步</button>
               </div>
             )}
           </div>
 
           <div style={{
-            padding: "15px", backgroundColor: "white", borderRadius: "8px",
-            marginBottom: "20px", boxShadow: "0 2px 5px rgba(0,0,0,0.1)", fontWeight: "bold", color: "#555", textAlign: "center"
+            padding: "14px 16px",
+            backgroundColor: "#ffffff",
+            borderRadius: "8px",
+            marginBottom: "18px",
+            boxShadow: "0 8px 24px rgba(17,24,39,0.08)",
+            fontWeight: 750,
+            color: "#374151",
+            textAlign: "center",
+            border: "1px solid #e5e0d8"
           }}>
             {status}
           </div>
 
           {/* 控制按鈕 */}
           <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", justifyContent: "center" }}>
-            <button onClick={() => { const ng = new Chess(); setGame(ng); setStatus("新局開始"); setAnalysisData([]); setChatHistory([]); if (humanColor === "black") makeAIMove(ng.fen()); }} style={buttonStyle("#ff4d4f")}>🔄 新局</button>
-            <button onClick={analyzeGame} style={buttonStyle("#52c41a")}>📈 賽後分析</button>
-            <button onClick={downloadPGN} style={buttonStyle("#1890ff")}>📥 PGN</button>
+            <button onClick={() => { const ng = new Chess(); setGame(ng); setStatus("新局開始"); setAnalysisData([]); setChatHistory([]); if (humanColor === "black") makeAIMove(ng.fen()); }} style={buttonStyle("#111827")}>新局</button>
+            <button onClick={analyzeGame} style={buttonStyle("#2f6f4e")}>賽後分析</button>
+            <button onClick={downloadPGN} style={buttonStyle("#6b5d43")}>匯出 PGN</button>
             <div style={{ display: "flex", gap: "2px" }}>
               <button onClick={() => setHumanColor("white")} style={buttonStyle(humanColor === "white" ? "#333" : "#ccc")}>白</button>
               <button onClick={() => setHumanColor("black")} style={buttonStyle(humanColor === "black" ? "#333" : "#ccc")}>黑</button>
@@ -427,17 +522,19 @@ function App() {
 
           {/* 💬 AI 戰術聊天室 */}
           <div style={{
-            backgroundColor: "white", borderRadius: "10px", boxShadow: "0 2px 10px rgba(0,0,0,0.1)",
+            backgroundColor: "#ffffff",
+            borderRadius: "8px",
+            boxShadow: "0 16px 38px rgba(17,24,39,0.10)",
             display: "flex", flexDirection: "column", height: "500px", overflow: "hidden"
           }}>
-            <div style={{ padding: "15px", backgroundColor: "#722ed1", color: "white", fontWeight: "bold", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span>🤖 AI 戰術教練</span>
+            <div style={{ padding: "14px 16px", backgroundColor: "#111827", color: "#f8f5ee", fontWeight: "bold", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span>AI 教練</span>
               <button
                 onClick={() => askCoach()}
                 disabled={isCoachThinking}
-                style={{ ...buttonStyle("#ffffff"), color: "#4c1d95", padding: "5px 10px", fontSize: "0.8rem", border: "1px solid rgba(255,255,255,0.65)" }}
+                style={{ ...buttonStyle("#f8f5ee"), color: "#111827", padding: "5px 10px", fontSize: "0.8rem", border: "1px solid rgba(255,255,255,0.65)" }}
               >
-                ⚡ 一鍵分析
+                分析目前局面
               </button>
             </div>
 
@@ -462,7 +559,7 @@ function App() {
               ))}
               {isCoachThinking && (
                 <div style={{ alignSelf: "flex-start", color: "#888", fontSize: "0.8rem", paddingLeft: "10px" }}>
-                  教練正在思考... 💭
+                  教練正在思考...
                 </div>
               )}
               <div ref={chatEndRef} />
@@ -482,7 +579,7 @@ function App() {
               <button
                 onClick={() => { if (userInput.trim()) askCoach(userInput); }}
                 disabled={isCoachThinking || !userInput.trim()}
-                style={{ ...buttonStyle("#722ed1"), borderRadius: "50%", width: "40px", height: "40px", padding: 0, display: "flex", alignItems: "center", justifyContent: "center" }}
+                style={{ ...buttonStyle("#111827"), borderRadius: "50%", width: "40px", height: "40px", padding: 0, display: "flex", alignItems: "center", justifyContent: "center" }}
               >
                 ➤
               </button>
@@ -528,17 +625,7 @@ function App() {
                   <YAxis hide domain={[-1000, 1000]} />
                   <Tooltip 
                     cursor={{ stroke: "#8f8a83", strokeWidth: 1 }}
-                    contentStyle={{
-                      backgroundColor: "#ffffff",
-                      border: "1px solid #cfc8bf",
-                      borderRadius: "6px",
-                      boxShadow: "0 6px 18px rgba(0,0,0,0.12)"
-                    }}
-                    labelFormatter={(label) => `第 ${label} 步`}
-                    formatter={(value, name, item) => {
-                      const score = item?.payload?.rawScore ?? value;
-                      return [(score / 100).toFixed(2), "白方評分"];
-                    }}
+                    content={renderEvalTooltip}
                   />
                   
                   <ReferenceArea y1={-1000} y2={1000} fill="#3a3833" fillOpacity={1} />
@@ -590,13 +677,18 @@ function App() {
             </div>
           )}
 
-          {/* 📜 歷史戰績 (修正版) */}
+          {/* 歷史戰績 */}
           <div style={{
-            width: "100%", maxWidth: "600px", backgroundColor: "white",
-            borderRadius: "10px", padding: "20px", boxShadow: "0 2px 10px rgba(0,0,0,0.1)"
+            width: "100%",
+            maxWidth: "600px",
+            backgroundColor: "#ffffff",
+            borderRadius: "8px",
+            padding: "18px",
+            boxShadow: "0 12px 30px rgba(17,24,39,0.08)",
+            border: "1px solid #e5e0d8"
           }}>
             <h3 style={{ borderBottom: "2px solid #eee", paddingBottom: "10px", marginTop: 0, color: "#333" }}>
-              📜 歷史戰績
+              最近棋局
             </h3>
             {history.length === 0 ? (
               <p style={{ textAlign: "center", color: "#999" }}>尚無紀錄</p>
@@ -653,7 +745,7 @@ function App() {
 function buttonStyle(bgColor) {
   return {
     padding: "8px 12px", cursor: "pointer", backgroundColor: bgColor, color: "white",
-    border: "none", borderRadius: "6px", fontSize: "0.9rem", fontWeight: "bold", transition: "all 0.2s"
+    border: "1px solid rgba(17,24,39,0.10)", borderRadius: "6px", fontSize: "0.88rem", fontWeight: 750, transition: "all 0.2s"
   };
 }
 

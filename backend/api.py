@@ -257,6 +257,8 @@ def analyze_full_game(request: AnalysisRequest):
         return v if persp == "white" else -v
 
     def search_position(search_board, search_depth):
+        if search_board.is_game_over():
+            return chess_engine.evaluate_board(search_board), None
         depth = max(1, search_depth)
         return chess_engine.minimax(
             search_board,
@@ -288,6 +290,7 @@ def analyze_full_game(request: AnalysisRequest):
         board.push(move)
         move_eval, _ = search_position(board, request.depth - 1)
         fen_after = board.fen()
+        is_checkmate = board.is_checkmate()
 
         # 3. 計算損失 (CP Loss)
         # 如果是白方走，loss = 最佳分 - 實際分
@@ -301,7 +304,7 @@ def analyze_full_game(request: AnalysisRequest):
         elif cp_loss < 300: classification = "mistake"
         else: classification = "blunder"
 
-        mate_threat = abs(move_eval) > chess_engine.MATE_THRESHOLD or abs(best_eval) > chess_engine.MATE_THRESHOLD
+        mate_threat = is_checkmate or abs(move_eval) > chess_engine.MATE_THRESHOLD or abs(best_eval) > chess_engine.MATE_THRESHOLD
 
         evaluations.append({
             "move_number": move_count,
@@ -316,6 +319,7 @@ def analyze_full_game(request: AnalysisRequest):
             "cp_loss": int(cp_loss),
             "classification": classification,
             "mate_threat": mate_threat,
+            "is_checkmate": is_checkmate,
             "perspective": persp
         })
         move_count += 1
