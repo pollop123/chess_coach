@@ -12,12 +12,12 @@ const BOT_DIFFICULTIES = [
   { id: "newbie", label: "新手", description: "不用開局庫，低深度" },
   { id: "beginner", label: "初階", description: "基本合理，仍會漏招" },
   { id: "intermediate", label: "中階", description: "穩定陪練" },
-  { id: "challenge", label: "挑戰", description: "開局與殘局更完整" }
+  { id: "advanced", label: "中階加強", description: "開局與殘局更完整，但不是高階引擎" }
 ];
 
 const BOT_STYLES = [
   { id: "balanced", label: "穩健", description: "優先選客觀穩定的走法" },
-  { id: "trickster", label: "陷阱", description: "偏好將軍、攻王與壓縮回應的走法" }
+  { id: "trickster", label: "陷阱", description: "偏好將軍、攻王與壓縮回應，用來練防守警覺" }
 ];
 
 const TRAINING_PHASES = [
@@ -271,6 +271,8 @@ function App() {
   const trainingComplete = trainingHistory.length >= selectedLesson.moves.length;
   const boardFen = appMode === "training" ? trainingGame.fen() : displayFen;
   const boardOrientation = appMode === "training" ? "white" : humanColor;
+  const selectedDifficulty = BOT_DIFFICULTIES.find((difficulty) => difficulty.id === botDifficulty) || BOT_DIFFICULTIES[2];
+  const selectedStyle = BOT_STYLES.find((style) => style.id === botStyle) || BOT_STYLES[0];
 
   // 🔥 核心修改：發送訊息給 AI 教練
   // manualQuestion: 如果有的話，代表是玩家手動打字；如果沒有，代表是按「分析按鈕」
@@ -501,7 +503,11 @@ function App() {
         safeGameMutate((g) => {
           g.move({ from, to, promotion });
           if (g.isGameOver()) handleGameOver(g);
-          else setStatus("輪到你了");
+          else if (response.data.bot_style === "trickster" && response.data.style_bonus > 0) {
+            setStatus(`輪到你了。陷阱型 AI 剛製造了威脅，先檢查將軍、吃子和被攻擊的子。`);
+          } else {
+            setStatus(`輪到你了（${response.data.difficulty_label || selectedDifficulty.label}／${selectedStyle.label}）`);
+          }
         });
       }
     } catch (error) {
@@ -824,6 +830,9 @@ function App() {
                   </button>
                 ))}
               </div>
+              <div style={{ color: "#6b6258", fontSize: "0.76rem", lineHeight: 1.45, marginTop: "6px" }}>
+                {selectedDifficulty.description}
+              </div>
               <div style={{ fontSize: "0.78rem", color: "#6b6258", fontWeight: 800, margin: "10px 0 7px" }}>
                 機器人風格
               </div>
@@ -844,6 +853,9 @@ function App() {
                     {style.label}
                   </button>
                 ))}
+              </div>
+              <div style={{ color: "#6b6258", fontSize: "0.76rem", lineHeight: 1.45, marginTop: "6px" }}>
+                {selectedStyle.description}
               </div>
             </div>
           )}

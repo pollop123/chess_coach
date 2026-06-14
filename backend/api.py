@@ -104,8 +104,16 @@ BOT_DIFFICULTY_PROFILES = {
         "use_book": True,
         "adaptive_depth": False,
     },
+    "advanced": {
+        "label": "中階加強",
+        "depth": 5,
+        "time_limit": 1.5,
+        "use_book": True,
+        "adaptive_depth": True,
+    },
+    # Backward-compatible alias for older clients.
     "challenge": {
-        "label": "挑戰",
+        "label": "中階加強",
         "depth": 5,
         "time_limit": 1.5,
         "use_book": True,

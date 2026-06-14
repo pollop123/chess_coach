@@ -34,7 +34,7 @@ BOT_CONFIGS = (
     BotConfig("beginner", 2, 0.7, False, False),
     BotConfig("intermediate", 3, 1.0, True, False),
     BotConfig("intermediate_trickster", 3, 1.0, False, False, "trickster"),
-    BotConfig("challenge", 5, 1.5, True, True),
+    BotConfig("advanced", 5, 1.5, True, True),
 )
 
 
