@@ -353,7 +353,86 @@ def get_pv_line(board, depth):
             break
     return pv_line
 
-def get_analysis(board, depth=3, time_limit=None):
+def score_trickster_move(board, move):
+    """Heuristic bonus for moves that create practical traps for humans."""
+    mover = board.turn
+    bonus = 0
+
+    if board.gives_check(move):
+        bonus += 100
+
+    captured = board.piece_at(move.to_square)
+    if captured:
+        bonus += min(90, piece_values.get(captured.piece_type, 0) // 8)
+
+    board.push(move)
+
+    opponent_replies = board.legal_moves.count()
+    bonus += max(0, 28 - opponent_replies) * 4
+
+    enemy_king = board.king(not mover)
+    if enemy_king is not None:
+        king_zone = [enemy_king, *chess.SquareSet(chess.BB_KING_ATTACKS[enemy_king])]
+        attacked_king_zone = sum(1 for square in king_zone if board.is_attacked_by(mover, square))
+        bonus += attacked_king_zone * 12
+
+    attacked_material = 0
+    for square, piece in board.piece_map().items():
+        if piece.color != mover and board.is_attacked_by(mover, square):
+            attacked_material += piece_values.get(piece.piece_type, 0)
+    bonus += min(140, attacked_material // 12)
+
+    board.pop()
+    return bonus
+
+
+def select_trickster_move(board, depth, best_move, best_score):
+    """Pick a trap-oriented move among near-best candidates."""
+    if best_move is None:
+        return best_move, best_score, 0
+
+    mover = board.turn
+    candidate_depth = max(0, depth - 1)
+    candidates = []
+
+    for move in order_moves(board)[:10]:
+        board.push(move)
+        if board.is_game_over():
+            score = evaluate_board(board, 1)
+        else:
+            score, _ = minimax(
+                board,
+                candidate_depth,
+                -math.inf,
+                math.inf,
+                board.turn == chess.WHITE,
+                1,
+            )
+        board.pop()
+
+        perspective_score = score if mover == chess.WHITE else -score
+        bonus = score_trickster_move(board, move)
+        candidates.append({
+            "move": move,
+            "score": score,
+            "perspective_score": perspective_score,
+            "bonus": bonus,
+            "style_score": perspective_score + bonus,
+        })
+
+    if not candidates:
+        return best_move, best_score, 0
+
+    best_perspective = max(item["perspective_score"] for item in candidates)
+    viable_candidates = [
+        item for item in candidates
+        if item["perspective_score"] >= best_perspective - 180
+    ]
+    selected = max(viable_candidates, key=lambda item: item["style_score"])
+    return selected["move"], selected["score"], selected["bonus"]
+
+
+def get_analysis(board, depth=3, time_limit=None, use_book=True, adaptive_depth=True, style="balanced"):
     """
     深度分析棋盤局面
     
@@ -361,6 +440,9 @@ def get_analysis(board, depth=3, time_limit=None):
         board: 棋盤狀態
         depth: 搜尋深度
         time_limit: 時間限制（秒），None 則使用固定深度
+        use_book: 是否使用開局庫
+        adaptive_depth: 是否在殘局自動加深
+        style: balanced 或 trickster
     
     Returns:
         dict: {
@@ -374,7 +456,7 @@ def get_analysis(board, depth=3, time_limit=None):
         }
     """
     # 🔥 優先使用開局庫（開局階段）
-    if len(board.move_stack) < 10:  # 前 10 手使用開局庫
+    if use_book and len(board.move_stack) < 10:  # 前 10 手使用開局庫
         try:
             with chess.polyglot.open_reader(BOOK_PATH) as reader:
                 entry = choose_book_entry(reader, board)
@@ -400,11 +482,12 @@ def get_analysis(board, depth=3, time_limit=None):
     is_maximizing = board.turn == chess.WHITE
     
     # 根據子力數量動態調整基礎深度
-    total_pieces = len(board.piece_map())
-    if total_pieces < 6:
-        depth = max(depth, 8)  # 殘局加深
-    elif total_pieces < 12:
-        depth = max(depth, 6)
+    if adaptive_depth:
+        total_pieces = len(board.piece_map())
+        if total_pieces < 6:
+            depth = max(depth, 8)  # 殘局加深
+        elif total_pieces < 12:
+            depth = max(depth, 6)
     
     best_move = None
     best_score = -math.inf
@@ -426,6 +509,10 @@ def get_analysis(board, depth=3, time_limit=None):
         # 固定深度搜尋
         best_score, best_move = minimax(board, depth, -math.inf, math.inf, is_maximizing)
         nodes_searched = len(transposition_table)
+
+    style_bonus = 0
+    if style == "trickster" and best_move:
+        best_move, best_score, style_bonus = select_trickster_move(board, final_depth, best_move, best_score)
     
     # 提取 PV Line
     pv_line = get_pv_line(board, final_depth)
@@ -439,7 +526,9 @@ def get_analysis(board, depth=3, time_limit=None):
         'book_line': [],
         'depth': final_depth,
         'nodes': nodes_searched,
-        'from_book': False
+        'from_book': False,
+        'style': style,
+        'style_bonus': style_bonus,
     }
 
 def get_best_move(board, depth=5):

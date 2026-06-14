@@ -49,6 +49,8 @@ class BoardRequest(BaseModel):
 class MakeMoveRequest(BaseModel):
     fen: str
     time_limit: float = 2.0
+    difficulty: str = "intermediate"
+    bot_style: str = "balanced"
 
 class GetAnalysisRequest(BaseModel):
     fen: str
@@ -80,6 +82,37 @@ class ExplainRequest(BaseModel):
     fen: str
     history: str = "" # 可選
 
+BOT_DIFFICULTY_PROFILES = {
+    "newbie": {
+        "label": "新手",
+        "depth": 1,
+        "time_limit": 0.35,
+        "use_book": False,
+        "adaptive_depth": False,
+    },
+    "beginner": {
+        "label": "初階",
+        "depth": 2,
+        "time_limit": 0.7,
+        "use_book": False,
+        "adaptive_depth": False,
+    },
+    "intermediate": {
+        "label": "中階",
+        "depth": 3,
+        "time_limit": 1.0,
+        "use_book": True,
+        "adaptive_depth": False,
+    },
+    "challenge": {
+        "label": "挑戰",
+        "depth": 5,
+        "time_limit": 1.5,
+        "use_book": True,
+        "adaptive_depth": True,
+    },
+}
+
 # --- API 端點 ---
 
 @app.get("/")
@@ -106,11 +139,17 @@ def make_move(request: MakeMoveRequest):
             "fen": request.fen
         }
 
-    # 使用時限搜尋，確保快速回應（輕量級版本）
+    profile = BOT_DIFFICULTY_PROFILES.get(request.difficulty, BOT_DIFFICULTY_PROFILES["intermediate"])
+    bot_style = request.bot_style if request.bot_style in {"balanced", "trickster"} else "balanced"
+
+    # 使用難度檔位控制搜尋深度、開局庫與殘局自動加深。
     analysis = chess_engine.get_analysis(
         board, 
-        depth=5,
-        time_limit=request.time_limit
+        depth=profile["depth"],
+        time_limit=min(request.time_limit, profile["time_limit"]),
+        use_book=profile["use_book"] and bot_style != "trickster",
+        adaptive_depth=profile["adaptive_depth"],
+        style=bot_style,
     )
 
     if not analysis['best_move']:
@@ -123,7 +162,13 @@ def make_move(request: MakeMoveRequest):
         "best_move": analysis['best_move'].uci(),
         "fen": board.fen(),
         "is_game_over": board.is_game_over(),
-        "result": board.result() if board.is_game_over() else None
+        "result": board.result() if board.is_game_over() else None,
+        "difficulty": request.difficulty,
+        "difficulty_label": profile["label"],
+        "bot_style": bot_style,
+        "depth_reached": analysis["depth"],
+        "from_book": analysis.get("from_book", False),
+        "style_bonus": analysis.get("style_bonus", 0),
     }
 
 # 2. 深度分析端點 (用於分析與教練建議)

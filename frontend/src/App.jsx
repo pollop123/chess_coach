@@ -8,9 +8,139 @@ import { ComposedChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Refere
 // 預設走同網域 /api，由 Vite/Nginx 代理到後端；分離部署時可用 VITE_API_URL 覆蓋。
 const API_URL = import.meta.env.VITE_API_URL || "/api";
 
+const BOT_DIFFICULTIES = [
+  { id: "newbie", label: "新手", description: "不用開局庫，低深度" },
+  { id: "beginner", label: "初階", description: "基本合理，仍會漏招" },
+  { id: "intermediate", label: "中階", description: "穩定陪練" },
+  { id: "challenge", label: "挑戰", description: "開局與殘局更完整" }
+];
+
+const BOT_STYLES = [
+  { id: "balanced", label: "穩健", description: "優先選客觀穩定的走法" },
+  { id: "trickster", label: "陷阱", description: "偏好將軍、攻王與壓縮回應的走法" }
+];
+
+const TRAINING_PHASES = [
+  { id: "opening", label: "開局" },
+  { id: "middlegame", label: "中局" },
+  { id: "endgame", label: "殘局" }
+];
+
+const TRAINING_LESSONS = [
+  {
+    id: "italian-giuoco-piano",
+    phase: "opening",
+    opening: "義大利開局",
+    variation: "Giuoco Piano",
+    goal: "快速發展子力，主教瞄準 f7，穩定完成短易位。",
+    moves: ["e4", "e5", "Nf3", "Nc6", "Bc4", "Bc5", "c3", "Nf6", "d3", "d6", "O-O"],
+    ideas: [
+      "e4 先占中心，打開后與主教的路線。",
+      "Nf3 發展騎士並攻擊 e5 兵，是義大利開局的核心節奏。",
+      "Bc4 瞄準 f7 弱點，同時完成王翼子力發展。",
+      "c3 支援後續 d4，也讓白方保留穩健中心。",
+      "O-O 把國王帶到安全位置，接著才談中局計畫。"
+    ]
+  },
+  {
+    id: "italian-two-knights",
+    phase: "opening",
+    opening: "義大利開局",
+    variation: "Two Knights Defense",
+    goal: "面對 ...Nf6 時保持中心壓力，理解黑方反擊 e4 的節奏。",
+    moves: ["e4", "e5", "Nf3", "Nc6", "Bc4", "Nf6", "d3", "Bc5", "c3", "d6", "O-O"],
+    ideas: [
+      "黑方 ...Nf6 直接攻擊 e4，白方要注意中心兵的保護。",
+      "d3 是穩健選擇，先保住 e4 並準備短易位。",
+      "c3 讓白方之後有 d4 的中心突破想法。",
+      "不要急著連續移動同一隻棋子，先完成發展比較重要。"
+    ]
+  },
+  {
+    id: "italian-evans-gambit",
+    phase: "opening",
+    opening: "義大利開局",
+    variation: "Evans Gambit",
+    goal: "用 b4 犧牲側翼兵搶節奏，換取中心與子力活動。",
+    moves: ["e4", "e5", "Nf3", "Nc6", "Bc4", "Bc5", "b4", "Bxb4", "c3", "Ba5", "d4"],
+    ideas: [
+      "b4 是 Evans Gambit 的關鍵，目標是趕走黑方主教。",
+      "白方犧牲 b 兵換取 c3、d4 的中心推進速度。",
+      "這條線比較進攻型，適合練習用節奏補償物質。",
+      "如果沒有跟上 c3、d4，棄兵就容易只剩虧損。"
+    ]
+  },
+  {
+    id: "middlegame-scholar-mate",
+    phase: "middlegame",
+    opening: "中局戰術",
+    variation: "弱點攻擊：f7 將殺",
+    goal: "辨識王旁弱點，抓住對方防守不足時的直接將殺。",
+    startFen: "r1bqkb1r/pppp1ppp/2n2n2/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR w KQkq - 4 4",
+    moves: ["Qxf7#"],
+    ideas: [
+      "f7 是黑方開局最脆弱的點，通常只有國王保護。",
+      "當后與主教同時瞄準 f7，對方又沒完成防守時，要先檢查是否有將殺。",
+      "中局戰術題先找王的安全，再找強迫手：將軍、吃子、威脅。"
+    ]
+  },
+  {
+    id: "middlegame-center-pressure",
+    phase: "middlegame",
+    opening: "中局判斷",
+    variation: "中心壓力：發展后支援攻擊",
+    goal: "在戰術還沒直接成立時，找能增加壓力又不丟子的發展手。",
+    startFen: "r1bqkb1r/ppp2ppp/2n5/3np1N1/2B5/8/PPPP1PPP/RNBQK2R w KQkq - 0 6",
+    moves: ["Qf3"],
+    ideas: [
+      "Qf3 支援 f7 壓力，也連結騎士與主教的攻擊方向。",
+      "中局不一定每步都是將殺；有時候好棋是把更多子力帶進同一個目標。",
+      "如果攻擊還沒成熟，不要只靠一隻棋子衝進去。"
+    ]
+  },
+  {
+    id: "endgame-queen-mate-net",
+    phase: "endgame",
+    opening: "殘局訓練",
+    variation: "后王配合：縮小國王空間",
+    goal: "用國王支援后的控制，讓對方國王沒有逃生格。",
+    startFen: "7k/6Q1/5K2/8/8/8/8/8 w - - 0 1",
+    moves: ["Kf7#"],
+    ideas: [
+      "后很強，但殘局將殺通常需要國王一起控制逃生格。",
+      "Kf7# 不是單純追王，而是用國王封住黑王周圍格子。",
+      "后王殺王的核心是縮小空間，不是一直無目的將軍。"
+    ]
+  },
+  {
+    id: "endgame-pawn-promotion",
+    phase: "endgame",
+    opening: "殘局訓練",
+    variation: "通路兵升變",
+    goal: "辨識能直接升變的通路兵，優先把優勢轉成后。",
+    startFen: "8/4P3/4K3/8/8/8/8/4k3 w - - 0 1",
+    moves: ["e8=Q"],
+    ideas: [
+      "通路兵到第七排時，升變通常比其他慢手更重要。",
+      "升變成后能把兵的優勢轉成決定性火力。",
+      "殘局先算升變格是否安全，再決定王要不要支援。"
+    ]
+  }
+];
+
 function App() {
   const [game, setGame] = useState(new Chess());
+  const [appMode, setAppMode] = useState("play");
+  const [trainingPhase, setTrainingPhase] = useState("opening");
+  const [trainingGame, setTrainingGame] = useState(() => createTrainingGame(TRAINING_LESSONS[0]));
+  const [selectedLessonId, setSelectedLessonId] = useState(TRAINING_LESSONS[0].id);
+  const [trainingFeedback, setTrainingFeedback] = useState({
+    tone: "neutral",
+    text: "選擇一條變體，照棋盤提示走白方主線。黑方會自動走出該變體的回應。"
+  });
+  const [selectedSquare, setSelectedSquare] = useState(null);
   const [status, setStatus] = useState("準備開始新棋局");
+  const [isResigned, setIsResigned] = useState(false);
   const [history, setHistory] = useState([]);
 
   // --- 新增/修改狀態 ---
@@ -24,6 +154,8 @@ function App() {
   const [analysisData, setAnalysisData] = useState([]);
   const [currentMoveIndex, setCurrentMoveIndex] = useState(-1);
   const [humanColor, setHumanColor] = useState("white");
+  const [botDifficulty, setBotDifficulty] = useState("intermediate");
+  const [botStyle, setBotStyle] = useState("balanced");
 
   // 用來自動捲動聊天室
   const chatEndRef = useRef(null);
@@ -61,9 +193,11 @@ function App() {
   }
 
   function resignGame() {
-    if (game.isGameOver()) return;
-    setStatus("你投降了！遊戲結束 (0-1)");
-    saveGameToDB("0-1");
+    if (appMode !== "play" || game.isGameOver() || isResigned || analysisData.length > 0) return;
+    const result = humanColor === "white" ? "0-1" : "1-0";
+    setIsResigned(true);
+    setStatus(`你已投降，遊戲結束：${result === "1-0" ? "白勝" : "黑勝"}`);
+    saveGameToDB(result);
   }
 
   function loadGame(pgn) {
@@ -74,6 +208,7 @@ function App() {
       setStatus("已載入歷史賽局 (復盤模式)");
       setAnalysisData([]);
       setCurrentMoveIndex(-1);
+      setIsResigned(false);
       // 載入新局時，重置聊天室，但保留歡迎訊息
       setChatHistory([{ role: "model", text: "已切換賽局，請隨時問我問題！" }]);
     } catch (e) {
@@ -129,6 +264,13 @@ function App() {
   const displayFen = (currentMoveIndex !== -1 && analysisData.length > 0)
     ? analysisData[currentMoveIndex].fen
     : game.fen();
+  const phaseLessons = TRAINING_LESSONS.filter((lesson) => lesson.phase === trainingPhase);
+  const selectedLesson = TRAINING_LESSONS.find((lesson) => lesson.id === selectedLessonId) || phaseLessons[0] || TRAINING_LESSONS[0];
+  const trainingHistory = trainingGame.history();
+  const expectedTrainingMove = selectedLesson.moves[trainingHistory.length];
+  const trainingComplete = trainingHistory.length >= selectedLesson.moves.length;
+  const boardFen = appMode === "training" ? trainingGame.fen() : displayFen;
+  const boardOrientation = appMode === "training" ? "white" : humanColor;
 
   // 🔥 核心修改：發送訊息給 AI 教練
   // manualQuestion: 如果有的話，代表是玩家手動打字；如果沒有，代表是按「分析按鈕」
@@ -180,7 +322,92 @@ function App() {
     });
   }
 
+  function cloneChess(chessInstance) {
+    const update = new Chess();
+    const pgn = chessInstance.pgn();
+    if (pgn) update.loadPgn(pgn);
+    return update;
+  }
+
+  function createTrainingGame(lesson) {
+    return lesson?.startFen ? new Chess(lesson.startFen) : new Chess();
+  }
+
+  function resetTraining(nextLessonId = selectedLessonId) {
+    const lesson = TRAINING_LESSONS.find((item) => item.id === nextLessonId) || TRAINING_LESSONS[0];
+    setTrainingPhase(lesson.phase);
+    setSelectedLessonId(lesson.id);
+    setTrainingGame(createTrainingGame(lesson));
+    setSelectedSquare(null);
+    setTrainingFeedback({
+      tone: "neutral",
+      text: `${lesson.opening}：${lesson.variation}。先走 ${lesson.moves[0]}，目標是：${lesson.goal}`
+    });
+  }
+
+  function selectTrainingPhase(nextPhase) {
+    const firstLesson = TRAINING_LESSONS.find((lesson) => lesson.phase === nextPhase) || TRAINING_LESSONS[0];
+    resetTraining(firstLesson.id);
+  }
+
+  function playTrainingMove(sourceSquare, targetSquare) {
+    if (trainingComplete) {
+      setTrainingFeedback({ tone: "neutral", text: "這條變體已完成。可以重練，或切換其他變體。" });
+      return false;
+    }
+    if (trainingGame.turn() !== "w") return false;
+
+    const nextGame = cloneChess(trainingGame);
+    let move = null;
+    try {
+      move = nextGame.move({ from: sourceSquare, to: targetSquare, promotion: "q" });
+    } catch {
+      return false;
+    }
+    if (!move) return false;
+
+    const expectedMove = selectedLesson.moves[trainingHistory.length];
+    if (move.san !== expectedMove) {
+      setTrainingFeedback({
+        tone: "warn",
+        text: `這步 ${move.san} 是合法棋，但本變體這裡要練的是 ${expectedMove}。先照主線走，重點是建立「中心、出子、保王」的節奏。`
+      });
+      return false;
+    }
+
+    const ideaIndex = Math.min(Math.floor(trainingHistory.length / 2), selectedLesson.ideas.length - 1);
+    const reply = selectedLesson.moves[nextGame.history().length];
+    if (reply) {
+      try {
+        nextGame.move(reply);
+      } catch {
+        setTrainingFeedback({
+          tone: "warn",
+          text: `主線資料在 ${reply} 這步無法套用，請檢查變體設定。`
+        });
+        return true;
+      }
+    }
+
+    const remaining = selectedLesson.moves.length - nextGame.history().length;
+    setTrainingGame(nextGame);
+    setTrainingFeedback({
+      tone: remaining <= 0 ? "success" : "success",
+      text: remaining <= 0
+        ? `完成 ${selectedLesson.variation}。重點：${selectedLesson.goal}`
+        : `正確：${move.san}。${selectedLesson.ideas[ideaIndex]} 下一步白方要找 ${selectedLesson.moves[nextGame.history().length]}。`
+    });
+    return true;
+  }
+
   function onDrop(sourceSquare, targetSquare) {
+    setSelectedSquare(null);
+    if (appMode === "training") {
+      return playTrainingMove(sourceSquare, targetSquare);
+    }
+
+    if (isResigned) return false;
+
     if (analysisData.length > 0) {
       setStatus("⚠️ 復盤模式下無法移動");
       return false;
@@ -194,7 +421,7 @@ function App() {
 
     try {
       move = tempGame.move({ from: sourceSquare, to: targetSquare, promotion: "q" });
-    } catch (error) { return false; }
+    } catch { return false; }
     if (move === null) return false;
 
     safeGameMutate((g) => {
@@ -214,6 +441,36 @@ function App() {
     return true;
   }
 
+  function handleSquareClick(square) {
+    if ((analysisData.length > 0 || isResigned) && appMode === "play") return;
+
+    if (!selectedSquare) {
+      const activeGame = appMode === "training" ? trainingGame : game;
+      const piece = activeGame.get(square);
+      if (!piece) return;
+      if (appMode === "training" && piece.color !== "w") return;
+      if (appMode === "play" && piece.color !== (humanColor === "white" ? "w" : "b")) return;
+      setSelectedSquare(square);
+      return;
+    }
+
+    if (selectedSquare === square) {
+      setSelectedSquare(null);
+      return;
+    }
+
+    const moved = onDrop(selectedSquare, square);
+    if (!moved) {
+      const activeGame = appMode === "training" ? trainingGame : game;
+      const piece = activeGame.get(square);
+      if (piece && (appMode === "training" ? piece.color === "w" : piece.color === (humanColor === "white" ? "w" : "b"))) {
+        setSelectedSquare(square);
+      } else {
+        setSelectedSquare(null);
+      }
+    }
+  }
+
   function handleGameOver(chessInstance) {
     let result = "Draw";
     if (chessInstance.isCheckmate()) {
@@ -230,7 +487,9 @@ function App() {
     try {
       const response = await axios.post(`${API_URL}/make_move`, { 
         fen: currentFen, 
-        time_limit: 1.5
+        time_limit: 1.5,
+        difficulty: botDifficulty,
+        bot_style: botStyle
       });
       
       const bestMoveUci = response.data.best_move;
@@ -471,7 +730,15 @@ function App() {
             position: "relative",
             border: "1px solid rgba(17,24,39,0.12)"
           }}>
-            <Chessboard position={displayFen} onPieceDrop={onDrop} boardOrientation={humanColor} />
+            <Chessboard
+              position={boardFen}
+              onPieceDrop={onDrop}
+              onSquareClick={handleSquareClick}
+              boardOrientation={boardOrientation}
+              customSquareStyles={selectedSquare ? {
+                [selectedSquare]: { boxShadow: "inset 0 0 0 4px rgba(47,111,78,0.85)" }
+              } : {}}
+            />
             </div>
 
             {/* 導航按鈕 */}
@@ -502,12 +769,23 @@ function App() {
             textAlign: "center",
             border: "1px solid #e5e0d8"
           }}>
-            {status}
+            {appMode === "training" ? "訓練模式：照提示走白方，黑方會自動回應" : status}
           </div>
 
           {/* 控制按鈕 */}
           <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", justifyContent: "center" }}>
-            <button onClick={() => { const ng = new Chess(); setGame(ng); setStatus("新局開始"); setAnalysisData([]); setChatHistory([]); if (humanColor === "black") makeAIMove(ng.fen()); }} style={buttonStyle("#111827")}>新局</button>
+            <button onClick={() => setAppMode("play")} style={buttonStyle(appMode === "play" ? "#111827" : "#9ca3af")}>對局</button>
+            <button onClick={() => { setAppMode("training"); resetTraining(selectedLessonId); }} style={buttonStyle(appMode === "training" ? "#2f6f4e" : "#9ca3af")}>訓練模式</button>
+            <button onClick={() => { const ng = new Chess(); setGame(ng); setStatus("新局開始"); setAnalysisData([]); setCurrentMoveIndex(-1); setIsResigned(false); setChatHistory([]); if (humanColor === "black") makeAIMove(ng.fen()); }} style={buttonStyle("#111827")}>新局</button>
+            {appMode === "play" && (
+              <button
+                onClick={resignGame}
+                disabled={game.isGameOver() || isResigned || analysisData.length > 0}
+                style={buttonStyle(game.isGameOver() || isResigned || analysisData.length > 0 ? "#c7c2b9" : "#9f3a38")}
+              >
+                投降
+              </button>
+            )}
             <button onClick={analyzeGame} style={buttonStyle("#2f6f4e")}>賽後分析</button>
             <button onClick={downloadPGN} style={buttonStyle("#6b5d43")}>匯出 PGN</button>
             <div style={{ display: "flex", gap: "2px" }}>
@@ -515,13 +793,84 @@ function App() {
               <button onClick={() => setHumanColor("black")} style={buttonStyle(humanColor === "black" ? "#333" : "#ccc")}>黑</button>
             </div>
           </div>
+
+          {appMode === "play" && (
+            <div style={{
+              marginTop: "10px",
+              padding: "10px",
+              borderRadius: "8px",
+              backgroundColor: "#ffffff",
+              border: "1px solid #e5e0d8",
+              boxShadow: "0 8px 24px rgba(17,24,39,0.06)"
+            }}>
+              <div style={{ fontSize: "0.78rem", color: "#6b6258", fontWeight: 800, marginBottom: "7px" }}>
+                機器人難度
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "6px" }}>
+                {BOT_DIFFICULTIES.map((difficulty) => (
+                  <button
+                    key={difficulty.id}
+                    onClick={() => setBotDifficulty(difficulty.id)}
+                    disabled={game.history().length > 0 || isResigned || analysisData.length > 0}
+                    title={difficulty.description}
+                    style={{
+                      ...buttonStyle(botDifficulty === difficulty.id ? "#2f6f4e" : "#e5e0d8"),
+                      color: botDifficulty === difficulty.id ? "#ffffff" : "#374151",
+                      padding: "7px 6px",
+                      fontSize: "0.78rem"
+                    }}
+                  >
+                    {difficulty.label}
+                  </button>
+                ))}
+              </div>
+              <div style={{ fontSize: "0.78rem", color: "#6b6258", fontWeight: 800, margin: "10px 0 7px" }}>
+                機器人風格
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "6px" }}>
+                {BOT_STYLES.map((style) => (
+                  <button
+                    key={style.id}
+                    onClick={() => setBotStyle(style.id)}
+                    disabled={game.history().length > 0 || isResigned || analysisData.length > 0}
+                    title={style.description}
+                    style={{
+                      ...buttonStyle(botStyle === style.id ? "#6b5d43" : "#e5e0d8"),
+                      color: botStyle === style.id ? "#ffffff" : "#374151",
+                      padding: "7px 6px",
+                      fontSize: "0.78rem"
+                    }}
+                  >
+                    {style.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* 右側：聊天室 & 分析圖表 */}
         <div style={{ width: "400px", display: "flex", flexDirection: "column", gap: "20px" }}>
 
-          {/* 💬 AI 戰術聊天室 */}
-          <div style={{
+          {appMode === "training" ? (
+            <OpeningTrainingPanel
+              phases={TRAINING_PHASES}
+              trainingPhase={trainingPhase}
+              onSelectPhase={selectTrainingPhase}
+              lessons={phaseLessons}
+              selectedLesson={selectedLesson}
+              selectedLessonId={selectedLessonId}
+              onSelectLesson={resetTraining}
+              feedback={trainingFeedback}
+              history={trainingHistory}
+              expectedMove={expectedTrainingMove}
+              complete={trainingComplete}
+              onReset={() => resetTraining(selectedLessonId)}
+            />
+          ) : (
+          <>
+            {/* 💬 AI 戰術聊天室 */}
+            <div style={{
             backgroundColor: "#ffffff",
             borderRadius: "8px",
             boxShadow: "0 16px 38px rgba(17,24,39,0.10)",
@@ -585,9 +934,11 @@ function App() {
               </button>
             </div>
           </div>
+          </>
+          )}
 
           {/* 📊 分析圖表 (如果有數據) */}
-          {analysisData.length > 0 && (
+          {appMode === "play" && analysisData.length > 0 && (
             <div style={{
               backgroundColor: "#f7f6f3",
               borderRadius: "8px",
@@ -678,6 +1029,7 @@ function App() {
           )}
 
           {/* 歷史戰績 */}
+          {appMode === "play" && (
           <div style={{
             width: "100%",
             maxWidth: "600px",
@@ -734,8 +1086,165 @@ function App() {
               </ul>
             )}
           </div>
+          )}
 
         </div>
+      </div>
+    </div>
+  );
+}
+
+function OpeningTrainingPanel({
+  phases,
+  trainingPhase,
+  onSelectPhase,
+  lessons,
+  selectedLesson,
+  selectedLessonId,
+  onSelectLesson,
+  feedback,
+  history,
+  expectedMove,
+  complete,
+  onReset
+}) {
+  const progress = Math.round((history.length / selectedLesson.moves.length) * 100);
+  const feedbackColor = feedback.tone === "success" ? "#2f6f4e" : feedback.tone === "warn" ? "#a15c18" : "#374151";
+  const feedbackBg = feedback.tone === "success" ? "#edf7f0" : feedback.tone === "warn" ? "#fff4e6" : "#f5f6f4";
+
+  return (
+    <div style={{
+      backgroundColor: "#ffffff",
+      borderRadius: "8px",
+      boxShadow: "0 16px 38px rgba(17,24,39,0.10)",
+      border: "1px solid #e5e0d8",
+      overflow: "hidden"
+    }}>
+      <div style={{ padding: "16px", backgroundColor: "#111827", color: "#f8f5ee" }}>
+        <div style={{ fontSize: "0.82rem", opacity: 0.78, fontWeight: 750 }}>訓練模式</div>
+        <div style={{ fontSize: "1.2rem", fontWeight: 850, marginTop: "2px" }}>{selectedLesson.opening}</div>
+        <div style={{ fontSize: "0.88rem", opacity: 0.88 }}>{selectedLesson.variation}</div>
+      </div>
+
+      <div style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "14px" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "6px" }}>
+          {phases.map((phase) => (
+            <button
+              key={phase.id}
+              onClick={() => onSelectPhase(phase.id)}
+              style={{
+                ...buttonStyle(trainingPhase === phase.id ? "#2f6f4e" : "#e5e0d8"),
+                color: trainingPhase === phase.id ? "#ffffff" : "#374151",
+                padding: "7px 8px"
+              }}
+            >
+              {phase.label}
+            </button>
+          ))}
+        </div>
+
+        <div>
+          <label style={{ display: "block", fontSize: "0.78rem", color: "#6b6258", fontWeight: 800, marginBottom: "6px" }}>
+            選擇題目
+          </label>
+          <select
+            value={selectedLessonId}
+            onChange={(event) => onSelectLesson(event.target.value)}
+            style={{
+              width: "100%",
+              border: "1px solid #d8d2c8",
+              borderRadius: "6px",
+              padding: "9px 10px",
+              color: "#1f2933",
+              backgroundColor: "#fff",
+              fontWeight: 700
+            }}
+          >
+            {lessons.map((lesson) => (
+              <option key={lesson.id} value={lesson.id}>
+                {lesson.variation}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div style={{
+          padding: "12px",
+          borderRadius: "8px",
+          backgroundColor: "#f7f6f3",
+          border: "1px solid #e5e0d8"
+        }}>
+          <div style={{ fontSize: "0.78rem", color: "#6b6258", fontWeight: 800, marginBottom: "4px" }}>本變體目標</div>
+          <div style={{ color: "#263238", fontWeight: 650, lineHeight: 1.45 }}>{selectedLesson.goal}</div>
+        </div>
+
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr",
+          gap: "10px"
+        }}>
+          <div style={trainingMetricStyle}>
+            <span style={metricLabelStyle}>下一步白方</span>
+            <strong>{complete ? "完成" : expectedMove}</strong>
+          </div>
+          <div style={trainingMetricStyle}>
+            <span style={metricLabelStyle}>進度</span>
+            <strong>{progress}%</strong>
+          </div>
+        </div>
+
+        <div style={{
+          height: "8px",
+          backgroundColor: "#e5e0d8",
+          borderRadius: "999px",
+          overflow: "hidden"
+        }}>
+          <div style={{
+            width: `${progress}%`,
+            height: "100%",
+            backgroundColor: "#2f6f4e",
+            transition: "width 0.2s ease"
+          }} />
+        </div>
+
+        <div style={{
+          padding: "12px",
+          borderRadius: "8px",
+          color: feedbackColor,
+          backgroundColor: feedbackBg,
+          border: `1px solid ${feedback.tone === "warn" ? "#f2c48d" : "#d8d2c8"}`,
+          fontWeight: 650,
+          lineHeight: 1.5
+        }}>
+          {feedback.text}
+        </div>
+
+        <div>
+          <div style={{ fontSize: "0.78rem", color: "#6b6258", fontWeight: 800, marginBottom: "6px" }}>目前棋譜</div>
+          <div style={{
+            minHeight: "42px",
+            padding: "10px",
+            borderRadius: "6px",
+            backgroundColor: "#fbfaf7",
+            border: "1px solid #e5e0d8",
+            color: "#374151",
+            fontSize: "0.9rem",
+            lineHeight: 1.5
+          }}>
+            {history.length ? history.join(" ") : "尚未開始"}
+          </div>
+        </div>
+
+        <div>
+          <div style={{ fontSize: "0.78rem", color: "#6b6258", fontWeight: 800, marginBottom: "6px" }}>學習重點</div>
+          <ul style={{ margin: 0, paddingLeft: "18px", color: "#374151", lineHeight: 1.55 }}>
+            {selectedLesson.ideas.map((idea) => (
+              <li key={idea}>{idea}</li>
+            ))}
+          </ul>
+        </div>
+
+        <button onClick={onReset} style={buttonStyle("#111827")}>重練這條變體</button>
       </div>
     </div>
   );
@@ -752,6 +1261,22 @@ function buttonStyle(bgColor) {
 const navButtonStyle = {
   padding: "4px 10px", cursor: "pointer", backgroundColor: "#555", color: "white",
   border: "none", borderRadius: "4px", fontSize: "0.8rem"
+};
+
+const trainingMetricStyle = {
+  padding: "10px",
+  borderRadius: "8px",
+  backgroundColor: "#f7f6f3",
+  border: "1px solid #e5e0d8",
+  display: "flex",
+  flexDirection: "column",
+  gap: "2px"
+};
+
+const metricLabelStyle = {
+  color: "#6b6258",
+  fontSize: "0.75rem",
+  fontWeight: 800
 };
 
 export default App;
