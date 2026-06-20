@@ -8,7 +8,8 @@ import chess_engine
 
 class TricksterSafetyTests(unittest.TestCase):
     def test_rejects_candidate_that_hangs_queen_for_pawn(self):
-        board = chess.Board("4k2r/7p/8/7Q/8/8/8/4K3 w - - 0 1")
+        board = chess.Board("7r/4k2p/8/7Q/8/8/8/4K3 w - - 0 1")
+        self.assertTrue(board.is_valid())
         blunder = board.parse_san("Qxh7")
 
         self.assertTrue(chess_engine.major_piece_loss_after_move(board, blunder))
@@ -22,7 +23,8 @@ class TricksterSafetyTests(unittest.TestCase):
         self.assertFalse(chess_engine.major_piece_loss_after_move(board, mate))
 
     def test_style_bonus_cannot_select_hanging_queen(self):
-        board = chess.Board("4k2r/7p/8/7Q/8/8/8/4K3 w - - 0 1")
+        board = chess.Board("7r/4k2p/8/7Q/8/8/8/4K3 w - - 0 1")
+        self.assertTrue(board.is_valid())
         blunder = board.parse_san("Qxh7")
         safe_move = board.parse_san("Qh3")
 
