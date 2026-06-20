@@ -32,8 +32,8 @@ class TestPosition:
 BOT_CONFIGS = (
     BotConfig("newbie", 1, 0.35, False, False),
     BotConfig("beginner", 2, 0.7, False, False),
-    BotConfig("intermediate", 3, 1.0, True, False),
-    BotConfig("intermediate_trickster", 3, 1.0, False, False, "trickster"),
+    BotConfig("intermediate", 4, 1.25, True, False),
+    BotConfig("intermediate_trickster", 4, 1.25, True, False, "trickster"),
     BotConfig("advanced", 5, 1.5, True, True),
 )
 

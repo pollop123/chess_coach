@@ -353,6 +353,40 @@ def get_pv_line(board, depth):
             break
     return pv_line
 
+def major_piece_loss_after_move(board, move):
+    """Return True when a style candidate permits an immediate bad major-piece trade."""
+    mover = board.turn
+    moving_piece = board.piece_at(move.from_square)
+    captured_piece = board.piece_at(move.to_square) if board.is_capture(move) else None
+    captured_value = piece_values.get(captured_piece.piece_type, 0) if captured_piece else 0
+
+    board.push(move)
+    if board.is_checkmate():
+        board.pop()
+        return False
+
+    for reply in board.legal_moves:
+        if not board.is_capture(reply):
+            continue
+
+        target = board.piece_at(reply.to_square)
+        attacker = board.piece_at(reply.from_square)
+        if not target or not attacker or target.color != mover:
+            continue
+        if target.piece_type not in {chess.ROOK, chess.QUEEN}:
+            continue
+
+        target_value = piece_values[target.piece_type]
+        attacker_value = piece_values[attacker.piece_type]
+        uncompensated_loss = target_value - captured_value
+        if uncompensated_loss >= 300 and target_value - attacker_value >= 150:
+            board.pop()
+            return True
+
+    board.pop()
+    return False
+
+
 def score_trickster_move(board, move):
     """Heuristic bonus for moves that create practical traps for humans."""
     mover = board.turn
@@ -392,10 +426,16 @@ def select_trickster_move(board, depth, best_move, best_score):
         return best_move, best_score, 0
 
     mover = board.turn
-    candidate_depth = max(0, depth - 1)
+    candidate_depth = max(1, depth - 1)
     candidates = []
+    candidate_moves = order_moves(board)[:12]
+    if best_move not in candidate_moves:
+        candidate_moves.append(best_move)
 
-    for move in order_moves(board)[:10]:
+    for move in candidate_moves:
+        if major_piece_loss_after_move(board, move):
+            continue
+
         board.push(move)
         if board.is_game_over():
             score = evaluate_board(board, 1)
@@ -417,7 +457,7 @@ def select_trickster_move(board, depth, best_move, best_score):
             "score": score,
             "perspective_score": perspective_score,
             "bonus": bonus,
-            "style_score": perspective_score + bonus,
+            "style_score": perspective_score + min(bonus, 60),
         })
 
     if not candidates:
@@ -426,7 +466,7 @@ def select_trickster_move(board, depth, best_move, best_score):
     best_perspective = max(item["perspective_score"] for item in candidates)
     viable_candidates = [
         item for item in candidates
-        if item["perspective_score"] >= best_perspective - 180
+        if item["perspective_score"] >= best_perspective - 70
     ]
     selected = max(viable_candidates, key=lambda item: item["style_score"])
     return selected["move"], selected["score"], selected["bonus"]

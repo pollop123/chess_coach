@@ -99,8 +99,8 @@ BOT_DIFFICULTY_PROFILES = {
     },
     "intermediate": {
         "label": "中階",
-        "depth": 3,
-        "time_limit": 1.0,
+        "depth": 4,
+        "time_limit": 1.25,
         "use_book": True,
         "adaptive_depth": False,
     },
@@ -155,7 +155,7 @@ def make_move(request: MakeMoveRequest):
         board, 
         depth=profile["depth"],
         time_limit=min(request.time_limit, profile["time_limit"]),
-        use_book=profile["use_book"] and bot_style != "trickster",
+        use_book=profile["use_book"],
         adaptive_depth=profile["adaptive_depth"],
         style=bot_style,
     )
