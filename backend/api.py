@@ -180,6 +180,8 @@ def make_move(request: MakeMoveRequest):
         "from_book": analysis.get("from_book", False),
         "style_bonus": analysis.get("style_bonus", 0),
         "difficulty_loss": analysis.get("difficulty_loss", 0),
+        "tt_hits": analysis.get("tt_hits", 0),
+        "tt_cutoffs": analysis.get("tt_cutoffs", 0),
     }
 
 # 2. 深度分析端點 (用於分析與教練建議)
@@ -252,7 +254,10 @@ def get_analysis_endpoint(request: GetAnalysisRequest):
             "winning_chance": analysis['winning_chance'],
             "pv_line": analysis['pv'],
             "depth_reached": analysis['depth'],
-            "nodes_searched": analysis['nodes']
+            "nodes_searched": analysis['nodes'],
+            "tt_hits": analysis.get('tt_hits', 0),
+            "tt_cutoffs": analysis.get('tt_cutoffs', 0),
+            "tt_size": analysis.get('tt_size', 0),
         },
         "game_state": game_phase,
         "coach_advice": coach_advice

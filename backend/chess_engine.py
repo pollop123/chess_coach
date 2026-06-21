@@ -3,9 +3,16 @@ import math
 import chess.polyglot
 import os
 import time
+from dataclasses import dataclass
 
-# Transposition table
+# Transposition table shared across iterative-deepening passes and requests.
 transposition_table = {}
+TT_MAX_ENTRIES = 200_000
+TT_EXACT = "exact"
+TT_LOWER = "lower"
+TT_UPPER = "upper"
+tt_generation = 0
+search_stats = {"nodes": 0, "tt_hits": 0, "tt_cutoffs": 0}
 ENGINE_DIR = os.path.dirname(os.path.abspath(__file__))
 BOOK_PATH = os.path.join(ENGINE_DIR, "books", "gm2001.bin")
 
@@ -20,6 +27,72 @@ DIFFICULTY_MOVE_PROFILES = {
     "advanced": {"target_loss": 0, "max_loss": 20, "error_rate": 0, "candidates": 12},
     "challenge": {"target_loss": 0, "max_loss": 20, "error_rate": 0, "candidates": 12},
 }
+
+
+@dataclass(frozen=True)
+class TTEntry:
+    depth: int
+    score: int | float
+    flag: str
+    best_move: chess.Move | None
+    generation: int
+
+
+def tt_key(board):
+    return chess.polyglot.zobrist_hash(board), board.halfmove_clock
+
+
+def score_to_tt(score, ply_from_root):
+    if score > MATE_THRESHOLD:
+        return score + ply_from_root
+    if score < -MATE_THRESHOLD:
+        return score - ply_from_root
+    return score
+
+
+def score_from_tt(score, ply_from_root):
+    if score > MATE_THRESHOLD:
+        return score - ply_from_root
+    if score < -MATE_THRESHOLD:
+        return score + ply_from_root
+    return score
+
+
+def store_tt(key, depth, score, flag, best_move, ply_from_root):
+    current = transposition_table.get(key)
+    if current and current.generation == tt_generation and current.depth > depth:
+        return
+
+    if key not in transposition_table and len(transposition_table) >= TT_MAX_ENTRIES:
+        transposition_table.pop(next(iter(transposition_table)))
+
+    transposition_table[key] = TTEntry(
+        depth=depth,
+        score=score_to_tt(score, ply_from_root),
+        flag=flag,
+        best_move=best_move,
+        generation=tt_generation,
+    )
+
+
+def begin_search_generation():
+    global tt_generation
+    tt_generation += 1
+    search_stats.update(nodes=0, tt_hits=0, tt_cutoffs=0)
+
+    if len(transposition_table) > TT_MAX_ENTRIES // 2:
+        oldest_allowed = tt_generation - 2
+        stale_keys = [
+            key for key, entry in transposition_table.items()
+            if entry.generation < oldest_allowed
+        ]
+        for key in stale_keys:
+            transposition_table.pop(key, None)
+
+
+def reset_transposition_table():
+    transposition_table.clear()
+    search_stats.update(nodes=0, tt_hits=0, tt_cutoffs=0)
 
 def format_evaluation(score):
     """將 centipawn 分數格式化為用戶友好的顯示"""
@@ -285,16 +358,32 @@ def quiescence_search(board, alpha, beta, q_depth=0, ply_from_root=0):
     return beta
 
 def minimax(board, depth, alpha, beta, maximizing_player, ply_from_root=0):
-    if board.is_repetition(2):
+    search_stats["nodes"] += 1
+    is_repetition = board.is_repetition(2)
+    if is_repetition:
         if depth == 0: 
              return evaluate_board(board, ply_from_root), None
 
-    key = chess.polyglot.zobrist_hash(board)
-    tt_entry = transposition_table.get((key, depth, maximizing_player, ply_from_root))
-    tt_move = None
-    
-    if tt_entry:
-        return tt_entry[0], tt_entry[1]
+    alpha_original = alpha
+    beta_original = beta
+    key = tt_key(board)
+    entry = None if is_repetition else transposition_table.get(key)
+    tt_move = entry.best_move if entry else None
+
+    if entry:
+        search_stats["tt_hits"] += 1
+        cached_score = score_from_tt(entry.score, ply_from_root)
+        if entry.depth >= depth:
+            if entry.flag == TT_EXACT:
+                search_stats["tt_cutoffs"] += 1
+                return cached_score, entry.best_move
+            if entry.flag == TT_LOWER:
+                alpha = max(alpha, cached_score)
+            elif entry.flag == TT_UPPER:
+                beta = min(beta, cached_score)
+            if alpha >= beta:
+                search_stats["tt_cutoffs"] += 1
+                return cached_score, entry.best_move
 
     if depth == 0 or board.is_game_over():
         if board.is_game_over():
@@ -302,11 +391,16 @@ def minimax(board, depth, alpha, beta, maximizing_player, ply_from_root=0):
         else:
             val = quiescence_search(board, alpha, beta, ply_from_root=ply_from_root)
         
-        transposition_table[(key, depth, maximizing_player, ply_from_root)] = (val, None)
+        if val <= alpha_original:
+            flag = TT_UPPER
+        elif val >= beta_original:
+            flag = TT_LOWER
+        else:
+            flag = TT_EXACT
+        if not is_repetition:
+            store_tt(key, depth, val, flag, None, ply_from_root)
         return val, None
 
-    # 簡單嘗試獲取同一局面但不同深度的 move 來排序 (加速用)
-    # 這裡因為 Key 包含 depth，所以其實還是拿不到，但邏輯保留沒問題
     moves = order_moves(board, tt_move) 
 
     best_move = None
@@ -322,7 +416,14 @@ def minimax(board, depth, alpha, beta, maximizing_player, ply_from_root=0):
                 best_move = move
             alpha = max(alpha, eval_score)
             if beta <= alpha: break 
-        transposition_table[(key, depth, maximizing_player, ply_from_root)] = (max_eval, best_move)
+        if max_eval <= alpha_original:
+            flag = TT_UPPER
+        elif max_eval >= beta_original:
+            flag = TT_LOWER
+        else:
+            flag = TT_EXACT
+        if not is_repetition:
+            store_tt(key, depth, max_eval, flag, best_move, ply_from_root)
         return max_eval, best_move
     else:
         min_eval = math.inf
@@ -336,7 +437,14 @@ def minimax(board, depth, alpha, beta, maximizing_player, ply_from_root=0):
                 best_move = move
             beta = min(beta, eval_score)
             if beta <= alpha: break
-        transposition_table[(key, depth, maximizing_player, ply_from_root)] = (min_eval, best_move)
+        if min_eval <= alpha_original:
+            flag = TT_UPPER
+        elif min_eval >= beta_original:
+            flag = TT_LOWER
+        else:
+            flag = TT_EXACT
+        if not is_repetition:
+            store_tt(key, depth, min_eval, flag, best_move, ply_from_root)
         return min_eval, best_move
 
 # 🔥 補上：你漏掉了這個函式
@@ -344,19 +452,13 @@ def get_pv_line(board, depth):
     """從置換表 (TT) 重建預測變例 (Principal Variation)"""
     pv_line = []
     curr_board = board.copy()
-    is_maximizing = curr_board.turn == chess.WHITE
-    ply_from_root = 0
-    
-    for d in range(depth, 0, -1):
-        key = chess.polyglot.zobrist_hash(curr_board)
-        tt_entry = transposition_table.get((key, d, is_maximizing, ply_from_root))
-        
-        if tt_entry and tt_entry[1]:
-            move = tt_entry[1]
+    for _ in range(depth):
+        entry = transposition_table.get(tt_key(curr_board))
+
+        if entry and entry.best_move and entry.best_move in curr_board.legal_moves:
+            move = entry.best_move
             pv_line.append(move.uci())
             curr_board.push(move)
-            is_maximizing = not is_maximizing
-            ply_from_root += 1
         else:
             break
     return pv_line
@@ -554,6 +656,9 @@ def get_analysis(
                         'book_line': book_line,
                         'depth': 0,  # 來自開局庫
                         'nodes': 0,
+                        'tt_hits': 0,
+                        'tt_cutoffs': 0,
+                        'tt_size': len(transposition_table),
                         'from_book': True,
                         'difficulty_loss': 0,
                     }
@@ -561,7 +666,7 @@ def get_analysis(
             # 開局庫缺局面或檔案不可用時，直接回到引擎計算。
             pass
     
-    transposition_table.clear()
+    begin_search_generation()
     is_maximizing = board.turn == chess.WHITE
     
     # 根據子力數量動態調整基礎深度
@@ -587,15 +692,16 @@ def get_analysis(
             best_move = move
             best_score = score
             final_depth = current_depth
-            nodes_searched = len(transposition_table)
+            nodes_searched = search_stats["nodes"]
     else:
         # 固定深度搜尋
         best_score, best_move = minimax(board, depth, -math.inf, math.inf, is_maximizing)
-        nodes_searched = len(transposition_table)
+        nodes_searched = search_stats["nodes"]
 
     style_bonus = 0
     difficulty_loss = 0
-    if best_move:
+    needs_move_overlay = style == "trickster" or difficulty not in {"advanced", "challenge"}
+    if best_move and needs_move_overlay:
         best_move, best_score, style_bonus, difficulty_loss = select_difficulty_move(
             board,
             final_depth,
@@ -617,6 +723,9 @@ def get_analysis(
         'book_line': [],
         'depth': final_depth,
         'nodes': nodes_searched,
+        'tt_hits': search_stats["tt_hits"],
+        'tt_cutoffs': search_stats["tt_cutoffs"],
+        'tt_size': len(transposition_table),
         'from_book': False,
         'style': style,
         'style_bonus': style_bonus,

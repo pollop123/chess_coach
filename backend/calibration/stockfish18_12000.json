@@ -214,11 +214,11 @@
     {
       "config": "beginner",
       "positions": 14,
-      "acpl": 64.9,
-      "median_loss": 19.0,
-      "avg_expectation_loss": 0.0861,
-      "best_move_rate": 0.429,
-      "blunder_rate": 0.143,
+      "acpl": 82.1,
+      "median_loss": 25.0,
+      "avg_expectation_loss": 0.1528,
+      "best_move_rate": 0.357,
+      "blunder_rate": 0.357,
       "major_piece_hangs": 0,
       "missed_mates": 0,
       "results": [
@@ -239,30 +239,30 @@
         {
           "name": "ruy_lopez",
           "phase": "opening",
-          "played": "Bxc6",
+          "played": "Bb3",
           "stockfish_best": "Re1",
-          "loss_cp": 35,
-          "expectation_loss": 0.0675,
-          "best_move": false,
-          "blunder": false,
-          "major_piece_hang": false,
-          "missed_mate": false,
-          "depth": 2,
-          "difficulty_loss": 40
-        },
-        {
-          "name": "najdorf",
-          "phase": "opening",
-          "played": "Bxa6",
-          "stockfish_best": "Bg5",
-          "loss_cp": 370,
-          "expectation_loss": 0.5695,
+          "loss_cp": 118,
+          "expectation_loss": 0.2015,
           "best_move": false,
           "blunder": true,
           "major_piece_hang": false,
           "missed_mate": false,
           "depth": 2,
-          "difficulty_loss": 200
+          "difficulty_loss": 150
+        },
+        {
+          "name": "najdorf",
+          "phase": "opening",
+          "played": "e5",
+          "stockfish_best": "Bg5",
+          "loss_cp": 183,
+          "expectation_loss": 0.463,
+          "best_move": false,
+          "blunder": true,
+          "major_piece_hang": false,
+          "missed_mate": false,
+          "depth": 2,
+          "difficulty_loss": 115
         },
         {
           "name": "queens_gambit_declined",
@@ -281,30 +281,30 @@
         {
           "name": "caro_kann",
           "phase": "opening",
-          "played": "Nf3",
+          "played": "d5",
           "stockfish_best": "h4",
-          "loss_cp": 3,
-          "expectation_loss": 0.006,
-          "best_move": true,
-          "blunder": false,
+          "loss_cp": 184,
+          "expectation_loss": 0.4685,
+          "best_move": false,
+          "blunder": true,
           "major_piece_hang": false,
           "missed_mate": false,
           "depth": 2,
-          "difficulty_loss": 0
+          "difficulty_loss": 150
         },
         {
           "name": "italian_center",
           "phase": "middlegame",
-          "played": "Nxc3",
+          "played": "Nf6",
           "stockfish_best": "Bxc3",
-          "loss_cp": 59,
-          "expectation_loss": 0.073,
+          "loss_cp": 219,
+          "expectation_loss": 0.5115,
           "best_move": false,
-          "blunder": false,
+          "blunder": true,
           "major_piece_hang": false,
           "missed_mate": false,
           "depth": 2,
-          "difficulty_loss": 0
+          "difficulty_loss": 120
         },
         {
           "name": "french_center",
@@ -393,16 +393,16 @@
         {
           "name": "king_pawn_opposition",
           "phase": "endgame",
-          "played": "Kf4",
+          "played": "e5",
           "stockfish_best": "Kd4",
-          "loss_cp": 7,
-          "expectation_loss": 0.008,
+          "loss_cp": 12,
+          "expectation_loss": 0.0135,
           "best_move": true,
           "blunder": false,
           "major_piece_hang": false,
           "missed_mate": false,
           "depth": 2,
-          "difficulty_loss": 10
+          "difficulty_loss": 130
         },
         {
           "name": "rook_endgame",
@@ -423,8 +423,8 @@
     {
       "config": "intermediate",
       "positions": 14,
-      "acpl": 35.3,
-      "median_loss": 9.5,
+      "acpl": 35.2,
+      "median_loss": 9.0,
       "avg_expectation_loss": 0.0404,
       "best_move_rate": 0.643,
       "blunder_rate": 0.071,
@@ -568,7 +568,7 @@
           "blunder": true,
           "major_piece_hang": false,
           "missed_mate": false,
-          "depth": 3,
+          "depth": 4,
           "difficulty_loss": 0
         },
         {
@@ -602,16 +602,16 @@
         {
           "name": "king_pawn_opposition",
           "phase": "endgame",
-          "played": "Kf4",
+          "played": "Kf2",
           "stockfish_best": "Kd4",
-          "loss_cp": 7,
-          "expectation_loss": 0.008,
+          "loss_cp": 6,
+          "expectation_loss": 0.007,
           "best_move": true,
           "blunder": false,
           "major_piece_hang": false,
           "missed_mate": false,
           "depth": 4,
-          "difficulty_loss": 15
+          "difficulty_loss": 35
         },
         {
           "name": "rook_endgame",
@@ -777,7 +777,7 @@
           "blunder": true,
           "major_piece_hang": false,
           "missed_mate": false,
-          "depth": 3,
+          "depth": 4,
           "difficulty_loss": 0
         },
         {
@@ -805,7 +805,7 @@
           "blunder": false,
           "major_piece_hang": false,
           "missed_mate": false,
-          "depth": 7,
+          "depth": 8,
           "difficulty_loss": 0
         },
         {

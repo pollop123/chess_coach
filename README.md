@@ -20,6 +20,7 @@
   
 - **搜尋優化**：
   - 迭代加深搜尋（Iterative Deepening）
+  - 具有 `EXACT / LOWER / UPPER` 邊界的 Zobrist 置換表，可跨深度與重複分析重用
   - 動態深度調整（殘局自動加深至 Depth 8）
   - 靜止搜索（Quiescence Search）防止水平線效應
   - 時限控制（確保 API 不超時）

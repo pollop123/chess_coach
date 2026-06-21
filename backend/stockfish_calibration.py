@@ -164,6 +164,7 @@ def analyze_with_stockfish(engine, board, move, nodes):
 def run_config(stockfish, config, positions, nodes):
     results = []
     for position in positions:
+        chess_engine.reset_transposition_table()
         board = chess.Board(position.fen)
         analysis = chess_engine.get_analysis(
             board,
