@@ -24,6 +24,11 @@
   - 靜止搜索（Quiescence Search）防止水平線效應
   - 時限控制（確保 API 不超時）
 
+- **可校準的四級難度**：
+  - 新手、初階、中階使用不同的安全失誤帶，同一局面會穩定重現同一走法
+  - 中階加強使用自製引擎在當前時間與深度下的最佳手
+  - 所有難度都會淘汰會立即淨送后或車的風格候選手
+
 - **效能表現**：
   - 快速走法：透過時限搜尋控制回應時間
   - 深度分析：依局面複雜度與設定深度調整
@@ -142,6 +147,25 @@
    # 在專案根目錄執行
    ./start_local.sh
    ```
+
+### 用 Stockfish 校準機器人強度
+
+Stockfish 只擔任裁判，實戰走棋仍由本專案的 Minimax 引擎負責。
+
+```bash
+brew install stockfish
+PYTHONPATH=backend .venv/bin/python backend/stockfish_calibration.py --nodes 12000
+```
+
+也可以用 `STOCKFISH_PATH` 指定其他 UCI 執行檔。報告包含：
+
+- `ACPL`：與 Stockfish 最佳手的平均百分兵損失
+- `WPL`：平均預期得分損失，在已勝或已敗局面比 ACPL 穩定
+- `near-best`：與 Stockfish 評分差不超過 15cp 的比例
+- `blunders`：單手造成至少 20% 預期得分損失的比例
+- `hangs` 與 `missed_mates`：送大子與漏將死次數
+
+這些是固定局面的走法品質指標，不是 Elo。要估計 Elo，還需要使用固定時制進行大量對局。
 
 ### Docker 相關指令
 

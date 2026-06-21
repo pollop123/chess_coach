@@ -103,6 +103,7 @@ def evaluate_position(config: BotConfig, position: TestPosition) -> dict:
         use_book=config.use_book,
         adaptive_depth=config.adaptive_depth,
         style=config.style,
+        difficulty=config.name.removesuffix("_trickster"),
     )
     elapsed_ms = round((time.perf_counter() - started) * 1000)
     san = move_to_san(board, analysis.get("best_move"))
@@ -123,6 +124,7 @@ def evaluate_position(config: BotConfig, position: TestPosition) -> dict:
         "from_book": analysis.get("from_book", False),
         "style": analysis.get("style", "balanced"),
         "style_bonus": analysis.get("style_bonus", 0),
+        "difficulty_loss": analysis.get("difficulty_loss", 0),
         "nodes": analysis.get("nodes"),
         "elapsed_ms": elapsed_ms,
         "note": position.note,

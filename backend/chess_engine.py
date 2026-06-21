@@ -13,6 +13,14 @@ BOOK_PATH = os.path.join(ENGINE_DIR, "books", "gm2001.bin")
 MATE_SCORE = 20000
 MATE_THRESHOLD = 15000
 
+DIFFICULTY_MOVE_PROFILES = {
+    "newbie": {"target_loss": 220, "max_loss": 350, "error_rate": 60, "candidates": 18},
+    "beginner": {"target_loss": 140, "max_loss": 240, "error_rate": 45, "candidates": 16},
+    "intermediate": {"target_loss": 60, "max_loss": 110, "error_rate": 25, "candidates": 14},
+    "advanced": {"target_loss": 0, "max_loss": 20, "error_rate": 0, "candidates": 12},
+    "challenge": {"target_loss": 0, "max_loss": 20, "error_rate": 0, "candidates": 12},
+}
+
 def format_evaluation(score):
     """將 centipawn 分數格式化為用戶友好的顯示"""
     if abs(score) > MATE_THRESHOLD:
@@ -420,15 +428,24 @@ def score_trickster_move(board, move):
     return bonus
 
 
-def select_trickster_move(board, depth, best_move, best_score):
-    """Pick a trap-oriented move among near-best candidates."""
+def should_apply_difficulty_error(board, profile):
+    error_rate = profile["error_rate"]
+    if error_rate <= 0:
+        return False
+    position_bucket = (chess.polyglot.zobrist_hash(board) >> 40) % 100
+    return position_bucket < error_rate
+
+
+def select_difficulty_move(board, depth, best_move, best_score, difficulty, style):
+    """Select a reproducible, safe move from a difficulty-specific loss band."""
     if best_move is None:
-        return best_move, best_score, 0
+        return best_move, best_score, 0, 0
 
     mover = board.turn
+    profile = DIFFICULTY_MOVE_PROFILES.get(difficulty, DIFFICULTY_MOVE_PROFILES["advanced"])
     candidate_depth = max(1, depth - 1)
     candidates = []
-    candidate_moves = order_moves(board)[:12]
+    candidate_moves = order_moves(board)[:profile["candidates"]]
     if best_move not in candidate_moves:
         candidate_moves.append(best_move)
 
@@ -451,28 +468,52 @@ def select_trickster_move(board, depth, best_move, best_score):
         board.pop()
 
         perspective_score = score if mover == chess.WHITE else -score
-        bonus = score_trickster_move(board, move)
+        bonus = score_trickster_move(board, move) if style == "trickster" else 0
         candidates.append({
             "move": move,
             "score": score,
             "perspective_score": perspective_score,
             "bonus": bonus,
-            "style_score": perspective_score + min(bonus, 60),
         })
 
     if not candidates:
-        return best_move, best_score, 0
+        return best_move, best_score, 0, 0
 
     best_perspective = max(item["perspective_score"] for item in candidates)
-    viable_candidates = [
-        item for item in candidates
-        if item["perspective_score"] >= best_perspective - 70
-    ]
-    selected = max(viable_candidates, key=lambda item: item["style_score"])
-    return selected["move"], selected["score"], selected["bonus"]
+    for item in candidates:
+        item["loss"] = max(0, best_perspective - item["perspective_score"])
+
+    viable_candidates = [item for item in candidates if item["loss"] <= profile["max_loss"]]
+    if not viable_candidates:
+        return best_move, best_score, 0, 0
+
+    target_loss = profile["target_loss"] if should_apply_difficulty_error(board, profile) else 0
+
+    def selection_key(item):
+        style_influence = min(item["bonus"], 35) if style == "trickster" else 0
+        return (-abs(item["loss"] - target_loss) + style_influence, item["perspective_score"])
+
+    selected = max(viable_candidates, key=selection_key)
+    return selected["move"], selected["score"], selected["bonus"], selected["loss"]
 
 
-def get_analysis(board, depth=3, time_limit=None, use_book=True, adaptive_depth=True, style="balanced"):
+def select_trickster_move(board, depth, best_move, best_score):
+    """Backward-compatible wrapper for the intermediate trap personality."""
+    move, score, bonus, _loss = select_difficulty_move(
+        board, depth, best_move, best_score, "intermediate", "trickster"
+    )
+    return move, score, bonus
+
+
+def get_analysis(
+    board,
+    depth=3,
+    time_limit=None,
+    use_book=True,
+    adaptive_depth=True,
+    style="balanced",
+    difficulty="advanced",
+):
     """
     深度分析棋盤局面
     
@@ -483,6 +524,7 @@ def get_analysis(board, depth=3, time_limit=None, use_book=True, adaptive_depth=
         use_book: 是否使用開局庫
         adaptive_depth: 是否在殘局自動加深
         style: balanced 或 trickster
+        difficulty: newbie、beginner、intermediate 或 advanced
     
     Returns:
         dict: {
@@ -512,7 +554,8 @@ def get_analysis(board, depth=3, time_limit=None, use_book=True, adaptive_depth=
                         'book_line': book_line,
                         'depth': 0,  # 來自開局庫
                         'nodes': 0,
-                        'from_book': True
+                        'from_book': True,
+                        'difficulty_loss': 0,
                     }
         except Exception:
             # 開局庫缺局面或檔案不可用時，直接回到引擎計算。
@@ -551,8 +594,16 @@ def get_analysis(board, depth=3, time_limit=None, use_book=True, adaptive_depth=
         nodes_searched = len(transposition_table)
 
     style_bonus = 0
-    if style == "trickster" and best_move:
-        best_move, best_score, style_bonus = select_trickster_move(board, final_depth, best_move, best_score)
+    difficulty_loss = 0
+    if best_move:
+        best_move, best_score, style_bonus, difficulty_loss = select_difficulty_move(
+            board,
+            final_depth,
+            best_move,
+            best_score,
+            difficulty,
+            style,
+        )
     
     # 提取 PV Line
     pv_line = get_pv_line(board, final_depth)
@@ -569,6 +620,7 @@ def get_analysis(board, depth=3, time_limit=None, use_book=True, adaptive_depth=
         'from_book': False,
         'style': style,
         'style_bonus': style_bonus,
+        'difficulty_loss': difficulty_loss,
     }
 
 def get_best_move(board, depth=5):

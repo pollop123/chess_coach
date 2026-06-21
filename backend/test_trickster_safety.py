@@ -7,6 +7,49 @@ import chess_engine
 
 
 class TricksterSafetyTests(unittest.TestCase):
+    def test_difficulty_profiles_choose_distinct_loss_bands(self):
+        board = chess.Board()
+        moves = {
+            "best": board.parse_san("e4"),
+            "intermediate": board.parse_san("d4"),
+            "beginner": board.parse_san("Nf3"),
+            "newbie": board.parse_san("c4"),
+        }
+        scores = {
+            moves["best"]: 100,
+            moves["intermediate"]: 40,
+            moves["beginner"]: -40,
+            moves["newbie"]: -120,
+        }
+
+        def fake_minimax(candidate_board, *_args, **_kwargs):
+            return scores[candidate_board.peek()], None
+
+        expected = {
+            "newbie": moves["newbie"],
+            "beginner": moves["beginner"],
+            "intermediate": moves["intermediate"],
+            "advanced": moves["best"],
+        }
+
+        with (
+            patch("chess_engine.order_moves", return_value=list(moves.values())),
+            patch("chess_engine.minimax", side_effect=fake_minimax),
+            patch("chess_engine.major_piece_loss_after_move", return_value=False),
+            patch("chess_engine.should_apply_difficulty_error", return_value=True),
+        ):
+            for difficulty, expected_move in expected.items():
+                with self.subTest(difficulty=difficulty):
+                    selected, _score, _bonus, _loss = chess_engine.select_difficulty_move(
+                        board,
+                        depth=1,
+                        best_move=moves["best"],
+                        best_score=100,
+                        difficulty=difficulty,
+                        style="balanced",
+                    )
+                    self.assertEqual(selected, expected_move)
+
     def test_rejects_candidate_that_hangs_queen_for_pawn(self):
         board = chess.Board("7r/4k2p/8/7Q/8/8/8/4K3 w - - 0 1")
         self.assertTrue(board.is_valid())

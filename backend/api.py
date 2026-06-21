@@ -147,7 +147,8 @@ def make_move(request: MakeMoveRequest):
             "fen": request.fen
         }
 
-    profile = BOT_DIFFICULTY_PROFILES.get(request.difficulty, BOT_DIFFICULTY_PROFILES["intermediate"])
+    difficulty = request.difficulty if request.difficulty in BOT_DIFFICULTY_PROFILES else "intermediate"
+    profile = BOT_DIFFICULTY_PROFILES[difficulty]
     bot_style = request.bot_style if request.bot_style in {"balanced", "trickster"} else "balanced"
 
     # 使用難度檔位控制搜尋深度、開局庫與殘局自動加深。
@@ -158,6 +159,7 @@ def make_move(request: MakeMoveRequest):
         use_book=profile["use_book"],
         adaptive_depth=profile["adaptive_depth"],
         style=bot_style,
+        difficulty=difficulty,
     )
 
     if not analysis['best_move']:
@@ -171,12 +173,13 @@ def make_move(request: MakeMoveRequest):
         "fen": board.fen(),
         "is_game_over": board.is_game_over(),
         "result": board.result() if board.is_game_over() else None,
-        "difficulty": request.difficulty,
+        "difficulty": difficulty,
         "difficulty_label": profile["label"],
         "bot_style": bot_style,
         "depth_reached": analysis["depth"],
         "from_book": analysis.get("from_book", False),
         "style_bonus": analysis.get("style_bonus", 0),
+        "difficulty_loss": analysis.get("difficulty_loss", 0),
     }
 
 # 2. 深度分析端點 (用於分析與教練建議)
