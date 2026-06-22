@@ -5,10 +5,10 @@
     {
       "config": "newbie",
       "positions": 14,
-      "acpl": 125.9,
+      "acpl": 124.8,
       "median_loss": 97.5,
-      "avg_expectation_loss": 0.209,
-      "best_move_rate": 0.286,
+      "avg_expectation_loss": 0.2074,
+      "best_move_rate": 0.357,
       "blunder_rate": 0.429,
       "major_piece_hangs": 0,
       "missed_mates": 0,
@@ -58,11 +58,11 @@
         {
           "name": "queens_gambit_declined",
           "phase": "opening",
-          "played": "cxd5",
+          "played": "Nf3",
           "stockfish_best": "Nf3",
-          "loss_cp": 17,
-          "expectation_loss": 0.0265,
-          "best_move": false,
+          "loss_cp": 2,
+          "expectation_loss": 0.0035,
+          "best_move": true,
           "blunder": false,
           "major_piece_hang": false,
           "missed_mate": false,
@@ -214,10 +214,10 @@
     {
       "config": "beginner",
       "positions": 14,
-      "acpl": 82.1,
+      "acpl": 81.1,
       "median_loss": 25.0,
-      "avg_expectation_loss": 0.1528,
-      "best_move_rate": 0.357,
+      "avg_expectation_loss": 0.1512,
+      "best_move_rate": 0.429,
       "blunder_rate": 0.357,
       "major_piece_hangs": 0,
       "missed_mates": 0,
@@ -267,15 +267,15 @@
         {
           "name": "queens_gambit_declined",
           "phase": "opening",
-          "played": "cxd5",
+          "played": "Nf3",
           "stockfish_best": "Nf3",
-          "loss_cp": 17,
-          "expectation_loss": 0.0265,
-          "best_move": false,
+          "loss_cp": 2,
+          "expectation_loss": 0.0035,
+          "best_move": true,
           "blunder": false,
           "major_piece_hang": false,
           "missed_mate": false,
-          "depth": 2,
+          "depth": 1,
           "difficulty_loss": 0
         },
         {
@@ -317,7 +317,7 @@
           "blunder": false,
           "major_piece_hang": false,
           "missed_mate": false,
-          "depth": 2,
+          "depth": 1,
           "difficulty_loss": 0
         },
         {
@@ -512,8 +512,8 @@
           "blunder": false,
           "major_piece_hang": false,
           "missed_mate": false,
-          "depth": 4,
-          "difficulty_loss": 70
+          "depth": 3,
+          "difficulty_loss": 80
         },
         {
           "name": "french_center",
@@ -554,7 +554,7 @@
           "blunder": false,
           "major_piece_hang": false,
           "missed_mate": false,
-          "depth": 4,
+          "depth": 3,
           "difficulty_loss": 0
         },
         {
@@ -568,7 +568,7 @@
           "blunder": true,
           "major_piece_hang": false,
           "missed_mate": false,
-          "depth": 4,
+          "depth": 3,
           "difficulty_loss": 0
         },
         {
@@ -721,7 +721,7 @@
           "blunder": false,
           "major_piece_hang": false,
           "missed_mate": false,
-          "depth": 4,
+          "depth": 3,
           "difficulty_loss": 0
         },
         {
@@ -763,7 +763,7 @@
           "blunder": false,
           "major_piece_hang": false,
           "missed_mate": false,
-          "depth": 5,
+          "depth": 4,
           "difficulty_loss": 0
         },
         {
@@ -777,7 +777,7 @@
           "blunder": true,
           "major_piece_hang": false,
           "missed_mate": false,
-          "depth": 4,
+          "depth": 3,
           "difficulty_loss": 0
         },
         {
@@ -791,7 +791,7 @@
           "blunder": false,
           "major_piece_hang": false,
           "missed_mate": false,
-          "depth": 8,
+          "depth": 7,
           "difficulty_loss": 0
         },
         {
@@ -805,7 +805,7 @@
           "blunder": false,
           "major_piece_hang": false,
           "missed_mate": false,
-          "depth": 8,
+          "depth": 7,
           "difficulty_loss": 0
         },
         {

@@ -2,6 +2,7 @@ import chess
 import math
 import chess.polyglot
 import os
+import threading
 import time
 from dataclasses import dataclass
 
@@ -13,6 +14,7 @@ TT_LOWER = "lower"
 TT_UPPER = "upper"
 tt_generation = 0
 search_stats = {"nodes": 0, "tt_hits": 0, "tt_cutoffs": 0}
+search_runtime = threading.local()
 ENGINE_DIR = os.path.dirname(os.path.abspath(__file__))
 BOOK_PATH = os.path.join(ENGINE_DIR, "books", "gm2001.bin")
 
@@ -36,6 +38,19 @@ class TTEntry:
     flag: str
     best_move: chess.Move | None
     generation: int
+
+
+class SearchTimeout(Exception):
+    pass
+
+
+def visit_search_node():
+    search_stats["nodes"] += 1
+    if search_stats["nodes"] % 64 != 0:
+        return
+    deadline = getattr(search_runtime, "deadline", None)
+    if deadline is not None and time.monotonic() >= deadline:
+        raise SearchTimeout
 
 
 def tt_key(board):
@@ -75,10 +90,11 @@ def store_tt(key, depth, score, flag, best_move, ply_from_root):
     )
 
 
-def begin_search_generation():
+def begin_search_generation(deadline=None):
     global tt_generation
     tt_generation += 1
     search_stats.update(nodes=0, tt_hits=0, tt_cutoffs=0)
+    search_runtime.deadline = deadline
 
     if len(transposition_table) > TT_MAX_ENTRIES // 2:
         oldest_allowed = tt_generation - 2
@@ -93,6 +109,7 @@ def begin_search_generation():
 def reset_transposition_table():
     transposition_table.clear()
     search_stats.update(nodes=0, tt_hits=0, tt_cutoffs=0)
+    search_runtime.deadline = None
 
 def format_evaluation(score):
     """將 centipawn 分數格式化為用戶友好的顯示"""
@@ -325,6 +342,7 @@ def evaluate_board(board, ply_from_root=0):
     return score
 
 def quiescence_search(board, alpha, beta, q_depth=0, ply_from_root=0):
+    visit_search_node()
     if board.is_game_over():
         return evaluate_board(board, ply_from_root)
 
@@ -340,8 +358,10 @@ def quiescence_search(board, alpha, beta, q_depth=0, ply_from_root=0):
 
         for move in capture_moves:
             board.push(move)
-            score = quiescence_search(board, alpha, beta, q_depth + 1, ply_from_root + 1)
-            board.pop()
+            try:
+                score = quiescence_search(board, alpha, beta, q_depth + 1, ply_from_root + 1)
+            finally:
+                board.pop()
             if score >= beta: return beta
             if score > alpha: alpha = score
         return alpha
@@ -351,14 +371,16 @@ def quiescence_search(board, alpha, beta, q_depth=0, ply_from_root=0):
 
     for move in capture_moves:
         board.push(move)
-        score = quiescence_search(board, alpha, beta, q_depth + 1, ply_from_root + 1)
-        board.pop()
+        try:
+            score = quiescence_search(board, alpha, beta, q_depth + 1, ply_from_root + 1)
+        finally:
+            board.pop()
         if score <= alpha: return alpha
         if score < beta: beta = score
     return beta
 
 def minimax(board, depth, alpha, beta, maximizing_player, ply_from_root=0):
-    search_stats["nodes"] += 1
+    visit_search_node()
     is_repetition = board.is_repetition(2)
     if is_repetition:
         if depth == 0: 
@@ -408,8 +430,10 @@ def minimax(board, depth, alpha, beta, maximizing_player, ply_from_root=0):
         max_eval = -math.inf
         for move in moves:
             board.push(move)
-            eval_score, _ = minimax(board, depth - 1, alpha, beta, False, ply_from_root + 1)
-            board.pop()
+            try:
+                eval_score, _ = minimax(board, depth - 1, alpha, beta, False, ply_from_root + 1)
+            finally:
+                board.pop()
             
             if eval_score > max_eval:
                 max_eval = eval_score
@@ -429,8 +453,10 @@ def minimax(board, depth, alpha, beta, maximizing_player, ply_from_root=0):
         min_eval = math.inf
         for move in moves:
             board.push(move)
-            eval_score, _ = minimax(board, depth - 1, alpha, beta, True, ply_from_root + 1)
-            board.pop()
+            try:
+                eval_score, _ = minimax(board, depth - 1, alpha, beta, True, ply_from_root + 1)
+            finally:
+                board.pop()
             
             if eval_score < min_eval:
                 min_eval = eval_score
@@ -547,27 +573,31 @@ def select_difficulty_move(board, depth, best_move, best_score, difficulty, styl
     profile = DIFFICULTY_MOVE_PROFILES.get(difficulty, DIFFICULTY_MOVE_PROFILES["advanced"])
     candidate_depth = max(1, depth - 1)
     candidates = []
-    candidate_moves = order_moves(board)[:profile["candidates"]]
-    if best_move not in candidate_moves:
-        candidate_moves.append(best_move)
+    ordered_candidates = order_moves(board)[:profile["candidates"]]
+    candidate_moves = [best_move, *[move for move in ordered_candidates if move != best_move]]
 
     for move in candidate_moves:
         if major_piece_loss_after_move(board, move):
             continue
 
-        board.push(move)
-        if board.is_game_over():
-            score = evaluate_board(board, 1)
-        else:
-            score, _ = minimax(
-                board,
-                candidate_depth,
-                -math.inf,
-                math.inf,
-                board.turn == chess.WHITE,
-                1,
-            )
-        board.pop()
+        try:
+            board.push(move)
+            try:
+                if board.is_game_over():
+                    score = evaluate_board(board, 1)
+                else:
+                    score, _ = minimax(
+                        board,
+                        candidate_depth,
+                        -math.inf,
+                        math.inf,
+                        board.turn == chess.WHITE,
+                        1,
+                    )
+            finally:
+                board.pop()
+        except SearchTimeout:
+            break
 
         perspective_score = score if mover == chess.WHITE else -score
         bonus = score_trickster_move(board, move) if style == "trickster" else 0
@@ -666,7 +696,14 @@ def get_analysis(
             # 開局庫缺局面或檔案不可用時，直接回到引擎計算。
             pass
     
-    begin_search_generation()
+    started_at = time.monotonic()
+    overall_deadline = started_at + time_limit if time_limit else None
+    needs_move_overlay = style == "trickster" or difficulty not in {"advanced", "challenge"}
+    if overall_deadline and needs_move_overlay:
+        search_deadline = started_at + time_limit * 0.65
+    else:
+        search_deadline = overall_deadline
+    begin_search_generation(deadline=search_deadline)
     is_maximizing = board.turn == chess.WHITE
     
     # 根據子力數量動態調整基礎深度
@@ -681,14 +718,18 @@ def get_analysis(
     best_score = -math.inf
     nodes_searched = 0
     final_depth = depth
+    timed_out = False
     
     # 迭代加深搜尋 (Iterative Deepening)
     if time_limit:
-        start_time = time.time()
         for current_depth in range(1, depth + 1):
-            if time.time() - start_time > time_limit:
+            if time.monotonic() >= search_deadline:
                 break
-            score, move = minimax(board, current_depth, -math.inf, math.inf, is_maximizing)
+            try:
+                score, move = minimax(board, current_depth, -math.inf, math.inf, is_maximizing)
+            except SearchTimeout:
+                timed_out = True
+                break
             best_move = move
             best_score = score
             final_depth = current_depth
@@ -698,18 +739,35 @@ def get_analysis(
         best_score, best_move = minimax(board, depth, -math.inf, math.inf, is_maximizing)
         nodes_searched = search_stats["nodes"]
 
+    if best_move is None:
+        safe_moves = [move for move in order_moves(board) if not major_piece_loss_after_move(board, move)]
+        fallback_moves = safe_moves or list(board.legal_moves)
+        best_move = fallback_moves[0] if fallback_moves else None
+        if best_move:
+            board.push(best_move)
+            try:
+                best_score = evaluate_board(board, 1)
+            finally:
+                board.pop()
+        final_depth = 0
+        nodes_searched = search_stats["nodes"]
+
     style_bonus = 0
     difficulty_loss = 0
-    needs_move_overlay = style == "trickster" or difficulty not in {"advanced", "challenge"}
     if best_move and needs_move_overlay:
-        best_move, best_score, style_bonus, difficulty_loss = select_difficulty_move(
-            board,
-            final_depth,
-            best_move,
-            best_score,
-            difficulty,
-            style,
-        )
+        search_runtime.deadline = overall_deadline
+        try:
+            best_move, best_score, style_bonus, difficulty_loss = select_difficulty_move(
+                board,
+                final_depth,
+                best_move,
+                best_score,
+                difficulty,
+                style,
+            )
+        except SearchTimeout:
+            timed_out = True
+            pass
     
     # 提取 PV Line
     pv_line = get_pv_line(board, final_depth)
@@ -730,6 +788,7 @@ def get_analysis(
         'style': style,
         'style_bonus': style_bonus,
         'difficulty_loss': difficulty_loss,
+        'timed_out': timed_out,
     }
 
 def get_best_move(board, depth=5):

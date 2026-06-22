@@ -1,4 +1,5 @@
 import math
+import time
 import unittest
 
 import chess
@@ -49,6 +50,35 @@ class TranspositionTableTests(unittest.TestCase):
         stored = chess_engine.score_to_tt(score, ply_from_root=3)
 
         self.assertEqual(chess_engine.score_from_tt(stored, ply_from_root=7), score - 4)
+
+    def test_timeout_restores_board_after_recursive_push(self):
+        board = chess.Board()
+        original_fen = board.fen()
+        chess_engine.search_stats["nodes"] = 62
+        chess_engine.search_runtime.deadline = 0
+
+        with self.assertRaises(chess_engine.SearchTimeout):
+            chess_engine.minimax(board, 3, -math.inf, math.inf, True)
+
+        self.assertEqual(board.fen(), original_fen)
+
+    def test_timed_search_returns_last_complete_iteration(self):
+        board = chess.Board()
+        original_fen = board.fen()
+        started = time.perf_counter()
+
+        result = chess_engine.get_analysis(
+            board,
+            depth=8,
+            time_limit=0.05,
+            use_book=False,
+            adaptive_depth=False,
+            difficulty="advanced",
+        )
+
+        self.assertLess(time.perf_counter() - started, 0.25)
+        self.assertIn(result["best_move"], board.legal_moves)
+        self.assertEqual(board.fen(), original_fen)
 
 
 if __name__ == "__main__":

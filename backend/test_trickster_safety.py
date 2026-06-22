@@ -50,6 +50,36 @@ class TricksterSafetyTests(unittest.TestCase):
                     )
                     self.assertEqual(selected, expected_move)
 
+    def test_partial_candidate_results_survive_timeout(self):
+        board = chess.Board()
+        best_move = board.parse_san("e4")
+        target_move = board.parse_san("d4")
+        unfinished_move = board.parse_san("Nf3")
+
+        with (
+            patch(
+                "chess_engine.order_moves",
+                return_value=[best_move, target_move, unfinished_move],
+            ),
+            patch(
+                "chess_engine.minimax",
+                side_effect=[(100, None), (40, None), chess_engine.SearchTimeout()],
+            ),
+            patch("chess_engine.major_piece_loss_after_move", return_value=False),
+            patch("chess_engine.should_apply_difficulty_error", return_value=True),
+        ):
+            selected, _score, _bonus, loss = chess_engine.select_difficulty_move(
+                board,
+                depth=2,
+                best_move=best_move,
+                best_score=100,
+                difficulty="intermediate",
+                style="balanced",
+            )
+
+        self.assertEqual(selected, target_move)
+        self.assertEqual(loss, 60)
+
     def test_rejects_candidate_that_hangs_queen_for_pawn(self):
         board = chess.Board("7r/4k2p/8/7Q/8/8/8/4K3 w - - 0 1")
         self.assertTrue(board.is_valid())

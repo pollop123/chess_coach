@@ -182,6 +182,7 @@ def make_move(request: MakeMoveRequest):
         "difficulty_loss": analysis.get("difficulty_loss", 0),
         "tt_hits": analysis.get("tt_hits", 0),
         "tt_cutoffs": analysis.get("tt_cutoffs", 0),
+        "timed_out": analysis.get("timed_out", False),
     }
 
 # 2. 深度分析端點 (用於分析與教練建議)
@@ -258,6 +259,7 @@ def get_analysis_endpoint(request: GetAnalysisRequest):
             "tt_hits": analysis.get('tt_hits', 0),
             "tt_cutoffs": analysis.get('tt_cutoffs', 0),
             "tt_size": analysis.get('tt_size', 0),
+            "timed_out": analysis.get('timed_out', False),
         },
         "game_state": game_phase,
         "coach_advice": coach_advice
