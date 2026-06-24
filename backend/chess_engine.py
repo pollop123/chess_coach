@@ -13,7 +13,7 @@ TT_EXACT = "exact"
 TT_LOWER = "lower"
 TT_UPPER = "upper"
 tt_generation = 0
-search_stats = {"nodes": 0, "tt_hits": 0, "tt_cutoffs": 0}
+search_stats = {"nodes": 0, "tt_hits": 0, "tt_cutoffs": 0, "pvs_researches": 0}
 search_runtime = threading.local()
 ENGINE_DIR = os.path.dirname(os.path.abspath(__file__))
 BOOK_PATH = os.path.join(ENGINE_DIR, "books", "gm2001.bin")
@@ -93,7 +93,7 @@ def store_tt(key, depth, score, flag, best_move, ply_from_root):
 def begin_search_generation(deadline=None):
     global tt_generation
     tt_generation += 1
-    search_stats.update(nodes=0, tt_hits=0, tt_cutoffs=0)
+    search_stats.update(nodes=0, tt_hits=0, tt_cutoffs=0, pvs_researches=0)
     search_runtime.deadline = deadline
 
     if len(transposition_table) > TT_MAX_ENTRIES // 2:
@@ -108,7 +108,7 @@ def begin_search_generation(deadline=None):
 
 def reset_transposition_table():
     transposition_table.clear()
-    search_stats.update(nodes=0, tt_hits=0, tt_cutoffs=0)
+    search_stats.update(nodes=0, tt_hits=0, tt_cutoffs=0, pvs_researches=0)
     search_runtime.deadline = None
 
 def format_evaluation(score):
@@ -428,10 +428,22 @@ def minimax(board, depth, alpha, beta, maximizing_player, ply_from_root=0):
     best_move = None
     if maximizing_player:
         max_eval = -math.inf
-        for move in moves:
+        for move_index, move in enumerate(moves):
             board.push(move)
             try:
-                eval_score, _ = minimax(board, depth - 1, alpha, beta, False, ply_from_root + 1)
+                if move_index == 0:
+                    eval_score, _ = minimax(
+                        board, depth - 1, alpha, beta, False, ply_from_root + 1
+                    )
+                else:
+                    eval_score, _ = minimax(
+                        board, depth - 1, alpha, alpha + 1, False, ply_from_root + 1
+                    )
+                    if alpha < eval_score < beta:
+                        search_stats["pvs_researches"] += 1
+                        eval_score, _ = minimax(
+                            board, depth - 1, alpha, beta, False, ply_from_root + 1
+                        )
             finally:
                 board.pop()
             
@@ -451,10 +463,22 @@ def minimax(board, depth, alpha, beta, maximizing_player, ply_from_root=0):
         return max_eval, best_move
     else:
         min_eval = math.inf
-        for move in moves:
+        for move_index, move in enumerate(moves):
             board.push(move)
             try:
-                eval_score, _ = minimax(board, depth - 1, alpha, beta, True, ply_from_root + 1)
+                if move_index == 0:
+                    eval_score, _ = minimax(
+                        board, depth - 1, alpha, beta, True, ply_from_root + 1
+                    )
+                else:
+                    eval_score, _ = minimax(
+                        board, depth - 1, beta - 1, beta, True, ply_from_root + 1
+                    )
+                    if alpha < eval_score < beta:
+                        search_stats["pvs_researches"] += 1
+                        eval_score, _ = minimax(
+                            board, depth - 1, alpha, beta, True, ply_from_root + 1
+                        )
             finally:
                 board.pop()
             
@@ -688,6 +712,7 @@ def get_analysis(
                         'nodes': 0,
                         'tt_hits': 0,
                         'tt_cutoffs': 0,
+                        'pvs_researches': 0,
                         'tt_size': len(transposition_table),
                         'from_book': True,
                         'difficulty_loss': 0,
@@ -784,6 +809,7 @@ def get_analysis(
         'tt_hits': search_stats["tt_hits"],
         'tt_cutoffs': search_stats["tt_cutoffs"],
         'tt_size': len(transposition_table),
+        'pvs_researches': search_stats["pvs_researches"],
         'from_book': False,
         'style': style,
         'style_bonus': style_bonus,

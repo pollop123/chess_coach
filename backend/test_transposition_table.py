@@ -80,6 +80,36 @@ class TranspositionTableTests(unittest.TestCase):
         self.assertIn(result["best_move"], board.legal_moves)
         self.assertEqual(board.fen(), original_fen)
 
+    def test_pvs_matches_full_window_reference(self):
+        board = chess.Board()
+
+        def reference_search(position, depth):
+            if depth == 0 or position.is_game_over():
+                if position.is_game_over():
+                    return chess_engine.evaluate_board(position), None
+                return chess_engine.quiescence_search(position, -math.inf, math.inf), None
+
+            maximizing = position.turn == chess.WHITE
+            best_score = -math.inf if maximizing else math.inf
+            best_move = None
+            for move in chess_engine.order_moves(position):
+                position.push(move)
+                try:
+                    score, _ = reference_search(position, depth - 1)
+                finally:
+                    position.pop()
+                if (maximizing and score > best_score) or (not maximizing and score < best_score):
+                    best_score = score
+                    best_move = move
+            return best_score, best_move
+
+        expected = reference_search(board.copy(), 2)
+        chess_engine.reset_transposition_table()
+        chess_engine.begin_search_generation()
+        actual = chess_engine.minimax(board, 2, -math.inf, math.inf, True)
+
+        self.assertEqual(actual, expected)
+
 
 if __name__ == "__main__":
     unittest.main()
