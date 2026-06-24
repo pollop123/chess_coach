@@ -110,6 +110,42 @@ class TranspositionTableTests(unittest.TestCase):
 
         self.assertEqual(actual, expected)
 
+    def test_incremental_repetition_counts_match_python_chess(self):
+        board = chess.Board()
+        for san in ("Nf3", "Nf6", "Ng1", "Ng8"):
+            board.push_san(san)
+
+        counts = chess_engine.build_repetition_counts(board)
+        current_hash = chess.polyglot.zobrist_hash(board)
+
+        self.assertTrue(board.is_repetition(2))
+        self.assertEqual(counts[current_hash], 2)
+
+        board.push_san("Nf3")
+        child_hash = chess_engine.push_repetition(counts, board)
+        chess_engine.pop_repetition(counts, child_hash)
+        board.pop()
+
+        self.assertEqual(counts[current_hash], 2)
+
+    def test_quiescence_searches_quiet_check_evasions(self):
+        board = chess.Board("4r1k1/8/8/8/8/8/8/4K3 w - - 0 1")
+        chess_engine.begin_search_generation()
+
+        chess_engine.quiescence_search(board, -math.inf, math.inf)
+
+        self.assertTrue(board.is_check())
+        self.assertGreater(chess_engine.search_stats["nodes"], 1)
+
+    def test_quiescence_includes_non_capture_promotion(self):
+        board = chess.Board("k7/4P3/4K3/8/8/8/8/8 w - - 0 1")
+        stand_pat = chess_engine.evaluate_board(board)
+        chess_engine.begin_search_generation()
+
+        score = chess_engine.quiescence_search(board, -math.inf, math.inf)
+
+        self.assertGreater(score, stand_pat)
+
 
 if __name__ == "__main__":
     unittest.main()

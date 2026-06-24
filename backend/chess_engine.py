@@ -13,7 +13,14 @@ TT_EXACT = "exact"
 TT_LOWER = "lower"
 TT_UPPER = "upper"
 tt_generation = 0
-search_stats = {"nodes": 0, "tt_hits": 0, "tt_cutoffs": 0, "pvs_researches": 0}
+search_stats = {
+    "nodes": 0,
+    "tt_hits": 0,
+    "tt_cutoffs": 0,
+    "pvs_researches": 0,
+    "candidate_cache_hits": 0,
+    "candidate_bound_skips": 0,
+}
 search_runtime = threading.local()
 ENGINE_DIR = os.path.dirname(os.path.abspath(__file__))
 BOOK_PATH = os.path.join(ENGINE_DIR, "books", "gm2001.bin")
@@ -57,6 +64,32 @@ def tt_key(board):
     return chess.polyglot.zobrist_hash(board), board.halfmove_clock
 
 
+def build_repetition_counts(board):
+    counts = {}
+    history = board.copy(stack=True)
+    while True:
+        position_hash = chess.polyglot.zobrist_hash(history)
+        counts[position_hash] = counts.get(position_hash, 0) + 1
+        if not history.move_stack:
+            break
+        history.pop()
+    return counts
+
+
+def push_repetition(repetition_counts, board):
+    position_hash = chess.polyglot.zobrist_hash(board)
+    repetition_counts[position_hash] = repetition_counts.get(position_hash, 0) + 1
+    return position_hash
+
+
+def pop_repetition(repetition_counts, position_hash):
+    remaining = repetition_counts[position_hash] - 1
+    if remaining:
+        repetition_counts[position_hash] = remaining
+    else:
+        repetition_counts.pop(position_hash)
+
+
 def score_to_tt(score, ply_from_root):
     if score > MATE_THRESHOLD:
         return score + ply_from_root
@@ -93,7 +126,14 @@ def store_tt(key, depth, score, flag, best_move, ply_from_root):
 def begin_search_generation(deadline=None):
     global tt_generation
     tt_generation += 1
-    search_stats.update(nodes=0, tt_hits=0, tt_cutoffs=0, pvs_researches=0)
+    search_stats.update(
+        nodes=0,
+        tt_hits=0,
+        tt_cutoffs=0,
+        pvs_researches=0,
+        candidate_cache_hits=0,
+        candidate_bound_skips=0,
+    )
     search_runtime.deadline = deadline
 
     if len(transposition_table) > TT_MAX_ENTRIES // 2:
@@ -108,7 +148,14 @@ def begin_search_generation(deadline=None):
 
 def reset_transposition_table():
     transposition_table.clear()
-    search_stats.update(nodes=0, tt_hits=0, tt_cutoffs=0, pvs_researches=0)
+    search_stats.update(
+        nodes=0,
+        tt_hits=0,
+        tt_cutoffs=0,
+        pvs_researches=0,
+        candidate_cache_hits=0,
+        candidate_bound_skips=0,
+    )
     search_runtime.deadline = None
 
 def format_evaluation(score):
@@ -349,14 +396,22 @@ def quiescence_search(board, alpha, beta, q_depth=0, ply_from_root=0):
     if q_depth > 10:
         return evaluate_board(board, ply_from_root)
 
+    in_check = board.is_check()
     stand_pat = evaluate_board(board, ply_from_root)
-    capture_moves = [move for move in order_moves(board) if board.is_capture(move)]
+    if in_check:
+        tactical_moves = order_moves(board)
+    else:
+        tactical_moves = [
+            move for move in order_moves(board)
+            if board.is_capture(move) or move.promotion
+        ]
 
     if board.turn == chess.WHITE:
-        if stand_pat >= beta: return beta
-        if stand_pat > alpha: alpha = stand_pat
+        if not in_check:
+            if stand_pat >= beta: return beta
+            if stand_pat > alpha: alpha = stand_pat
 
-        for move in capture_moves:
+        for move in tactical_moves:
             board.push(move)
             try:
                 score = quiescence_search(board, alpha, beta, q_depth + 1, ply_from_root + 1)
@@ -366,10 +421,11 @@ def quiescence_search(board, alpha, beta, q_depth=0, ply_from_root=0):
             if score > alpha: alpha = score
         return alpha
 
-    if stand_pat <= alpha: return alpha
-    if stand_pat < beta: beta = stand_pat
+    if not in_check:
+        if stand_pat <= alpha: return alpha
+        if stand_pat < beta: beta = stand_pat
 
-    for move in capture_moves:
+    for move in tactical_moves:
         board.push(move)
         try:
             score = quiescence_search(board, alpha, beta, q_depth + 1, ply_from_root + 1)
@@ -379,9 +435,20 @@ def quiescence_search(board, alpha, beta, q_depth=0, ply_from_root=0):
         if score < beta: beta = score
     return beta
 
-def minimax(board, depth, alpha, beta, maximizing_player, ply_from_root=0):
+def minimax(
+    board,
+    depth,
+    alpha,
+    beta,
+    maximizing_player,
+    ply_from_root=0,
+    repetition_counts=None,
+):
     visit_search_node()
-    is_repetition = board.is_repetition(2)
+    if repetition_counts is None:
+        repetition_counts = build_repetition_counts(board)
+    position_hash = chess.polyglot.zobrist_hash(board)
+    is_repetition = repetition_counts.get(position_hash, 0) >= 2
     if is_repetition:
         if depth == 0: 
              return evaluate_board(board, ply_from_root), None
@@ -430,21 +497,26 @@ def minimax(board, depth, alpha, beta, maximizing_player, ply_from_root=0):
         max_eval = -math.inf
         for move_index, move in enumerate(moves):
             board.push(move)
+            child_hash = push_repetition(repetition_counts, board)
             try:
                 if move_index == 0:
                     eval_score, _ = minimax(
-                        board, depth - 1, alpha, beta, False, ply_from_root + 1
+                        board, depth - 1, alpha, beta, False, ply_from_root + 1,
+                        repetition_counts
                     )
                 else:
                     eval_score, _ = minimax(
-                        board, depth - 1, alpha, alpha + 1, False, ply_from_root + 1
+                        board, depth - 1, alpha, alpha + 1, False, ply_from_root + 1,
+                        repetition_counts
                     )
                     if alpha < eval_score < beta:
                         search_stats["pvs_researches"] += 1
                         eval_score, _ = minimax(
-                            board, depth - 1, alpha, beta, False, ply_from_root + 1
+                            board, depth - 1, alpha, beta, False, ply_from_root + 1,
+                            repetition_counts
                         )
             finally:
+                pop_repetition(repetition_counts, child_hash)
                 board.pop()
             
             if eval_score > max_eval:
@@ -465,21 +537,26 @@ def minimax(board, depth, alpha, beta, maximizing_player, ply_from_root=0):
         min_eval = math.inf
         for move_index, move in enumerate(moves):
             board.push(move)
+            child_hash = push_repetition(repetition_counts, board)
             try:
                 if move_index == 0:
                     eval_score, _ = minimax(
-                        board, depth - 1, alpha, beta, True, ply_from_root + 1
+                        board, depth - 1, alpha, beta, True, ply_from_root + 1,
+                        repetition_counts
                     )
                 else:
                     eval_score, _ = minimax(
-                        board, depth - 1, beta - 1, beta, True, ply_from_root + 1
+                        board, depth - 1, beta - 1, beta, True, ply_from_root + 1,
+                        repetition_counts
                     )
                     if alpha < eval_score < beta:
                         search_stats["pvs_researches"] += 1
                         eval_score, _ = minimax(
-                            board, depth - 1, alpha, beta, True, ply_from_root + 1
+                            board, depth - 1, alpha, beta, True, ply_from_root + 1,
+                            repetition_counts
                         )
             finally:
+                pop_repetition(repetition_counts, child_hash)
                 board.pop()
             
             if eval_score < min_eval:
@@ -607,7 +684,27 @@ def select_difficulty_move(board, depth, best_move, best_score, difficulty, styl
         try:
             board.push(move)
             try:
-                if board.is_game_over():
+                cached_entry = transposition_table.get(tt_key(board))
+                cached_score = None
+                if cached_entry and cached_entry.depth >= candidate_depth:
+                    cached_score = score_from_tt(cached_entry.score, 1)
+                    if cached_entry.flag == TT_EXACT:
+                        search_stats["candidate_cache_hits"] += 1
+                    elif candidates:
+                        bound_is_upper = (
+                            mover == chess.WHITE and cached_entry.flag == TT_UPPER
+                        ) or (
+                            mover == chess.BLACK and cached_entry.flag == TT_LOWER
+                        )
+                        bound_perspective = cached_score if mover == chess.WHITE else -cached_score
+                        best_known = max(item["perspective_score"] for item in candidates)
+                        if bound_is_upper and bound_perspective < best_known - profile["max_loss"]:
+                            search_stats["candidate_bound_skips"] += 1
+                            continue
+
+                if cached_entry and cached_entry.depth >= candidate_depth and cached_entry.flag == TT_EXACT:
+                    score = cached_score
+                elif board.is_game_over():
                     score = evaluate_board(board, 1)
                 else:
                     score, _ = minimax(
@@ -713,6 +810,8 @@ def get_analysis(
                         'tt_hits': 0,
                         'tt_cutoffs': 0,
                         'pvs_researches': 0,
+                        'candidate_cache_hits': 0,
+                        'candidate_bound_skips': 0,
                         'tt_size': len(transposition_table),
                         'from_book': True,
                         'difficulty_loss': 0,
@@ -730,6 +829,7 @@ def get_analysis(
         search_deadline = overall_deadline
     begin_search_generation(deadline=search_deadline)
     is_maximizing = board.turn == chess.WHITE
+    repetition_counts = build_repetition_counts(board)
     
     # 根據子力數量動態調整基礎深度
     if adaptive_depth:
@@ -751,7 +851,14 @@ def get_analysis(
             if time.monotonic() >= search_deadline:
                 break
             try:
-                score, move = minimax(board, current_depth, -math.inf, math.inf, is_maximizing)
+                score, move = minimax(
+                    board,
+                    current_depth,
+                    -math.inf,
+                    math.inf,
+                    is_maximizing,
+                    repetition_counts=repetition_counts,
+                )
             except SearchTimeout:
                 timed_out = True
                 break
@@ -761,7 +868,14 @@ def get_analysis(
             nodes_searched = search_stats["nodes"]
     else:
         # 固定深度搜尋
-        best_score, best_move = minimax(board, depth, -math.inf, math.inf, is_maximizing)
+        best_score, best_move = minimax(
+            board,
+            depth,
+            -math.inf,
+            math.inf,
+            is_maximizing,
+            repetition_counts=repetition_counts,
+        )
         nodes_searched = search_stats["nodes"]
 
     if best_move is None:
@@ -810,6 +924,8 @@ def get_analysis(
         'tt_cutoffs': search_stats["tt_cutoffs"],
         'tt_size': len(transposition_table),
         'pvs_researches': search_stats["pvs_researches"],
+        'candidate_cache_hits': search_stats["candidate_cache_hits"],
+        'candidate_bound_skips': search_stats["candidate_bound_skips"],
         'from_book': False,
         'style': style,
         'style_bonus': style_bonus,

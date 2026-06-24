@@ -5,10 +5,10 @@
     {
       "config": "newbie",
       "positions": 14,
-      "acpl": 124.8,
-      "median_loss": 97.5,
-      "avg_expectation_loss": 0.2074,
-      "best_move_rate": 0.357,
+      "acpl": 137.8,
+      "median_loss": 25.0,
+      "avg_expectation_loss": 0.2109,
+      "best_move_rate": 0.429,
       "blunder_rate": 0.429,
       "major_piece_hangs": 0,
       "missed_mates": 0,
@@ -86,16 +86,16 @@
         {
           "name": "italian_center",
           "phase": "middlegame",
-          "played": "d5",
+          "played": "Nxd4",
           "stockfish_best": "Bxc3",
-          "loss_cp": 185,
-          "expectation_loss": 0.478,
+          "loss_cp": 558,
+          "expectation_loss": 0.528,
           "best_move": false,
           "blunder": true,
           "major_piece_hang": false,
           "missed_mate": false,
           "depth": 1,
-          "difficulty_loss": 190
+          "difficulty_loss": 315
         },
         {
           "name": "french_center",
@@ -170,16 +170,16 @@
         {
           "name": "pawn_promotion",
           "phase": "endgame",
-          "played": "e8=Q",
+          "played": "Kf7",
           "stockfish_best": "Kd6",
-          "loss_cp": 191,
+          "loss_cp": 0,
           "expectation_loss": 0,
-          "best_move": false,
+          "best_move": true,
           "blunder": false,
           "major_piece_hang": false,
           "missed_mate": false,
           "depth": 1,
-          "difficulty_loss": 0
+          "difficulty_loss": 130
         },
         {
           "name": "king_pawn_opposition",
@@ -214,10 +214,10 @@
     {
       "config": "beginner",
       "positions": 14,
-      "acpl": 81.1,
-      "median_loss": 25.0,
+      "acpl": 67.4,
+      "median_loss": 16.5,
       "avg_expectation_loss": 0.1512,
-      "best_move_rate": 0.429,
+      "best_move_rate": 0.5,
       "blunder_rate": 0.357,
       "major_piece_hangs": 0,
       "missed_mates": 0,
@@ -304,7 +304,7 @@
           "major_piece_hang": false,
           "missed_mate": false,
           "depth": 2,
-          "difficulty_loss": 120
+          "difficulty_loss": 115
         },
         {
           "name": "french_center",
@@ -379,11 +379,11 @@
         {
           "name": "pawn_promotion",
           "phase": "endgame",
-          "played": "e8=Q",
+          "played": "Ke5",
           "stockfish_best": "Kd6",
-          "loss_cp": 191,
+          "loss_cp": 0,
           "expectation_loss": 0,
-          "best_move": false,
+          "best_move": true,
           "blunder": false,
           "major_piece_hang": false,
           "missed_mate": false,
@@ -423,10 +423,10 @@
     {
       "config": "intermediate",
       "positions": 14,
-      "acpl": 35.2,
-      "median_loss": 9.0,
+      "acpl": 21.6,
+      "median_loss": 5.5,
       "avg_expectation_loss": 0.0404,
-      "best_move_rate": 0.643,
+      "best_move_rate": 0.714,
       "blunder_rate": 0.071,
       "major_piece_hangs": 0,
       "missed_mates": 0,
@@ -512,7 +512,7 @@
           "blunder": false,
           "major_piece_hang": false,
           "missed_mate": false,
-          "depth": 3,
+          "depth": 2,
           "difficulty_loss": 80
         },
         {
@@ -568,7 +568,7 @@
           "blunder": true,
           "major_piece_hang": false,
           "missed_mate": false,
-          "depth": 3,
+          "depth": 2,
           "difficulty_loss": 0
         },
         {
@@ -588,11 +588,11 @@
         {
           "name": "pawn_promotion",
           "phase": "endgame",
-          "played": "e8=Q",
+          "played": "Kf5",
           "stockfish_best": "Kd6",
-          "loss_cp": 191,
+          "loss_cp": 0,
           "expectation_loss": 0,
-          "best_move": false,
+          "best_move": true,
           "blunder": false,
           "major_piece_hang": false,
           "missed_mate": false,
@@ -791,7 +791,7 @@
           "blunder": false,
           "major_piece_hang": false,
           "missed_mate": false,
-          "depth": 7,
+          "depth": 6,
           "difficulty_loss": 0
         },
         {
@@ -805,7 +805,7 @@
           "blunder": false,
           "major_piece_hang": false,
           "missed_mate": false,
-          "depth": 7,
+          "depth": 6,
           "difficulty_loss": 0
         },
         {
