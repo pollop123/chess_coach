@@ -168,6 +168,17 @@ PYTHONPATH=backend .venv/bin/python backend/stockfish_calibration.py --nodes 120
 
 這些是固定局面的走法品質指標，不是 Elo。要估計 Elo，還需要使用固定時制進行大量對局。
 
+### 檢查教學分析品質
+
+教學分析基準會檢查 `teaching_analysis` 的結構化輸出，包含候選手排序、局面主題、criticality 與錯誤警告。它用來追蹤「教學能不能講到重點」，不是 Stockfish 走棋強度或 Elo 測試。
+
+```bash
+PYTHONPATH=backend .venv/bin/python backend/teaching_benchmark.py
+PYTHONPATH=backend .venv/bin/python backend/teaching_benchmark.py --json
+```
+
+目前基準涵蓋開局、戰術、殘局與失誤警告。若調整 `get_teaching_analysis` 或引擎評估，先跑這個基準確認教學輸出沒有退步，再用 Stockfish 校準檢查實戰走棋品質。
+
 ### Docker 相關指令
 
 ```bash
@@ -300,6 +311,9 @@ curl -X POST http://localhost:8000/get_analysis \
 ```bash
 # 後端回歸測試
 PYTHONPATH=backend .venv/bin/python -m unittest discover -s backend -p 'test_*.py'
+
+# 教學分析基準
+PYTHONPATH=backend .venv/bin/python backend/teaching_benchmark.py
 
 # 前端檢查
 cd frontend

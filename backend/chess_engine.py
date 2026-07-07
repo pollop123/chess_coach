@@ -786,11 +786,24 @@ def _move_allows_immediate_mate(board, move):
         board.pop()
 
 
+def _is_teaching_endgame(board):
+    white_queens = len(board.pieces(chess.QUEEN, chess.WHITE))
+    black_queens = len(board.pieces(chess.QUEEN, chess.BLACK))
+    minor_pieces = (
+        len(board.pieces(chess.KNIGHT, chess.WHITE))
+        + len(board.pieces(chess.BISHOP, chess.WHITE))
+        + len(board.pieces(chess.KNIGHT, chess.BLACK))
+        + len(board.pieces(chess.BISHOP, chess.BLACK))
+    )
+    return len(board.piece_map()) <= 8 or (white_queens == 0 and black_queens == 0) or minor_pieces <= 2
+
+
 def _move_themes(board, move, reason=None):
     themes = set()
     moving_piece = board.piece_at(move.from_square)
+    is_endgame = _is_teaching_endgame(board)
 
-    if len(board.move_stack) < 10:
+    if len(board.move_stack) < 10 and not is_endgame:
         themes.add("opening_principle")
 
     if moving_piece and moving_piece.piece_type in {chess.KNIGHT, chess.BISHOP}:
@@ -821,7 +834,7 @@ def _move_themes(board, move, reason=None):
     if _move_attacks_king_zone(board, move):
         themes.add("king_safety")
 
-    if len(board.piece_map()) <= 6 or move.promotion:
+    if is_endgame or move.promotion:
         themes.add("endgame")
 
     return sorted(themes)

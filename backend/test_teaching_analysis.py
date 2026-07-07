@@ -104,6 +104,24 @@ class TeachingAnalysisTests(unittest.TestCase):
         self.assertIn("development", best["themes"])
         self.assertIn("development", teaching["position_themes"])
 
+    def test_rook_and_pawn_endgame_is_classified_as_endgame_not_opening(self):
+        board = chess.Board("8/5pk1/6p1/3R4/7P/6P1/5PK1/3r4 w - - 0 1")
+        base_analysis = {
+            "best_move": board.parse_san("Rd7"),
+            "score": 0,
+            "depth": 1,
+        }
+
+        teaching = chess_engine.get_teaching_analysis(
+            board,
+            base_analysis,
+            candidate_count=8,
+            depth=1,
+        )
+
+        self.assertIn("endgame", teaching["position_themes"])
+        self.assertNotIn("opening_principle", teaching["position_themes"])
+
 
 if __name__ == "__main__":
     unittest.main()
