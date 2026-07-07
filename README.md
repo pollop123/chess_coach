@@ -298,12 +298,13 @@ curl -X POST http://localhost:8000/get_analysis \
 
 ### 測試
 ```bash
-# 引擎功能測試
-cd backend
-python3 test_engine_upgrade.py
+# 後端回歸測試
+PYTHONPATH=backend .venv/bin/python -m unittest discover -s backend -p 'test_*.py'
 
-# API 端點測試
-python3 test_api_endpoints.py
+# 前端檢查
+cd frontend
+npm run lint
+npm run build
 ```
 
 ## 專案結構

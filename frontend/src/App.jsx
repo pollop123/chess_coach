@@ -156,6 +156,7 @@ function App() {
   const [humanColor, setHumanColor] = useState("white");
   const [botDifficulty, setBotDifficulty] = useState("intermediate");
   const [botStyle, setBotStyle] = useState("balanced");
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   // 用來自動捲動聊天室
   const chatEndRef = useRef(null);
@@ -217,7 +218,8 @@ function App() {
   }
 
   async function analyzeGame() {
-    if (game.pgn() === "") return;
+    if (game.pgn() === "" || isAnalyzing) return;
+    setIsAnalyzing(true);
     setStatus("📊 正在進行全盤深度分析...");
     try {
       const res = await axios.post(`${API_URL}/analyze_full`, {
@@ -248,6 +250,8 @@ function App() {
     } catch (err) {
       console.error("分析失敗", err);
       setStatus("❌ 分析失敗");
+    } finally {
+      setIsAnalyzing(false);
     }
   }
 
@@ -532,70 +536,26 @@ function App() {
     const blackHeight = 100 - winningChance;
 
     return (
-      <div style={{ 
-        display: "flex", 
-        flexDirection: "column", 
-        alignItems: "center",
-        width: "40px"
-      }}>
-        <div style={{
-          width: "100%",
-          height: "480px",
-          backgroundColor: "#ddd",
-          borderRadius: "5px",
-          overflow: "hidden",
-          display: "flex",
-          flexDirection: "column-reverse",
-          position: "relative",
-          boxShadow: "0 2px 5px rgba(0,0,0,0.2)"
-        }}>
+      <div className="eval-bar">
+        <div className="eval-bar__track">
           {/* 白方區域 */}
-          <div style={{
-            height: `${whiteHeight}%`,
-            backgroundColor: "#f0f0f0",
-            transition: "height 0.3s ease",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center"
-          }}>
+          <div className="eval-bar__white" style={{ height: `${whiteHeight}%`, flexBasis: `${whiteHeight}%` }}>
           </div>
           
           {/* 黑方區域 */}
-          <div style={{
-            height: `${blackHeight}%`,
-            backgroundColor: "#333",
-            transition: "height 0.3s ease"
-          }}>
+          <div className="eval-bar__black" style={{ height: `${blackHeight}%`, flexBasis: `${blackHeight}%` }}>
           </div>
 
           {/* 中間線 */}
-          <div style={{
-            position: "absolute",
-            top: "50%",
-            left: "0",
-            right: "0",
-            height: "2px",
-            backgroundColor: "#999",
-            transform: "translateY(-50%)"
-          }}></div>
+          <div className="eval-bar__midline"></div>
         </div>
 
         {/* 評分顯示 */}
-        <div style={{
-          marginTop: "10px",
-          fontSize: "14px",
-          fontWeight: "bold",
-          color: evalDisplay.startsWith("+") ? "#52c41a" : evalDisplay.startsWith("-") ? "#ff4d4f" : "#666",
-          textAlign: "center"
-        }}>
+        <div className={`eval-bar__score ${evalDisplay.startsWith("+") ? "is-positive" : evalDisplay.startsWith("-") ? "is-negative" : ""}`}>
           {evalDisplay}
         </div>
         
-        <div style={{
-          fontSize: "12px",
-          color: "#999",
-          marginTop: "5px"
-        }}>
+        <div className="eval-bar__chance">
           {winningChance.toFixed(1)}%
         </div>
       </div>
@@ -635,77 +595,28 @@ function App() {
     if (!active || !payload || payload.length === 0) return null;
     const point = payload[0].payload;
     return (
-      <div style={{
-        backgroundColor: "rgba(255,255,255,0.96)",
-        border: "1px solid #cfc8bf",
-        borderRadius: "6px",
-        boxShadow: "0 8px 20px rgba(0,0,0,0.16)",
-        color: "#111827",
-        padding: "7px 9px",
-        fontSize: "0.78rem",
-        lineHeight: 1.35,
-        minWidth: "112px"
-      }}>
-        <div style={{ color: "#6b6258", fontWeight: 700 }}>第 {label} 步</div>
-        <div style={{ fontWeight: 800 }}>{point.evalLabel}</div>
+      <div className="chart-tooltip">
+        <div className="chart-tooltip__label">第 {label} 步</div>
+        <div className="chart-tooltip__value">{point.evalLabel}</div>
       </div>
     );
   }
 
   return (
-    <div style={{
-      display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-      minHeight: "100vh",
-      fontFamily: "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-      background: "linear-gradient(180deg, #eef0ed 0%, #f8f6f1 46%, #ebe7de 100%)",
-      padding: "28px 20px",
-      color: "#1f2933"
-    }}>
-      <header style={{
-        width: "100%",
-        maxWidth: "980px",
-        display: "flex",
-        alignItems: "flex-end",
-        justifyContent: "space-between",
-        gap: "18px",
-        marginBottom: "22px"
-      }}>
+    <div className="app-shell">
+      <header className="app-header">
         <div>
-          <div style={{
-            color: "#6b5d43",
-            fontSize: "0.76rem",
-            fontWeight: 800,
-            letterSpacing: "0.08em",
-            textTransform: "uppercase",
-            marginBottom: "4px"
-          }}>
-            棋局分析工作台
-          </div>
-          <h1 style={{
-            color: "#111827",
-            margin: 0,
-            fontSize: "2.1rem",
-            lineHeight: 1.05,
-            fontWeight: 850,
-            letterSpacing: 0
-          }}>
-            Chess Coach AI
-          </h1>
+          <div className="app-header__eyebrow">棋局分析工作台</div>
+          <h1>Chess Coach AI</h1>
+          <p>對局、訓練、復盤與教練問答集中在同一個棋盤旁。</p>
         </div>
-        <div style={{
-          padding: "8px 12px",
-          borderRadius: "999px",
-          backgroundColor: "rgba(17,24,39,0.08)",
-          color: "#374151",
-          fontSize: "0.85rem",
-          fontWeight: 700,
-          border: "1px solid rgba(17,24,39,0.10)"
-        }}>
-          訪客模式
+        <div className="session-card">
+          <span>目前模式</span>
+          <strong>{appMode === "training" ? "訓練" : analysisData.length > 0 ? "復盤" : "對局"}</strong>
         </div>
       </header>
 
-      <div style={{ display: "flex", gap: "30px", alignItems: "flex-start", flexWrap: "wrap", justifyContent: "center" }}>
+      <main className={`coach-workspace ${analysisData.length > 0 ? "has-evaluation" : ""}`}>
 
         {/* 勝率條 - 只在賽後分析時顯示 */}
         {analysisData.length > 0 && (
@@ -726,143 +637,111 @@ function App() {
         )}
 
         {/* 左側：棋盤區 */}
-        <div style={{ width: "480px" }}>
-          <div style={{
-            marginBottom: "18px"
-          }}>
-            <div style={{
-            height: "480px",
-            boxShadow: "0 18px 42px rgba(17,24,39,0.18)",
-            position: "relative",
-            border: "1px solid rgba(17,24,39,0.12)"
-          }}>
-            <Chessboard
-              position={boardFen}
-              onPieceDrop={onDrop}
-              onSquareClick={handleSquareClick}
-              boardOrientation={boardOrientation}
-              customSquareStyles={selectedSquare ? {
-                [selectedSquare]: { boxShadow: "inset 0 0 0 4px rgba(47,111,78,0.85)" }
-              } : {}}
-            />
-            </div>
-
-            {/* 導航按鈕 */}
-            {analysisData.length > 0 && (
-              <div style={{
-                minHeight: "38px",
-                display: "flex",
-                justifyContent: "center",
-                alignItems: "center",
-                gap: "10px",
-                marginTop: "10px"
-              }}>
-                <button onClick={() => navigateMove(-1)} style={navButtonStyle}>上一步</button>
-                <span style={{ fontWeight: 800, alignSelf: "center", color: "#374151", minWidth: "68px", textAlign: "center" }}>{currentMoveIndex === -1 ? "最終局" : `第 ${currentMoveIndex} 步`}</span>
-                <button onClick={() => navigateMove(1)} style={navButtonStyle}>下一步</button>
+        <section className="board-panel" aria-label="棋盤與對局控制">
+          <div className="board-console">
+            <div className="board-console__topline">
+              <div>
+                <span>你執</span>
+                <strong>{boardOrientation === "white" ? "白方" : "黑方"}</strong>
               </div>
-            )}
+              <div>
+                <span>難度</span>
+                <strong>{appMode === "training" ? selectedLesson.phase : selectedDifficulty.label}</strong>
+              </div>
+              <div>
+                <span>風格</span>
+                <strong>{appMode === "training" ? selectedLesson.variation : selectedStyle.label}</strong>
+              </div>
+            </div>
+            <div className="board-frame">
+              <Chessboard
+                position={boardFen}
+                onPieceDrop={onDrop}
+                onSquareClick={handleSquareClick}
+                boardOrientation={boardOrientation}
+                customLightSquareStyle={{ backgroundColor: "#dce7d0" }}
+                customDarkSquareStyle={{ backgroundColor: "#4f7f69" }}
+                customBoardStyle={{ borderRadius: "6px" }}
+                customSquareStyles={selectedSquare ? {
+                  [selectedSquare]: { boxShadow: "inset 0 0 0 4px rgba(255,209,102,0.92)" }
+                } : {}}
+              />
+            </div>
           </div>
 
-          <div style={{
-            padding: "14px 16px",
-            backgroundColor: "#ffffff",
-            borderRadius: "8px",
-            marginBottom: "18px",
-            boxShadow: "0 8px 24px rgba(17,24,39,0.08)",
-            fontWeight: 750,
-            color: "#374151",
-            textAlign: "center",
-            border: "1px solid #e5e0d8"
-          }}>
+          {analysisData.length > 0 && (
+            <div className="review-nav">
+              <button className="btn btn-ghost btn-sm" onClick={() => navigateMove(-1)}>上一步</button>
+              <span>{currentMoveIndex === -1 ? "最終局" : `第 ${currentMoveIndex} 步`}</span>
+              <button className="btn btn-ghost btn-sm" onClick={() => navigateMove(1)}>下一步</button>
+            </div>
+          )}
+
+          <div className="status-strip" aria-live="polite">
             {appMode === "training" ? "訓練模式：照提示走白方，黑方會自動回應" : status}
           </div>
 
-          {/* 控制按鈕 */}
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", justifyContent: "center" }}>
-            <button onClick={() => setAppMode("play")} style={buttonStyle(appMode === "play" ? "#111827" : "#9ca3af")}>對局</button>
-            <button onClick={() => { setAppMode("training"); resetTraining(selectedLessonId); }} style={buttonStyle(appMode === "training" ? "#2f6f4e" : "#9ca3af")}>訓練模式</button>
-            <button onClick={() => { const ng = new Chess(); setGame(ng); setStatus("新局開始"); setAnalysisData([]); setCurrentMoveIndex(-1); setIsResigned(false); setChatHistory([]); if (humanColor === "black") makeAIMove(ng.fen()); }} style={buttonStyle("#111827")}>新局</button>
+          <div className="control-bar">
+            <button className={`btn ${appMode === "play" ? "btn-primary" : "btn-muted"}`} onClick={() => setAppMode("play")}>對局</button>
+            <button className={`btn ${appMode === "training" ? "btn-success" : "btn-muted"}`} onClick={() => { setAppMode("training"); resetTraining(selectedLessonId); }}>訓練模式</button>
+            <button className="btn btn-primary" onClick={() => { const ng = new Chess(); setGame(ng); setStatus("新局開始"); setAnalysisData([]); setCurrentMoveIndex(-1); setIsResigned(false); setChatHistory([]); if (humanColor === "black") makeAIMove(ng.fen()); }}>新局</button>
             {appMode === "play" && (
               <button
+                className="btn btn-danger"
                 onClick={resignGame}
                 disabled={game.isGameOver() || isResigned || analysisData.length > 0}
-                style={buttonStyle(game.isGameOver() || isResigned || analysisData.length > 0 ? "#c7c2b9" : "#9f3a38")}
               >
                 投降
               </button>
             )}
-            <button onClick={analyzeGame} style={buttonStyle("#2f6f4e")}>賽後分析</button>
-            <button onClick={downloadPGN} style={buttonStyle("#6b5d43")}>匯出 PGN</button>
-            <div style={{ display: "flex", gap: "2px" }}>
-              <button onClick={() => setHumanColor("white")} style={buttonStyle(humanColor === "white" ? "#333" : "#ccc")}>白</button>
-              <button onClick={() => setHumanColor("black")} style={buttonStyle(humanColor === "black" ? "#333" : "#ccc")}>黑</button>
+            <button className="btn btn-success" onClick={analyzeGame} disabled={isAnalyzing || game.pgn() === ""}>
+              {isAnalyzing ? "分析中..." : "賽後分析"}
+            </button>
+            <button className="btn btn-secondary" onClick={downloadPGN}>匯出 PGN</button>
+            <div className="segmented-control" aria-label="選擇玩家顏色">
+              <button className={humanColor === "white" ? "is-active" : ""} onClick={() => setHumanColor("white")}>白</button>
+              <button className={humanColor === "black" ? "is-active" : ""} onClick={() => setHumanColor("black")}>黑</button>
             </div>
           </div>
 
           {appMode === "play" && (
-            <div style={{
-              marginTop: "10px",
-              padding: "10px",
-              borderRadius: "8px",
-              backgroundColor: "#ffffff",
-              border: "1px solid #e5e0d8",
-              boxShadow: "0 8px 24px rgba(17,24,39,0.06)"
-            }}>
-              <div style={{ fontSize: "0.78rem", color: "#6b6258", fontWeight: 800, marginBottom: "7px" }}>
-                機器人難度
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "6px" }}>
+            <div className="bot-settings">
+              <div className="setting-label">機器人難度</div>
+              <div className="option-grid option-grid-four">
                 {BOT_DIFFICULTIES.map((difficulty) => (
                   <button
                     key={difficulty.id}
+                    className={`option-tile ${botDifficulty === difficulty.id ? "is-selected" : ""}`}
                     onClick={() => setBotDifficulty(difficulty.id)}
                     disabled={game.history().length > 0 || isResigned || analysisData.length > 0}
                     title={difficulty.description}
-                    style={{
-                      ...buttonStyle(botDifficulty === difficulty.id ? "#2f6f4e" : "#e5e0d8"),
-                      color: botDifficulty === difficulty.id ? "#ffffff" : "#374151",
-                      padding: "7px 6px",
-                      fontSize: "0.78rem"
-                    }}
                   >
                     {difficulty.label}
                   </button>
                 ))}
               </div>
-              <div style={{ color: "#6b6258", fontSize: "0.76rem", lineHeight: 1.45, marginTop: "6px" }}>
-                {selectedDifficulty.description}
-              </div>
-              <div style={{ fontSize: "0.78rem", color: "#6b6258", fontWeight: 800, margin: "10px 0 7px" }}>
-                機器人風格
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "6px" }}>
+              <div className="setting-help">{selectedDifficulty.description}</div>
+              <div className="setting-label">機器人風格</div>
+              <div className="option-grid option-grid-two">
                 {BOT_STYLES.map((style) => (
                   <button
                     key={style.id}
+                    className={`option-tile ${botStyle === style.id ? "is-selected is-earth" : ""}`}
                     onClick={() => setBotStyle(style.id)}
                     disabled={game.history().length > 0 || isResigned || analysisData.length > 0}
                     title={style.description}
-                    style={{
-                      ...buttonStyle(botStyle === style.id ? "#6b5d43" : "#e5e0d8"),
-                      color: botStyle === style.id ? "#ffffff" : "#374151",
-                      padding: "7px 6px",
-                      fontSize: "0.78rem"
-                    }}
                   >
                     {style.label}
                   </button>
                 ))}
               </div>
-              <div style={{ color: "#6b6258", fontSize: "0.76rem", lineHeight: 1.45, marginTop: "6px" }}>
-                {selectedStyle.description}
-              </div>
+              <div className="setting-help">{selectedStyle.description}</div>
             </div>
           )}
-        </div>
+        </section>
 
         {/* 右側：聊天室 & 分析圖表 */}
-        <div style={{ width: "400px", display: "flex", flexDirection: "column", gap: "20px" }}>
+        <aside className="side-panel" aria-label="教練、訓練與分析">
 
           {appMode === "training" ? (
             <OpeningTrainingPanel
@@ -882,44 +761,27 @@ function App() {
           ) : (
           <>
             {/* 💬 AI 戰術聊天室 */}
-            <div style={{
-            backgroundColor: "#ffffff",
-            borderRadius: "8px",
-            boxShadow: "0 16px 38px rgba(17,24,39,0.10)",
-            display: "flex", flexDirection: "column", height: "500px", overflow: "hidden"
-          }}>
-            <div style={{ padding: "14px 16px", backgroundColor: "#111827", color: "#f8f5ee", fontWeight: "bold", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div className="coach-card">
+            <div className="panel-header">
               <span>AI 教練</span>
               <button
+                className="btn btn-inverse btn-sm"
                 onClick={() => askCoach()}
                 disabled={isCoachThinking}
-                style={{ ...buttonStyle("#f8f5ee"), color: "#111827", padding: "5px 10px", fontSize: "0.8rem", border: "1px solid rgba(255,255,255,0.65)" }}
               >
                 分析目前局面
               </button>
             </div>
 
             {/* 訊息列表 */}
-            <div style={{ flex: 1, padding: "15px", overflowY: "auto", display: "flex", flexDirection: "column", gap: "10px", backgroundColor: "#f9f9f9" }}>
+            <div className="chat-feed">
               {chatHistory.map((msg, idx) => (
-                <div key={idx} style={{
-                  alignSelf: msg.role === "user" ? "flex-end" : "flex-start",
-                  backgroundColor: msg.role === "user" ? "#722ed1" : "white",
-                  color: msg.role === "user" ? "white" : "#333",
-                  padding: "10px 14px",
-                  borderRadius: "12px",
-                  maxWidth: "85%",
-                  boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
-                  whiteSpace: "pre-line", // 支援換行
-                  fontSize: "0.95rem",
-                  borderBottomRightRadius: msg.role === "user" ? "2px" : "12px",
-                  borderTopLeftRadius: msg.role === "model" ? "2px" : "12px"
-                }}>
+                <div key={idx} className={`chat-bubble ${msg.role === "user" ? "is-user" : "is-model"}`}>
                   {msg.text}
                 </div>
               ))}
               {isCoachThinking && (
-                <div style={{ alignSelf: "flex-start", color: "#888", fontSize: "0.8rem", paddingLeft: "10px" }}>
+                <div className="thinking-line">
                   教練正在思考...
                 </div>
               )}
@@ -927,7 +789,7 @@ function App() {
             </div>
 
             {/* 輸入框 */}
-            <div style={{ padding: "10px", borderTop: "1px solid #eee", display: "flex", gap: "5px", backgroundColor: "white" }}>
+            <div className="chat-composer">
               <input
                 type="text"
                 value={userInput}
@@ -935,12 +797,12 @@ function App() {
                 onKeyDown={handleKeyDown}
                 placeholder="問教練問題 (例如：為什麼這步不好？)"
                 disabled={isCoachThinking}
-                style={{ flex: 1, padding: "10px", borderRadius: "20px", border: "1px solid #ddd", outline: "none" }}
               />
               <button
+                className="send-button"
                 onClick={() => { if (userInput.trim()) askCoach(userInput); }}
                 disabled={isCoachThinking || !userInput.trim()}
-                style={{ ...buttonStyle("#111827"), borderRadius: "50%", width: "40px", height: "40px", padding: 0, display: "flex", alignItems: "center", justifyContent: "center" }}
+                aria-label="送出問題"
               >
                 ➤
               </button>
@@ -951,26 +813,10 @@ function App() {
 
           {/* 📊 分析圖表 (如果有數據) */}
           {appMode === "play" && analysisData.length > 0 && (
-            <div style={{
-              backgroundColor: "#f7f6f3",
-              borderRadius: "8px",
-              boxShadow: "0 2px 10px rgba(0,0,0,0.1)",
-              height: "170px",
-              overflow: "hidden",
-              border: "1px solid #e6e1dc"
-            }}>
-              <div style={{
-                height: "28px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                padding: "0 12px",
-                color: "#282622",
-                fontSize: "0.78rem",
-                fontWeight: 700
-              }}>
+            <div className="analysis-card">
+              <div className="chart-header">
                 <span>局勢走勢（白方視角）</span>
-                <span style={{ color: "#5f5a52", fontWeight: 600 }}>0 線</span>
+                <span>0 線</span>
               </div>
               <ResponsiveContainer width="100%" height={142}>
                 <ComposedChart
@@ -1042,55 +888,27 @@ function App() {
 
           {/* 歷史戰績 */}
           {appMode === "play" && (
-          <div style={{
-            width: "100%",
-            maxWidth: "600px",
-            backgroundColor: "#ffffff",
-            borderRadius: "8px",
-            padding: "18px",
-            boxShadow: "0 12px 30px rgba(17,24,39,0.08)",
-            border: "1px solid #e5e0d8"
-          }}>
-            <h3 style={{ borderBottom: "2px solid #eee", paddingBottom: "10px", marginTop: 0, color: "#333" }}>
+          <div className="history-card">
+            <h3>
               最近棋局
             </h3>
             {history.length === 0 ? (
-              <p style={{ textAlign: "center", color: "#999" }}>尚無紀錄</p>
+              <p className="empty-state">尚無紀錄</p>
             ) : (
-              <ul style={{ listStyle: "none", padding: 0, maxHeight: "200px", overflowY: "auto" }}>
+              <ul className="history-list">
                 {history.map((h) => (
                   <li key={h.id} onClick={() => loadGame(h.pgn)}
-                    style={{
-                      borderBottom: "1px solid #eee",
-                      padding: "10px",
-                      cursor: "pointer",
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      color: "#333" // 🔥 強制設定文字顏色為深灰，防止變成白色
-                    }}
-                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#f9f9f9"}
-                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
                   >
-                    <div style={{ display: "flex", flexDirection: "column" }}>
-                      {/* 🔥 確保 ID 和 日期 都有顏色，並且處理日期格式 */}
-                      <span style={{ fontWeight: "bold", fontSize: "0.95rem", color: "#333" }}>
+                    <div className="history-meta">
+                      <span>
                         #{h.id ? h.id : "?"}
                       </span>
-                      <span style={{ fontSize: "0.85rem", color: "#888" }}>
+                      <small>
                         {h.date ? new Date(h.date).toLocaleString("zh-TW") : "無日期"}
-                      </span>
+                      </small>
                     </div>
 
-                    <span style={{
-                      color: h.result === "1-0" ? "green" : (h.result === "0-1" ? "red" : "#faad14"),
-                      fontWeight: "bold",
-                      backgroundColor: "#f0f0f0",
-                      padding: "4px 8px",
-                      borderRadius: "4px",
-                      minWidth: "40px",
-                      textAlign: "center"
-                    }}>
+                    <span className={`result-badge ${h.result === "1-0" ? "is-win" : h.result === "0-1" ? "is-loss" : "is-draw"}`}>
                       {h.result}
                     </span>
                   </li>
@@ -1100,8 +918,8 @@ function App() {
           </div>
           )}
 
-        </div>
-      </div>
+        </aside>
+      </main>
     </div>
   );
 }
@@ -1121,34 +939,22 @@ function OpeningTrainingPanel({
   onReset
 }) {
   const progress = Math.round((history.length / selectedLesson.moves.length) * 100);
-  const feedbackColor = feedback.tone === "success" ? "#2f6f4e" : feedback.tone === "warn" ? "#a15c18" : "#374151";
-  const feedbackBg = feedback.tone === "success" ? "#edf7f0" : feedback.tone === "warn" ? "#fff4e6" : "#f5f6f4";
 
   return (
-    <div style={{
-      backgroundColor: "#ffffff",
-      borderRadius: "8px",
-      boxShadow: "0 16px 38px rgba(17,24,39,0.10)",
-      border: "1px solid #e5e0d8",
-      overflow: "hidden"
-    }}>
-      <div style={{ padding: "16px", backgroundColor: "#111827", color: "#f8f5ee" }}>
-        <div style={{ fontSize: "0.82rem", opacity: 0.78, fontWeight: 750 }}>訓練模式</div>
-        <div style={{ fontSize: "1.2rem", fontWeight: 850, marginTop: "2px" }}>{selectedLesson.opening}</div>
-        <div style={{ fontSize: "0.88rem", opacity: 0.88 }}>{selectedLesson.variation}</div>
+    <div className="training-card">
+      <div className="training-card__header">
+        <div className="panel-kicker">訓練模式</div>
+        <div className="training-title">{selectedLesson.opening}</div>
+        <div className="training-subtitle">{selectedLesson.variation}</div>
       </div>
 
-      <div style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "14px" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "6px" }}>
+      <div className="training-card__body">
+        <div className="phase-tabs">
           {phases.map((phase) => (
             <button
               key={phase.id}
+              className={trainingPhase === phase.id ? "is-active" : ""}
               onClick={() => onSelectPhase(phase.id)}
-              style={{
-                ...buttonStyle(trainingPhase === phase.id ? "#2f6f4e" : "#e5e0d8"),
-                color: trainingPhase === phase.id ? "#ffffff" : "#374151",
-                padding: "7px 8px"
-              }}
             >
               {phase.label}
             </button>
@@ -1156,21 +962,13 @@ function OpeningTrainingPanel({
         </div>
 
         <div>
-          <label style={{ display: "block", fontSize: "0.78rem", color: "#6b6258", fontWeight: 800, marginBottom: "6px" }}>
+          <label className="setting-label">
             選擇題目
           </label>
           <select
+            className="lesson-select"
             value={selectedLessonId}
             onChange={(event) => onSelectLesson(event.target.value)}
-            style={{
-              width: "100%",
-              border: "1px solid #d8d2c8",
-              borderRadius: "6px",
-              padding: "9px 10px",
-              color: "#1f2933",
-              backgroundColor: "#fff",
-              fontWeight: 700
-            }}
           >
             {lessons.map((lesson) => (
               <option key={lesson.id} value={lesson.id}>
@@ -1180,115 +978,50 @@ function OpeningTrainingPanel({
           </select>
         </div>
 
-        <div style={{
-          padding: "12px",
-          borderRadius: "8px",
-          backgroundColor: "#f7f6f3",
-          border: "1px solid #e5e0d8"
-        }}>
-          <div style={{ fontSize: "0.78rem", color: "#6b6258", fontWeight: 800, marginBottom: "4px" }}>本變體目標</div>
-          <div style={{ color: "#263238", fontWeight: 650, lineHeight: 1.45 }}>{selectedLesson.goal}</div>
+        <div className="goal-box">
+          <div className="setting-label">本變體目標</div>
+          <div>{selectedLesson.goal}</div>
         </div>
 
-        <div style={{
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr",
-          gap: "10px"
-        }}>
-          <div style={trainingMetricStyle}>
-            <span style={metricLabelStyle}>下一步白方</span>
+        <div className="training-metrics">
+          <div className="metric-card">
+            <span>下一步白方</span>
             <strong>{complete ? "完成" : expectedMove}</strong>
           </div>
-          <div style={trainingMetricStyle}>
-            <span style={metricLabelStyle}>進度</span>
+          <div className="metric-card">
+            <span>進度</span>
             <strong>{progress}%</strong>
           </div>
         </div>
 
-        <div style={{
-          height: "8px",
-          backgroundColor: "#e5e0d8",
-          borderRadius: "999px",
-          overflow: "hidden"
-        }}>
-          <div style={{
-            width: `${progress}%`,
-            height: "100%",
-            backgroundColor: "#2f6f4e",
-            transition: "width 0.2s ease"
-          }} />
+        <div className="progress-track">
+          <div style={{ width: `${progress}%` }} />
         </div>
 
-        <div style={{
-          padding: "12px",
-          borderRadius: "8px",
-          color: feedbackColor,
-          backgroundColor: feedbackBg,
-          border: `1px solid ${feedback.tone === "warn" ? "#f2c48d" : "#d8d2c8"}`,
-          fontWeight: 650,
-          lineHeight: 1.5
-        }}>
+        <div className={`feedback-box tone-${feedback.tone}`}>
           {feedback.text}
         </div>
 
         <div>
-          <div style={{ fontSize: "0.78rem", color: "#6b6258", fontWeight: 800, marginBottom: "6px" }}>目前棋譜</div>
-          <div style={{
-            minHeight: "42px",
-            padding: "10px",
-            borderRadius: "6px",
-            backgroundColor: "#fbfaf7",
-            border: "1px solid #e5e0d8",
-            color: "#374151",
-            fontSize: "0.9rem",
-            lineHeight: 1.5
-          }}>
+          <div className="setting-label">目前棋譜</div>
+          <div className="move-line">
             {history.length ? history.join(" ") : "尚未開始"}
           </div>
         </div>
 
         <div>
-          <div style={{ fontSize: "0.78rem", color: "#6b6258", fontWeight: 800, marginBottom: "6px" }}>學習重點</div>
-          <ul style={{ margin: 0, paddingLeft: "18px", color: "#374151", lineHeight: 1.55 }}>
+          <div className="setting-label">學習重點</div>
+          <ul className="idea-list">
             {selectedLesson.ideas.map((idea) => (
               <li key={idea}>{idea}</li>
             ))}
           </ul>
         </div>
 
-        <button onClick={onReset} style={buttonStyle("#111827")}>重練這條變體</button>
+        <button className="btn btn-primary" onClick={onReset}>重練這條變體</button>
       </div>
     </div>
   );
 }
-
-// 通用按鈕樣式
-function buttonStyle(bgColor) {
-  return {
-    padding: "8px 12px", cursor: "pointer", backgroundColor: bgColor, color: "white",
-    border: "1px solid rgba(17,24,39,0.10)", borderRadius: "6px", fontSize: "0.88rem", fontWeight: 750, transition: "all 0.2s"
-  };
-}
-
-const navButtonStyle = {
-  padding: "4px 10px", cursor: "pointer", backgroundColor: "#555", color: "white",
-  border: "none", borderRadius: "4px", fontSize: "0.8rem"
-};
-
-const trainingMetricStyle = {
-  padding: "10px",
-  borderRadius: "8px",
-  backgroundColor: "#f7f6f3",
-  border: "1px solid #e5e0d8",
-  display: "flex",
-  flexDirection: "column",
-  gap: "2px"
-};
-
-const metricLabelStyle = {
-  color: "#6b6258",
-  fontSize: "0.75rem",
-  fontWeight: 800
-};
 
 export default App;

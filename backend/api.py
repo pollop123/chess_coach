@@ -214,6 +214,12 @@ def get_analysis_endpoint(request: GetAnalysisRequest):
         depth=request.depth,
         time_limit=request.time_limit
     )
+    teaching_time_limit = min(1.0, max(0.2, request.time_limit * 0.25)) if request.time_limit else None
+    teaching_analysis = chess_engine.get_teaching_analysis(
+        board,
+        analysis,
+        time_limit=teaching_time_limit,
+    )
     
     game_phase = chess_engine.detect_game_phase(board)
 
@@ -243,7 +249,8 @@ def get_analysis_endpoint(request: GetAnalysisRequest):
                     user_question,
                     pv_line=analysis['pv'],
                     pv_score=analysis['score'],
-                    analysis_result=analysis  # 🔥 傳遞完整分析結果（包含 from_book）
+                    analysis_result=analysis,  # 🔥 傳遞完整分析結果（包含 from_book）
+                    teaching_analysis=teaching_analysis,
                 )
             except Exception as e:
                 print(f"RAG 分析失敗: {e}")
@@ -267,6 +274,7 @@ def get_analysis_endpoint(request: GetAnalysisRequest):
             "candidate_bound_skips": analysis.get('candidate_bound_skips', 0),
             "timed_out": analysis.get('timed_out', False),
         },
+        "teaching_analysis": teaching_analysis,
         "game_state": game_phase,
         "coach_advice": coach_advice
     }

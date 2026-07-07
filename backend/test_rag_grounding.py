@@ -92,6 +92,69 @@ class RagGroundingTests(unittest.TestCase):
         self.assertIn("目的格支援子：象@c4", generated_prompts[0])
         self.assertNotIn("Légal Trap", advice)
 
+    def test_advice_prompt_includes_verified_teaching_analysis(self):
+        rag = ChessRAG()
+        rag.client = object()
+        rag.retrieve_rule = lambda _query: "開局原則"
+        rag.retrieve_similar_game = lambda _fen: "無相似歷史對局。"
+
+        generated_prompts = []
+
+        def fake_generate(prompt, _system_instruction=None):
+            generated_prompts.append(prompt)
+            return "Nf3 發展子力。"
+
+        rag.call_gemini_with_fallback = fake_generate
+        analysis = {
+            "best_move": chess.Move.from_uci("g1f3"),
+            "from_book": False,
+            "book_line": [],
+        }
+        teaching_analysis = {
+            "criticality": "sharp",
+            "best_move_reason": "develops_piece",
+            "position_themes": ["opening_principle", "development"],
+            "mistake_warnings": ["large_eval_drop"],
+            "candidates": [
+                {
+                    "rank": 1,
+                    "san": "Nf3",
+                    "score_cp": 35,
+                    "loss_cp": 0,
+                    "warnings": [],
+                    "themes": ["development"],
+                    "pv": ["g1f3", "b8c6"],
+                    "reason": "develops_piece",
+                },
+                {
+                    "rank": 2,
+                    "san": "Qh5",
+                    "score_cp": -120,
+                    "loss_cp": 155,
+                    "warnings": ["large_eval_drop"],
+                    "themes": ["tactics"],
+                    "pv": ["d1h5"],
+                    "reason": "best_engine_score",
+                },
+            ],
+        }
+
+        rag.get_advice(
+            chess.STARTING_FEN,
+            "",
+            "怎麼下比較好？",
+            analysis_result=analysis,
+            teaching_analysis=teaching_analysis,
+        )
+
+        prompt = generated_prompts[0]
+        self.assertIn("[已驗證教學分析]", prompt)
+        self.assertIn("criticality=sharp", prompt)
+        self.assertIn("best_move_reason=develops_piece", prompt)
+        self.assertIn("#1 Nf3 score=35 loss=0", prompt)
+        self.assertIn("warnings=large_eval_drop", prompt)
+        self.assertIn("themes=opening_principle, development", prompt)
+
     def test_unverified_opening_names_are_removed_from_generated_text(self):
         advice = "這是 Légal Trap。\n白后與白象正在同時攻擊 f7。"
 

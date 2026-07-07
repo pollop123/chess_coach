@@ -758,6 +758,258 @@ def select_trickster_move(board, depth, best_move, best_score):
     return move, score, bonus
 
 
+def _move_attacks_king_zone(board, move):
+    mover = board.turn
+    board.push(move)
+    try:
+        enemy_king = board.king(not mover)
+        if enemy_king is None:
+            return False
+        king_zone = [enemy_king, *chess.SquareSet(chess.BB_KING_ATTACKS[enemy_king])]
+        return any(board.is_attacked_by(mover, square) for square in king_zone)
+    finally:
+        board.pop()
+
+
+def _move_allows_immediate_mate(board, move):
+    board.push(move)
+    try:
+        for reply in board.legal_moves:
+            board.push(reply)
+            try:
+                if board.is_checkmate():
+                    return True
+            finally:
+                board.pop()
+        return False
+    finally:
+        board.pop()
+
+
+def _move_themes(board, move, reason=None):
+    themes = set()
+    moving_piece = board.piece_at(move.from_square)
+
+    if len(board.move_stack) < 10:
+        themes.add("opening_principle")
+
+    if moving_piece and moving_piece.piece_type in {chess.KNIGHT, chess.BISHOP}:
+        starting_squares = {
+            chess.B1, chess.G1, chess.C1, chess.F1,
+            chess.B8, chess.G8, chess.C8, chess.F8,
+        }
+        if move.from_square in starting_squares:
+            themes.add("development")
+
+    from_file = chess.square_file(move.from_square)
+    from_rank = chess.square_rank(move.from_square)
+    to_file = chess.square_file(move.to_square)
+    to_rank = chess.square_rank(move.to_square)
+    moves_from_or_to_center = (
+        2 <= to_file <= 5 and 2 <= to_rank <= 5
+    ) or (
+        2 <= from_file <= 5 and 2 <= from_rank <= 5
+    )
+    if moves_from_or_to_center or (
+        moving_piece and moving_piece.piece_type == chess.PAWN and move.to_square in {chess.D4, chess.E4, chess.D5, chess.E5}
+    ):
+        themes.add("center_control")
+
+    if board.gives_check(move) or board.is_capture(move) or move.promotion or reason == "checkmate":
+        themes.add("tactics")
+
+    if _move_attacks_king_zone(board, move):
+        themes.add("king_safety")
+
+    if len(board.piece_map()) <= 6 or move.promotion:
+        themes.add("endgame")
+
+    return sorted(themes)
+
+
+def _move_reason(board, move, warnings):
+    moving_piece = board.piece_at(move.from_square)
+    captured_piece = board.piece_at(move.to_square) if board.is_capture(move) else None
+
+    board.push(move)
+    try:
+        if board.is_checkmate():
+            return "checkmate"
+    finally:
+        board.pop()
+
+    if captured_piece and piece_values.get(captured_piece.piece_type, 0) >= 300:
+        return "wins_material"
+    if "hangs_major_piece" not in warnings and moving_piece and moving_piece.piece_type in {chess.ROOK, chess.QUEEN}:
+        return "avoids_major_piece_loss"
+    if moving_piece and moving_piece.piece_type in {chess.KNIGHT, chess.BISHOP}:
+        starting_squares = {
+            chess.B1, chess.G1, chess.C1, chess.F1,
+            chess.B8, chess.G8, chess.C8, chess.F8,
+        }
+        if move.from_square in starting_squares:
+            return "develops_piece"
+    if move.to_square in {chess.D4, chess.E4, chess.D5, chess.E5}:
+        return "controls_center"
+    if _move_attacks_king_zone(board, move):
+        return "improves_king_safety"
+    if move.promotion:
+        return "promotes_or_supports_promotion"
+    return "best_engine_score"
+
+
+def _candidate_moves(board, best_move, candidate_count):
+    moves = []
+    if best_move and best_move in board.legal_moves:
+        moves.append(best_move)
+    for move in order_moves(board):
+        if move not in moves:
+            moves.append(move)
+        if len(moves) >= candidate_count:
+            break
+    return moves
+
+
+def _candidate_score(board, depth):
+    if board.is_game_over():
+        return evaluate_board(board, 1)
+    score, _move = minimax(
+        board,
+        max(1, depth),
+        -math.inf,
+        math.inf,
+        board.turn == chess.WHITE,
+        1,
+    )
+    return score
+
+
+def get_teaching_analysis(
+    board,
+    base_analysis,
+    candidate_count=5,
+    depth=None,
+    time_limit=None,
+):
+    """Return structured candidate comparisons and teaching evidence."""
+    original_fen = board.fen()
+    mover = board.turn
+    best_move = base_analysis.get("best_move")
+    base_depth = depth if depth is not None else max(1, int(base_analysis.get("depth") or 1) - 1)
+    started_at = time.monotonic()
+    deadline = started_at + time_limit if time_limit else None
+    begin_search_generation(deadline=deadline)
+
+    candidates = []
+    for move in _candidate_moves(board, best_move, candidate_count):
+        if deadline is not None and time.monotonic() >= deadline:
+            break
+
+        san = board.san(move)
+        warnings = []
+        if major_piece_loss_after_move(board, move):
+            warnings.append("hangs_major_piece")
+        if _move_allows_immediate_mate(board, move):
+            warnings.append("allows_mate_threat")
+
+        search_board = board.copy()
+        search_board.push(move)
+        try:
+            score = _candidate_score(search_board, base_depth)
+        except SearchTimeout:
+            break
+
+        if "hangs_major_piece" in warnings:
+            mover_sign = 1 if mover == chess.WHITE else -1
+            score -= mover_sign * 500
+
+        reason = _move_reason(board, move, warnings)
+        themes = _move_themes(board, move, reason)
+        pv = [move.uci(), *get_pv_line(search_board, base_depth)]
+        perspective_score = score if mover == chess.WHITE else -score
+        candidates.append({
+            "move_obj": move,
+            "move": move.uci(),
+            "san": san,
+            "score_cp": int(score),
+            "display": format_evaluation(score),
+            "perspective_score": perspective_score,
+            "pv": pv,
+            "warnings": warnings,
+            "themes": themes,
+            "reason": reason,
+        })
+
+    best_candidate = None
+    other_candidates = []
+    for item in candidates:
+        if best_move and item["move_obj"] == best_move:
+            best_candidate = item
+        else:
+            other_candidates.append(item)
+    other_candidates.sort(key=lambda item: item["perspective_score"], reverse=True)
+    candidates = ([best_candidate] if best_candidate else []) + other_candidates
+    if not candidates and best_move and best_move in board.legal_moves:
+        score = int(base_analysis.get("score") or 0)
+        candidates.append({
+            "move_obj": best_move,
+            "move": best_move.uci(),
+            "san": board.san(best_move),
+            "score_cp": score,
+            "display": format_evaluation(score),
+            "perspective_score": score if mover == chess.WHITE else -score,
+            "pv": [best_move.uci()],
+            "warnings": [],
+            "themes": _move_themes(board, best_move),
+            "reason": _move_reason(board, best_move, []),
+        })
+
+    best_perspective = candidates[0]["perspective_score"] if candidates else 0
+    for index, item in enumerate(candidates, start=1):
+        item["rank"] = index
+        item["loss_cp"] = int(max(0, best_perspective - item["perspective_score"]))
+        if item["loss_cp"] >= 150 and "large_eval_drop" not in item["warnings"]:
+            item["warnings"].append("large_eval_drop")
+
+    if candidates and candidates[0]["reason"] == "checkmate":
+        for item in candidates[1:]:
+            if item["reason"] != "checkmate" and "misses_mate" not in item["warnings"]:
+                item["warnings"].append("misses_mate")
+
+    position_themes = set()
+    mistake_warnings = set()
+    for item in candidates:
+        position_themes.update(item["themes"])
+        mistake_warnings.update(item["warnings"])
+
+    if len(candidates) >= 2 and candidates[1]["loss_cp"] >= 150:
+        criticality = "only_move"
+        position_themes.add("only_move")
+    elif mistake_warnings or (len(candidates) >= 2 and candidates[-1]["loss_cp"] >= 150):
+        criticality = "sharp"
+    else:
+        criticality = "normal"
+
+    best_reason = candidates[0]["reason"] if candidates else "best_engine_score"
+    public_candidates = []
+    for item in candidates:
+        public_item = dict(item)
+        public_item.pop("move_obj", None)
+        public_item.pop("perspective_score", None)
+        public_candidates.append(public_item)
+
+    if board.fen() != original_fen:
+        raise RuntimeError("teaching analysis mutated the board")
+
+    return {
+        "candidates": public_candidates,
+        "criticality": criticality,
+        "position_themes": sorted(position_themes),
+        "best_move_reason": best_reason,
+        "mistake_warnings": sorted(mistake_warnings),
+    }
+
+
 def get_analysis(
     board,
     depth=3,

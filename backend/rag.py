@@ -113,6 +113,41 @@ def strip_unverified_opening_claims(advice):
     return cleaned or "請以上方已驗證的開局辨識為準。"
 
 
+def format_teaching_analysis(teaching_analysis):
+    if not teaching_analysis:
+        return "無。"
+
+    lines = [
+        "[已驗證教學分析]",
+        f"criticality={teaching_analysis.get('criticality', 'normal')}",
+        f"best_move_reason={teaching_analysis.get('best_move_reason', 'best_engine_score')}",
+    ]
+
+    themes = teaching_analysis.get("position_themes") or []
+    if themes:
+        lines.append(f"themes={', '.join(themes)}")
+
+    mistake_warnings = teaching_analysis.get("mistake_warnings") or []
+    if mistake_warnings:
+        lines.append(f"mistake_warnings={', '.join(mistake_warnings)}")
+
+    candidates = teaching_analysis.get("candidates") or []
+    if candidates:
+        lines.append("候選手比較:")
+    for item in candidates[:6]:
+        warnings = ", ".join(item.get("warnings") or []) or "none"
+        item_themes = ", ".join(item.get("themes") or []) or "none"
+        pv = " ".join(item.get("pv") or []) or "none"
+        lines.append(
+            f"#{item.get('rank')} {item.get('san')} "
+            f"score={item.get('score_cp')} loss={item.get('loss_cp')} "
+            f"reason={item.get('reason')} warnings={warnings} "
+            f"themes={item_themes} pv={pv}"
+        )
+
+    return "\n".join(lines)
+
+
 def _simple_retrieve_rule(search_query):
     query = (search_query or "").lower()
     keyword_map = {
@@ -310,7 +345,16 @@ class ChessRAG:
             return f"[Lichess 相似局] {white} vs {black}, 高手走了 {move}"
         return f"[歷史名局] {white} vs {black}, 大師走了 {move}"
 
-    def get_advice(self, fen, move_history, user_question, pv_line=None, pv_score=None, analysis_result=None):
+    def get_advice(
+        self,
+        fen,
+        move_history,
+        user_question,
+        pv_line=None,
+        pv_score=None,
+        analysis_result=None,
+        teaching_analysis=None,
+    ):
         if not self.client:
             return "AI 教練尚未設定 API Key，請確認後端環境變數 GOOGLE_API_KEY。"
 
@@ -441,6 +485,7 @@ class ChessRAG:
             except Exception as e:
                 print(f"PV Line 解析錯誤: {e}")
 
+        teaching_analysis_text = format_teaching_analysis(teaching_analysis)
 
         final_prompt = f"""
 [當前局面 (FEN)]: {fen}
@@ -456,13 +501,15 @@ class ChessRAG:
 
 {pv_analysis}
 
+{teaching_analysis_text}
+
 [完整棋譜 (PGN)]: {pgn_text}
 [資料庫檢索]: {similar_game_info}
 [相關規則]: {rule_text}
 
 [玩家問題]: {user_question}
 
-請根據以上資訊提供專業分析。開局名稱會由程式另行顯示，回答內不要重複開局、防禦、棄兵或陷阱名稱，只解釋走法意圖與局面。
+請根據以上資訊提供專業分析。優先引用「已驗證教學分析」中的候選手比較、criticality、warnings 與 themes；不要宣稱未被資料支持的戰術或開局名稱。開局名稱會由程式另行顯示，回答內不要重複開局、防禦、棄兵或陷阱名稱，只解釋走法意圖與局面。
 """
         generated_advice = strip_unverified_opening_claims(
             self.call_gemini_with_fallback(final_prompt)
