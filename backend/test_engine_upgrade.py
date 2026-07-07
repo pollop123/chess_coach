@@ -40,6 +40,20 @@ class EngineUpgradeTests(unittest.TestCase):
         self.assertEqual(analysis["eval_display"], "M1")
         self.assertEqual(analysis["winning_chance"], 100.0)
 
+    def test_advanced_search_prefers_active_two_knights_tactic(self):
+        board = chess.Board("r1bqkb1r/ppp2ppp/2n5/3np1N1/2B5/8/PPPP1PPP/RNBQK2R w KQkq - 0 6")
+
+        analysis = chess_engine.get_analysis(
+            board,
+            depth=5,
+            time_limit=1.5,
+            use_book=False,
+            adaptive_depth=True,
+            difficulty="advanced",
+        )
+
+        self.assertIn(board.san(analysis["best_move"]), {"Nxf7", "d4"})
+
     def test_evaluation_formatting_and_win_probability(self):
         self.assertEqual(chess_engine.format_evaluation(150), "+1.50")
         self.assertEqual(chess_engine.format_evaluation(-80), "-0.80")

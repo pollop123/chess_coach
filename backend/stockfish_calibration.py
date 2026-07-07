@@ -133,6 +133,22 @@ def win_expectation(info, color, ply):
     return (wdl.wins + 0.5 * wdl.draws) / 1000
 
 
+def move_loss_metrics(
+    best_move,
+    played_move,
+    best_score,
+    played_score,
+    best_expectation,
+    played_expectation,
+):
+    if best_move == played_move:
+        return {"loss_cp": 0, "expectation_loss": 0}
+    return {
+        "loss_cp": min(max(0, best_score - played_score), 1000),
+        "expectation_loss": max(0, best_expectation - played_expectation),
+    }
+
+
 def analyze_with_stockfish(engine, board, move, nodes):
     engine.configure({"Clear Hash": None})
     best_info = engine.analyse(board, chess.engine.Limit(nodes=nodes))
@@ -144,18 +160,25 @@ def analyze_with_stockfish(engine, board, move, nodes):
     )
     best_score = score_cp(best_info, board.turn)
     played_score = score_cp(played_info, board.turn)
-    raw_loss = max(0, best_score - played_score)
     best_expectation = win_expectation(best_info, board.turn, board.ply())
     played_expectation = win_expectation(played_info, board.turn, board.ply())
-    expectation_loss = max(0, best_expectation - played_expectation)
+    best_move = best_info["pv"][0]
+    metrics = move_loss_metrics(
+        best_move,
+        move,
+        best_score,
+        played_score,
+        best_expectation,
+        played_expectation,
+    )
     best_mate = best_info["score"].pov(board.turn).mate()
     played_mate = played_info["score"].pov(board.turn).mate()
     return {
-        "best_move": best_info["pv"][0],
+        "best_move": best_move,
         "best_score": best_score,
         "played_score": played_score,
-        "loss_cp": min(raw_loss, 1000),
-        "expectation_loss": expectation_loss,
+        "loss_cp": metrics["loss_cp"],
+        "expectation_loss": metrics["expectation_loss"],
         "best_is_mate": best_mate is not None and best_mate > 0,
         "played_is_mate": played_mate is not None and played_mate > 0,
     }
