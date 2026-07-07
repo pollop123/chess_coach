@@ -30,6 +30,7 @@ const TRAINING_LESSONS = [
   {
     id: "italian-giuoco-piano",
     phase: "opening",
+    tags: ["opening", "development", "king_safety"],
     opening: "義大利開局",
     variation: "Giuoco Piano",
     goal: "快速發展子力，主教瞄準 f7，穩定完成短易位。",
@@ -45,6 +46,7 @@ const TRAINING_LESSONS = [
   {
     id: "italian-two-knights",
     phase: "opening",
+    tags: ["opening", "development", "calculation"],
     opening: "義大利開局",
     variation: "Two Knights Defense",
     goal: "面對 ...Nf6 時保持中心壓力，理解黑方反擊 e4 的節奏。",
@@ -59,6 +61,7 @@ const TRAINING_LESSONS = [
   {
     id: "italian-evans-gambit",
     phase: "opening",
+    tags: ["opening", "initiative", "center"],
     opening: "義大利開局",
     variation: "Evans Gambit",
     goal: "用 b4 犧牲側翼兵搶節奏，換取中心與子力活動。",
@@ -73,6 +76,7 @@ const TRAINING_LESSONS = [
   {
     id: "middlegame-scholar-mate",
     phase: "middlegame",
+    tags: ["tactics", "king_safety", "checkmate"],
     opening: "中局戰術",
     variation: "弱點攻擊：f7 將殺",
     goal: "辨識王旁弱點，抓住對方防守不足時的直接將殺。",
@@ -87,6 +91,7 @@ const TRAINING_LESSONS = [
   {
     id: "middlegame-center-pressure",
     phase: "middlegame",
+    tags: ["middlegame", "tactics", "calculation", "center"],
     opening: "中局判斷",
     variation: "中心壓力：發展后支援攻擊",
     goal: "在戰術還沒直接成立時，找能增加壓力又不丟子的發展手。",
@@ -101,6 +106,7 @@ const TRAINING_LESSONS = [
   {
     id: "endgame-queen-mate-net",
     phase: "endgame",
+    tags: ["endgame", "checkmate", "king_safety"],
     opening: "殘局訓練",
     variation: "后王配合：縮小國王空間",
     goal: "用國王支援后的控制，讓對方國王沒有逃生格。",
@@ -115,6 +121,7 @@ const TRAINING_LESSONS = [
   {
     id: "endgame-pawn-promotion",
     phase: "endgame",
+    tags: ["endgame", "promotion", "conversion"],
     opening: "殘局訓練",
     variation: "通路兵升變",
     goal: "辨識能直接升變的通路兵，優先把優勢轉成后。",
@@ -127,6 +134,103 @@ const TRAINING_LESSONS = [
     ]
   }
 ];
+
+const WEAKNESS_LABELS = {
+  opening: "開局節奏",
+  development: "子力發展",
+  king_safety: "王安全",
+  tactics: "戰術警覺",
+  calculation: "計算精準度",
+  endgame: "殘局轉換",
+  promotion: "通路兵升變",
+  center: "中心控制",
+  conversion: "優勢轉換"
+};
+
+function countPiecesFromFen(fen) {
+  const placement = (fen || "").split(" ")[0] || "";
+  return placement.replace(/[1-8/]/g, "").length;
+}
+
+function getMovePhase(item) {
+  if (item.move_number <= 8) return "opening";
+  if (countPiecesFromFen(item.fen) <= 10 || item.move_number >= 28) return "endgame";
+  return "middlegame";
+}
+
+function tagsForReviewMove(item) {
+  const tags = new Set();
+  const phase = getMovePhase(item);
+  const cpLoss = item.cp_loss || 0;
+
+  if (phase === "opening") {
+    tags.add("opening");
+    tags.add("development");
+  }
+  if (phase === "endgame") {
+    tags.add("endgame");
+    tags.add("conversion");
+  }
+  if (cpLoss >= 150) {
+    tags.add("tactics");
+    tags.add("calculation");
+  }
+  if (item.mate_threat || item.is_checkmate) {
+    tags.add("king_safety");
+    tags.add("checkmate");
+  }
+  if (phase === "endgame" && cpLoss >= 250) {
+    tags.add("promotion");
+  }
+  if (phase === "middlegame" && cpLoss >= 50) {
+    tags.add("center");
+  }
+
+  return [...tags];
+}
+
+function getPracticeRecommendations(analysisData, humanColor, lessons) {
+  const humanSide = humanColor === "black" ? "black" : "white";
+  const reviewMoves = analysisData
+    .filter((item) => item.move && item.side_to_move === humanSide)
+    .filter((item) => ["inaccuracy", "mistake", "blunder"].includes(item.classification));
+
+  const tagWeights = new Map();
+  for (const item of reviewMoves) {
+    const severity = item.classification === "blunder" ? 3 : item.classification === "mistake" ? 2 : 1;
+    for (const tag of tagsForReviewMove(item)) {
+      tagWeights.set(tag, (tagWeights.get(tag) || 0) + severity);
+    }
+  }
+
+  if (tagWeights.size === 0) {
+    return {
+      weaknesses: [],
+      recommendations: [lessons.find((lesson) => lesson.id === "italian-giuoco-piano") || lessons[0]].filter(Boolean)
+    };
+  }
+
+  const rankedLessons = lessons
+    .map((lesson) => {
+      const score = (lesson.tags || []).reduce((sum, tag) => sum + (tagWeights.get(tag) || 0), 0)
+        + (tagWeights.get(lesson.phase) || 0);
+      return { lesson, score };
+    })
+    .filter((item) => item.score > 0)
+    .sort((a, b) => b.score - a.score || a.lesson.id.localeCompare(b.lesson.id));
+
+  const weaknesses = [...tagWeights.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([tag]) => tag);
+
+  return {
+    weaknesses,
+    recommendations: rankedLessons.length
+      ? rankedLessons.slice(0, 2).map((item) => item.lesson)
+      : [lessons.find((lesson) => lesson.id === "middlegame-center-pressure") || lessons[0]].filter(Boolean)
+  };
+}
 
 function App() {
   const [game, setGame] = useState(new Chess());
@@ -277,6 +381,7 @@ function App() {
   const boardOrientation = appMode === "training" ? "white" : humanColor;
   const selectedDifficulty = BOT_DIFFICULTIES.find((difficulty) => difficulty.id === botDifficulty) || BOT_DIFFICULTIES[2];
   const selectedStyle = BOT_STYLES.find((style) => style.id === botStyle) || BOT_STYLES[0];
+  const practiceRecommendations = getPracticeRecommendations(analysisData, humanColor, TRAINING_LESSONS);
 
   // 🔥 核心修改：發送訊息給 AI 教練
   // manualQuestion: 如果有的話，代表是玩家手動打字；如果沒有，代表是按「分析按鈕」
@@ -349,6 +454,12 @@ function App() {
       tone: "neutral",
       text: `${lesson.opening}：${lesson.variation}。先走 ${lesson.moves[0]}，目標是：${lesson.goal}`
     });
+  }
+
+  function startRecommendedLesson(lessonId) {
+    resetTraining(lessonId);
+    setAppMode("training");
+    setStatus("已切換到推薦練習");
   }
 
   function selectTrainingPhase(nextPhase) {
@@ -883,6 +994,43 @@ function App() {
                   )}
                 </ComposedChart>
               </ResponsiveContainer>
+            </div>
+          )}
+
+          {appMode === "play" && analysisData.length > 0 && (
+            <div className="practice-card">
+              <div className="practice-card__header">
+                <div>
+                  <div className="panel-kicker">推薦練習</div>
+                  <h3>下一步訓練</h3>
+                </div>
+                <span>
+                  {practiceRecommendations.weaknesses.length
+                    ? practiceRecommendations.weaknesses.map((tag) => WEAKNESS_LABELS[tag] || tag).join(" / ")
+                    : "穩定復盤"}
+                </span>
+              </div>
+
+              <p className="practice-summary">
+                {practiceRecommendations.weaknesses.length
+                  ? "根據這盤的失誤類型，先補最常出現的弱點。"
+                  : "這盤沒有明顯反覆失誤，建議用基礎開局題維持節奏。"}
+              </p>
+
+              <div className="practice-list">
+                {practiceRecommendations.recommendations.map((lesson) => (
+                  <div className="practice-item" key={lesson.id}>
+                    <div>
+                      <strong>{lesson.variation}</strong>
+                      <small>{lesson.opening} · {TRAINING_PHASES.find((phase) => phase.id === lesson.phase)?.label || lesson.phase}</small>
+                      <p>{lesson.goal}</p>
+                    </div>
+                    <button className="btn btn-primary" onClick={() => startRecommendedLesson(lesson.id)}>
+                      開始練
+                    </button>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
