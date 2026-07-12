@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Chess } from "chess.js";
 import { Chessboard } from "react-chessboard";
 import axios from "axios";
+import { TRAINING_LESSONS, TRAINING_PHASES } from "./trainingLessons";
 // 引入圖表套件
 import { ComposedChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine, ReferenceDot, ReferenceArea, Area, Scatter } from 'recharts';
 
@@ -18,121 +19,6 @@ const BOT_DIFFICULTIES = [
 const BOT_STYLES = [
   { id: "balanced", label: "穩健", description: "優先選客觀穩定的走法" },
   { id: "trickster", label: "陷阱", description: "偏好將軍、攻王與壓縮回應，用來練防守警覺" }
-];
-
-const TRAINING_PHASES = [
-  { id: "opening", label: "開局" },
-  { id: "middlegame", label: "中局" },
-  { id: "endgame", label: "殘局" }
-];
-
-const TRAINING_LESSONS = [
-  {
-    id: "italian-giuoco-piano",
-    phase: "opening",
-    tags: ["opening", "development", "king_safety"],
-    opening: "義大利開局",
-    variation: "Giuoco Piano",
-    goal: "快速發展子力，主教瞄準 f7，穩定完成短易位。",
-    moves: ["e4", "e5", "Nf3", "Nc6", "Bc4", "Bc5", "c3", "Nf6", "d3", "d6", "O-O"],
-    ideas: [
-      "e4 先占中心，打開后與主教的路線。",
-      "Nf3 發展騎士並攻擊 e5 兵，是義大利開局的核心節奏。",
-      "Bc4 瞄準 f7 弱點，同時完成王翼子力發展。",
-      "c3 支援後續 d4，也讓白方保留穩健中心。",
-      "O-O 把國王帶到安全位置，接著才談中局計畫。"
-    ]
-  },
-  {
-    id: "italian-two-knights",
-    phase: "opening",
-    tags: ["opening", "development", "calculation"],
-    opening: "義大利開局",
-    variation: "Two Knights Defense",
-    goal: "面對 ...Nf6 時保持中心壓力，理解黑方反擊 e4 的節奏。",
-    moves: ["e4", "e5", "Nf3", "Nc6", "Bc4", "Nf6", "d3", "Bc5", "c3", "d6", "O-O"],
-    ideas: [
-      "黑方 ...Nf6 直接攻擊 e4，白方要注意中心兵的保護。",
-      "d3 是穩健選擇，先保住 e4 並準備短易位。",
-      "c3 讓白方之後有 d4 的中心突破想法。",
-      "不要急著連續移動同一隻棋子，先完成發展比較重要。"
-    ]
-  },
-  {
-    id: "italian-evans-gambit",
-    phase: "opening",
-    tags: ["opening", "initiative", "center"],
-    opening: "義大利開局",
-    variation: "Evans Gambit",
-    goal: "用 b4 犧牲側翼兵搶節奏，換取中心與子力活動。",
-    moves: ["e4", "e5", "Nf3", "Nc6", "Bc4", "Bc5", "b4", "Bxb4", "c3", "Ba5", "d4"],
-    ideas: [
-      "b4 是 Evans Gambit 的關鍵，目標是趕走黑方主教。",
-      "白方犧牲 b 兵換取 c3、d4 的中心推進速度。",
-      "這條線比較進攻型，適合練習用節奏補償物質。",
-      "如果沒有跟上 c3、d4，棄兵就容易只剩虧損。"
-    ]
-  },
-  {
-    id: "middlegame-scholar-mate",
-    phase: "middlegame",
-    tags: ["tactics", "king_safety", "checkmate"],
-    opening: "中局戰術",
-    variation: "弱點攻擊：f7 將殺",
-    goal: "辨識王旁弱點，抓住對方防守不足時的直接將殺。",
-    startFen: "r1bqkb1r/pppp1ppp/2n2n2/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR w KQkq - 4 4",
-    moves: ["Qxf7#"],
-    ideas: [
-      "f7 是黑方開局最脆弱的點，通常只有國王保護。",
-      "當后與主教同時瞄準 f7，對方又沒完成防守時，要先檢查是否有將殺。",
-      "中局戰術題先找王的安全，再找強迫手：將軍、吃子、威脅。"
-    ]
-  },
-  {
-    id: "middlegame-center-pressure",
-    phase: "middlegame",
-    tags: ["middlegame", "tactics", "calculation", "center"],
-    opening: "中局判斷",
-    variation: "中心壓力：發展后支援攻擊",
-    goal: "在戰術還沒直接成立時，找能增加壓力又不丟子的發展手。",
-    startFen: "r1bqkb1r/ppp2ppp/2n5/3np1N1/2B5/8/PPPP1PPP/RNBQK2R w KQkq - 0 6",
-    moves: ["Qf3"],
-    ideas: [
-      "Qf3 支援 f7 壓力，也連結騎士與主教的攻擊方向。",
-      "中局不一定每步都是將殺；有時候好棋是把更多子力帶進同一個目標。",
-      "如果攻擊還沒成熟，不要只靠一隻棋子衝進去。"
-    ]
-  },
-  {
-    id: "endgame-queen-mate-net",
-    phase: "endgame",
-    tags: ["endgame", "checkmate", "king_safety"],
-    opening: "殘局訓練",
-    variation: "后王配合：縮小國王空間",
-    goal: "用國王支援后的控制，讓對方國王沒有逃生格。",
-    startFen: "7k/6Q1/5K2/8/8/8/8/8 w - - 0 1",
-    moves: ["Kf7#"],
-    ideas: [
-      "后很強，但殘局將殺通常需要國王一起控制逃生格。",
-      "Kf7# 不是單純追王，而是用國王封住黑王周圍格子。",
-      "后王殺王的核心是縮小空間，不是一直無目的將軍。"
-    ]
-  },
-  {
-    id: "endgame-pawn-promotion",
-    phase: "endgame",
-    tags: ["endgame", "promotion", "conversion"],
-    opening: "殘局訓練",
-    variation: "通路兵升變",
-    goal: "辨識能直接升變的通路兵，優先把優勢轉成后。",
-    startFen: "8/4P3/4K3/8/8/8/8/4k3 w - - 0 1",
-    moves: ["e8=Q"],
-    ideas: [
-      "通路兵到第七排時，升變通常比其他慢手更重要。",
-      "升變成后能把兵的優勢轉成決定性火力。",
-      "殘局先算升變格是否安全，再決定王要不要支援。"
-    ]
-  }
 ];
 
 const WEAKNESS_LABELS = {
