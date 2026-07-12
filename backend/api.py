@@ -9,6 +9,7 @@ import chess.pgn
 import io
 import math
 import os
+import time
 
 # 匯入你的核心引擎
 import chess_engine  # Import the new engine module
@@ -28,7 +29,7 @@ app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -77,10 +78,6 @@ class GameResponse(GameCreate):
     class Config:
         # Pydantic V2 新寫法，解決 UserWarning
         from_attributes = True 
-
-class ExplainRequest(BaseModel):
-    fen: str
-    history: str = "" # 可選
 
 BOT_DIFFICULTY_PROFILES = {
     "newbie": {
@@ -233,30 +230,20 @@ def get_analysis_endpoint(request: GetAnalysisRequest):
         if len(user_question) > 200:
             user_question = user_question[:200]
         
-        # 過濾敏感字眼
-        forbidden_keywords = [
-            "ignore", "disregard", "forget", "system", "override",
-            "忽略", "無視", "覆蓋", "系統指令"
-        ]
-        user_question_lower = user_question.lower()
-        
-        if not any(keyword in user_question_lower for keyword in forbidden_keywords):
-            try:
-                rag_engine = get_rag_engine()
-                coach_advice = rag_engine.get_advice(
-                    request.fen,
-                    request.history,
-                    user_question,
-                    pv_line=analysis['pv'],
-                    pv_score=analysis['score'],
-                    analysis_result=analysis,  # 🔥 傳遞完整分析結果（包含 from_book）
-                    teaching_analysis=teaching_analysis,
-                )
-            except Exception as e:
-                print(f"RAG 分析失敗: {e}")
-                coach_advice = "教練分析暫時無法使用"
-        else:
-            coach_advice = "問題包含不允許的內容，請重新輸入"
+        try:
+            rag_engine = get_rag_engine()
+            coach_advice = rag_engine.get_advice(
+                request.fen,
+                request.history,
+                user_question,
+                pv_line=analysis['pv'],
+                pv_score=analysis['score'],
+                analysis_result=analysis,
+                teaching_analysis=teaching_analysis,
+            )
+        except Exception as e:
+            print(f"RAG 分析失敗: {e}")
+            coach_advice = "教練分析暫時無法使用"
 
     return {
         "evaluation": {
@@ -323,6 +310,7 @@ def analyze_full_game(request: AnalysisRequest):
 
     board = game.board()
     evaluations = []
+    chess_engine.begin_search_generation(deadline=time.monotonic() + 20.0)
     
     # 設定視角
     persp = (getattr(request, "perspective", "white") or "white").lower()
@@ -337,13 +325,16 @@ def analyze_full_game(request: AnalysisRequest):
         if search_board.is_game_over():
             return chess_engine.evaluate_board(search_board), None
         depth = max(1, search_depth)
-        return chess_engine.minimax(
-            search_board,
-            depth,
-            -math.inf,
-            math.inf,
-            search_board.turn == chess.WHITE,
-        )
+        try:
+            return chess_engine.minimax(
+                search_board,
+                depth,
+                -math.inf,
+                math.inf,
+                search_board.turn == chess.WHITE,
+            )
+        except chess_engine.SearchTimeout:
+            return chess_engine.evaluate_board(search_board), None
 
     # 初始局面評分
     start_eval, _ = search_position(board, request.depth)
@@ -447,15 +438,6 @@ def explain_position(request: ExplainRequest):
     # 限制問題長度
     if len(user_question) > request.max_question_length:
         user_question = user_question[:request.max_question_length]
-    
-    # 過濾敏感字眼
-    forbidden_keywords = [
-        "ignore", "disregard", "forget", "system", "override",
-        "忽略", "無視", "覆蓋", "系統指令"
-    ]
-    user_question_lower = user_question.lower()
-    if any(keyword in user_question_lower for keyword in forbidden_keywords):
-        return {"advice": "問題包含不允許的內容，請重新輸入"}
     
     # 計算引擎分析
     pv_line = None

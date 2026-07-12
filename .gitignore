@@ -24,3 +24,7 @@ chroma_db/
 backend/.env
 **/*.sqlite
 **/*.db
+
+# Local Codex/agent tool state
+.agents/
+.codex/
