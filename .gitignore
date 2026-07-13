@@ -28,3 +28,4 @@ backend/.env
 # Local Codex/agent tool state
 .agents/
 .codex/
+skills-lock.json

@@ -443,6 +443,7 @@ def explain_position(request: ExplainRequest):
     pv_line = None
     pv_score = None
     analysis = None
+    teaching_analysis = None
     
     try:
         board = chess.Board(request.fen)
@@ -454,6 +455,11 @@ def explain_position(request: ExplainRequest):
             )
             pv_line = analysis['pv']
             pv_score = analysis['score']
+            teaching_analysis = chess_engine.get_teaching_analysis(
+                board,
+                analysis,
+                time_limit=0.8,
+            )
             print(f"PV Line: {pv_line} | Score: {analysis['eval_display']} | Win%: {analysis['winning_chance']}% | From Book: {analysis.get('from_book', False)}")
     except Exception as e:
         print(f"引擎分析失敗: {e}")
@@ -467,7 +473,8 @@ def explain_position(request: ExplainRequest):
             user_question,
             pv_line=pv_line,
             pv_score=pv_score,
-            analysis_result=analysis  # 🔥 傳遞完整分析結果
+            analysis_result=analysis,
+            teaching_analysis=teaching_analysis,
         )
     except Exception as e:
         print(f"RAG 分析失敗: {e}")

@@ -98,6 +98,47 @@ class ApiEndpointTests(unittest.TestCase):
         self.assertEqual(response.json()["coach_advice"], "請先完成子力發展。")
         self.assertEqual(rag_engine.get_advice.call_args.args[2], "這個 system 性的弱點該怎麼守？")
 
+    def test_explain_passes_verified_teaching_analysis_to_rag(self):
+        rag_engine = Mock()
+        rag_engine.get_advice.return_value = "推薦手：Nf3"
+        analysis = {
+            "best_move": None,
+            "from_book": False,
+            "book_line": [],
+            "pv": [],
+            "score": 20,
+            "eval_display": "+0.20",
+            "winning_chance": 52.0,
+        }
+        teaching_analysis = {
+            "candidates": [{"san": "Nf3", "rank": 1}],
+            "criticality": "normal",
+            "position_themes": ["development"],
+            "best_move_reason": "develops_piece",
+            "mistake_warnings": [],
+        }
+
+        with (
+            patch("api.get_rag_engine", return_value=rag_engine),
+            patch("api.chess_engine.get_analysis", return_value=analysis),
+            patch("api.chess_engine.get_teaching_analysis", return_value=teaching_analysis),
+        ):
+            response = self.client.post(
+                "/explain",
+                json={
+                    "fen": self.analysis_fen,
+                    "history": "1. e4 e5",
+                    "question": "為什麼要發展騎士？",
+                    "depth": 2,
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            rag_engine.get_advice.call_args.kwargs["teaching_analysis"],
+            teaching_analysis,
+        )
+
     def test_analyze_full_after_make_move(self):
         move_response = self.client.post(
             "/make_move",
