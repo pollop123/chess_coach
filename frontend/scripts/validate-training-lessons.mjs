@@ -2,6 +2,8 @@ import { Chess } from "chess.js";
 import { TRAINING_LESSONS } from "../src/trainingLessons.js";
 
 const REQUIRED_PHASES = new Set(["opening", "middlegame", "endgame"]);
+const ALLOWED_TYPES = new Set(["opening", "puzzle", "guided", "endgame"]);
+const ALLOWED_SIDES = new Set(["white", "black"]);
 const seenIds = new Set();
 const phaseCounts = new Map();
 
@@ -18,6 +20,10 @@ for (const lesson of TRAINING_LESSONS) {
   seenIds.add(lesson.id);
   assert(REQUIRED_PHASES.has(lesson.phase), `${lesson.id} has invalid phase ${lesson.phase}`);
   assert(Array.isArray(lesson.tags) && lesson.tags.length >= 2, `${lesson.id} needs at least two tags`);
+  assert(ALLOWED_TYPES.has(lesson.type), `${lesson.id} has invalid type ${lesson.type}`);
+  assert(Number.isInteger(lesson.difficulty) && lesson.difficulty >= 1 && lesson.difficulty <= 3, `${lesson.id} has invalid difficulty`);
+  assert(ALLOWED_SIDES.has(lesson.side), `${lesson.id} has invalid side ${lesson.side}`);
+  assert(Array.isArray(lesson.prerequisites), `${lesson.id} needs prerequisites`);
   assert(lesson.opening && lesson.variation && lesson.goal, `${lesson.id} is missing display copy`);
   assert(Array.isArray(lesson.moves) && lesson.moves.length >= 1, `${lesson.id} needs moves`);
   assert(Array.isArray(lesson.ideas) && lesson.ideas.length >= 2, `${lesson.id} needs learning ideas`);
@@ -29,6 +35,13 @@ for (const lesson of TRAINING_LESSONS) {
   }
 
   phaseCounts.set(lesson.phase, (phaseCounts.get(lesson.phase) || 0) + 1);
+}
+
+for (const lesson of TRAINING_LESSONS) {
+  for (const prerequisite of lesson.prerequisites) {
+    assert(seenIds.has(prerequisite), `${lesson.id} has missing prerequisite ${prerequisite}`);
+    assert(prerequisite !== lesson.id, `${lesson.id} cannot require itself`);
+  }
 }
 
 for (const phase of REQUIRED_PHASES) {

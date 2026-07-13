@@ -4,7 +4,7 @@ export const TRAINING_PHASES = [
   { id: "endgame", label: "殘局" }
 ];
 
-export const TRAINING_LESSONS = [
+const LESSON_CATALOG = [
   {
     id: "italian-giuoco-piano",
     phase: "opening",
@@ -99,6 +99,7 @@ export const TRAINING_LESSONS = [
   {
     id: "middlegame-center-pressure",
     phase: "middlegame",
+    type: "guided",
     tags: ["middlegame", "tactics", "calculation", "center"],
     opening: "中局判斷",
     variation: "中心壓力：發展后支援攻擊",
@@ -129,6 +130,7 @@ export const TRAINING_LESSONS = [
   {
     id: "middlegame-hanging-queen",
     phase: "middlegame",
+    type: "guided",
     tags: ["tactics", "calculation", "king_safety"],
     opening: "中局判斷",
     variation: "后的位置安全",
@@ -159,6 +161,7 @@ export const TRAINING_LESSONS = [
   {
     id: "middlegame-center-break",
     phase: "middlegame",
+    type: "guided",
     tags: ["middlegame", "center", "calculation"],
     opening: "中局判斷",
     variation: "中心突破：d4",
@@ -174,6 +177,7 @@ export const TRAINING_LESSONS = [
   {
     id: "middlegame-pin-pressure",
     phase: "middlegame",
+    type: "guided",
     tags: ["tactics", "calculation", "king_safety"],
     opening: "中局戰術",
     variation: "牽制壓力：Bb5",
@@ -219,6 +223,7 @@ export const TRAINING_LESSONS = [
   {
     id: "endgame-rook-activity",
     phase: "endgame",
+    type: "guided",
     tags: ["endgame", "conversion", "activity"],
     opening: "殘局訓練",
     variation: "車的活躍性",
@@ -234,6 +239,7 @@ export const TRAINING_LESSONS = [
   {
     id: "endgame-king-opposition",
     phase: "endgame",
+    type: "guided",
     tags: ["endgame", "conversion", "king_safety"],
     opening: "殘局訓練",
     variation: "王兵殘局：靠近中心",
@@ -249,6 +255,7 @@ export const TRAINING_LESSONS = [
   {
     id: "endgame-king-activation",
     phase: "endgame",
+    type: "guided",
     tags: ["endgame", "conversion", "activity"],
     opening: "殘局訓練",
     variation: "王的活躍化",
@@ -264,6 +271,7 @@ export const TRAINING_LESSONS = [
   {
     id: "endgame-lucena-bridge",
     phase: "endgame",
+    type: "guided",
     tags: ["endgame", "promotion", "conversion"],
     opening: "殘局訓練",
     variation: "車兵升變：架橋概念",
@@ -275,5 +283,66 @@ export const TRAINING_LESSONS = [
       "Rg1+ 把車放到能遮擋與反將的位置，準備讓兵前進。",
       "這題不是背完整理論，而是理解車要幫兵擋住檢查線。"
     ]
+  },
+  {
+    id: "sicilian-black-setup",
+    phase: "opening",
+    type: "opening",
+    difficulty: 2,
+    side: "black",
+    tags: ["opening", "development", "center"],
+    opening: "西西里防禦",
+    variation: "黑方基本發展",
+    goal: "用 ...c5 從側翼反擊中心，再以 ...d6、...Nf6 完成穩健發展。",
+    moves: ["e4", "c5", "Nf3", "d6", "d4", "cxd4", "Nxd4", "Nf6"],
+    ideas: [
+      "...c5 不直接占據中心，而是立刻向 d4 施壓。",
+      "...d6 支援中心並替后翼主教保留發展選擇。",
+      "交換 d4 兵後用 ...Nf6 攻擊 e4，黑方要靠子力活動平衡空間。"
+    ]
+  },
+  {
+    id: "caro-kann-black-center",
+    phase: "opening",
+    type: "opening",
+    difficulty: 2,
+    side: "black",
+    prerequisites: ["sicilian-black-setup"],
+    tags: ["opening", "development", "center"],
+    opening: "卡羅康防禦",
+    variation: "中心交換與主教出子",
+    goal: "用 ...c6、...d5 建立中心，交換後讓后翼主教在兵鏈外發展。",
+    moves: ["e4", "c6", "d4", "d5", "Nc3", "dxe4", "Nxe4", "Bf5"],
+    ideas: [
+      "...c6 的目的不是被動防守，而是準備以 ...d5 挑戰白方中心。",
+      "...dxe4 後要接續發展，不能只顧著守住多出來的兵。",
+      "...Bf5 先把主教放到兵鏈外，是卡羅康常見的發展重點。"
+    ]
+  },
+  {
+    id: "black-back-rank-mate",
+    phase: "middlegame",
+    type: "puzzle",
+    difficulty: 1,
+    side: "black",
+    tags: ["tactics", "checkmate", "king_safety"],
+    opening: "黑方戰術",
+    variation: "底線將殺：Ra1",
+    goal: "從黑方視角辨識白王被自己的兵封住時，車可以直接切入底線。",
+    startFen: "r5k1/5ppp/8/8/8/8/5PPP/6K1 b - - 0 1",
+    moves: ["Ra1#"],
+    ideas: [
+      "先檢查白王是否有逃生格，再確認車進入底線不會被吃。",
+      "從黑方視角練題，可以避免只習慣替白方尋找戰術。",
+      "強迫手的順序仍然是將軍、吃子、威脅。"
+    ]
   }
 ];
+
+export const TRAINING_LESSONS = LESSON_CATALOG.map((lesson) => ({
+  type: lesson.phase === "opening" ? "opening" : "puzzle",
+  difficulty: lesson.phase === "endgame" ? 2 : 1,
+  side: "white",
+  prerequisites: [],
+  ...lesson
+}));

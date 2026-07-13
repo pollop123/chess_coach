@@ -8,6 +8,7 @@
     "build": "vite build",
     "lint": "eslint .",
     "validate:lessons": "node scripts/validate-training-lessons.mjs",
+    "validate:learning": "node scripts/validate-learning-progress.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

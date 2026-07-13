@@ -3,6 +3,16 @@ import { Chess } from "chess.js";
 import { Chessboard } from "react-chessboard";
 import axios from "axios";
 import { TRAINING_LESSONS, TRAINING_PHASES } from "./trainingLessons";
+import { LearningDashboard } from "./LearningDashboard";
+import {
+  buildLearningPlan,
+  getLearningStats,
+  getLessonProgress,
+  getNextLesson,
+  loadLearningProgress,
+  recordLessonResult,
+  saveLearningProgress
+} from "./learningProgress";
 // 引入圖表套件
 import { ComposedChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine, ReferenceDot, ReferenceArea, Area, Scatter } from 'recharts';
 
@@ -31,6 +41,13 @@ const WEAKNESS_LABELS = {
   promotion: "通路兵升變",
   center: "中心控制",
   conversion: "優勢轉換"
+};
+
+const LESSON_TYPE_LABELS = {
+  opening: "主線課",
+  puzzle: "局面題",
+  guided: "引導課",
+  endgame: "殘局課"
 };
 
 function countPiecesFromFen(fen) {
@@ -126,8 +143,13 @@ function App() {
   const [selectedLessonId, setSelectedLessonId] = useState(TRAINING_LESSONS[0].id);
   const [trainingFeedback, setTrainingFeedback] = useState({
     tone: "neutral",
-    text: "選擇一條變體，照棋盤提示走白方主線。黑方會自動走出該變體的回應。"
+    text: "先觀察局面再走棋；需要時可逐步開啟提示。"
   });
+  const [learningProgress, setLearningProgress] = useState(() => loadLearningProgress());
+  const [trainingMistakes, setTrainingMistakes] = useState(0);
+  const [trainingHints, setTrainingHints] = useState(0);
+  const [hintLevel, setHintLevel] = useState(0);
+  const [trainingResultRecorded, setTrainingResultRecorded] = useState(false);
   const [selectedSquare, setSelectedSquare] = useState(null);
   const [status, setStatus] = useState("準備開始新棋局");
   const [isResigned, setIsResigned] = useState(false);
@@ -160,6 +182,10 @@ function App() {
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatHistory]);
+
+  useEffect(() => {
+    saveLearningProgress(learningProgress);
+  }, [learningProgress]);
 
   async function fetchHistory() {
     try {
@@ -264,10 +290,34 @@ function App() {
   const expectedTrainingMove = selectedLesson.moves[trainingHistory.length];
   const trainingComplete = trainingHistory.length >= selectedLesson.moves.length;
   const boardFen = appMode === "training" ? trainingGame.fen() : displayFen;
-  const boardOrientation = appMode === "training" ? "white" : humanColor;
+  const boardOrientation = appMode === "training" ? selectedLesson.side : humanColor;
   const selectedDifficulty = BOT_DIFFICULTIES.find((difficulty) => difficulty.id === botDifficulty) || BOT_DIFFICULTIES[2];
   const selectedStyle = BOT_STYLES.find((style) => style.id === botStyle) || BOT_STYLES[0];
   const practiceRecommendations = getPracticeRecommendations(analysisData, humanColor, TRAINING_LESSONS);
+  const learningStats = getLearningStats(learningProgress, TRAINING_LESSONS);
+  const learningPlan = buildLearningPlan(
+    TRAINING_LESSONS,
+    learningProgress,
+    analysisData.length > 0 ? practiceRecommendations.recommendations : []
+  );
+  const nextLesson = getNextLesson(TRAINING_LESSONS, selectedLesson.id, learningProgress);
+
+  useEffect(() => {
+    if (appMode !== "training" || !trainingComplete || trainingResultRecorded) return;
+    setLearningProgress((current) => recordLessonResult(current, selectedLesson.id, {
+      completed: true,
+      mistakes: trainingMistakes,
+      hintsUsed: trainingHints
+    }));
+    setTrainingResultRecorded(true);
+  }, [
+    appMode,
+    selectedLesson.id,
+    trainingComplete,
+    trainingHints,
+    trainingMistakes,
+    trainingResultRecorded
+  ]);
 
   // 🔥 核心修改：發送訊息給 AI 教練
   // manualQuestion: 如果有的話，代表是玩家手動打字；如果沒有，代表是按「分析按鈕」
@@ -327,7 +377,12 @@ function App() {
   }
 
   function createTrainingGame(lesson) {
-    return lesson?.startFen ? new Chess(lesson.startFen) : new Chess();
+    const training = lesson?.startFen ? new Chess(lesson.startFen) : new Chess();
+    const learnerTurn = lesson?.side === "black" ? "b" : "w";
+    if (lesson?.moves?.length && training.turn() !== learnerTurn) {
+      training.move(lesson.moves[0]);
+    }
+    return training;
   }
 
   function resetTraining(nextLessonId = selectedLessonId) {
@@ -336,9 +391,13 @@ function App() {
     setSelectedLessonId(lesson.id);
     setTrainingGame(createTrainingGame(lesson));
     setSelectedSquare(null);
+    setTrainingMistakes(0);
+    setTrainingHints(0);
+    setHintLevel(0);
+    setTrainingResultRecorded(false);
     setTrainingFeedback({
       tone: "neutral",
-      text: `${lesson.opening}：${lesson.variation}。先走 ${lesson.moves[0]}，目標是：${lesson.goal}`
+      text: `${lesson.opening}：${lesson.variation}。先觀察局面，目標是：${lesson.goal}`
     });
   }
 
@@ -353,12 +412,33 @@ function App() {
     resetTraining(firstLesson.id);
   }
 
+  function openLearningArea() {
+    setSelectedSquare(null);
+    setAppMode("learning");
+  }
+
+  function revealTrainingHint() {
+    if (trainingComplete) return;
+    const nextLevel = Math.min(2, hintLevel + 1);
+    setHintLevel(nextLevel);
+    setTrainingHints((count) => count + 1);
+    const learnerMoveIndex = Math.max(0, Math.floor(trainingHistory.length / 2));
+    const idea = selectedLesson.ideas[Math.min(learnerMoveIndex, selectedLesson.ideas.length - 1)];
+    setTrainingFeedback({
+      tone: "neutral",
+      text: nextLevel === 1
+        ? `觀念提示：${idea}`
+        : `走法提示：這一步要找 ${expectedTrainingMove}。想想它如何達成本課目標。`
+    });
+  }
+
   function playTrainingMove(sourceSquare, targetSquare) {
     if (trainingComplete) {
       setTrainingFeedback({ tone: "neutral", text: "這條變體已完成。可以重練，或切換其他變體。" });
       return false;
     }
-    if (trainingGame.turn() !== "w") return false;
+    const learnerTurn = selectedLesson.side === "black" ? "b" : "w";
+    if (trainingGame.turn() !== learnerTurn) return false;
 
     const nextGame = cloneChess(trainingGame);
     let move = null;
@@ -371,9 +451,14 @@ function App() {
 
     const expectedMove = selectedLesson.moves[trainingHistory.length];
     if (move.san !== expectedMove) {
+      const nextMistakeCount = trainingMistakes + 1;
+      setTrainingMistakes(nextMistakeCount);
+      const ideaIndex = Math.min(Math.floor(trainingHistory.length / 2), selectedLesson.ideas.length - 1);
       setTrainingFeedback({
         tone: "warn",
-        text: `這步 ${move.san} 是合法棋，但本變體這裡要練的是 ${expectedMove}。先照主線走，重點是建立「中心、出子、保王」的節奏。`
+        text: nextMistakeCount >= 2
+          ? `這步 ${move.san} 是合法棋，但沒有命中本題重點。可以開啟第二層提示查看走法。`
+          : `再想一次：${selectedLesson.ideas[ideaIndex]}`
       });
       return false;
     }
@@ -398,7 +483,7 @@ function App() {
       tone: remaining <= 0 ? "success" : "success",
       text: remaining <= 0
         ? `完成 ${selectedLesson.variation}。重點：${selectedLesson.goal}`
-        : `正確：${move.san}。${selectedLesson.ideas[ideaIndex]} 下一步白方要找 ${selectedLesson.moves[nextGame.history().length]}。`
+        : `正確：${move.san}。${selectedLesson.ideas[ideaIndex]} 輪到你時再找下一個符合目標的走法。`
     });
     return true;
   }
@@ -451,7 +536,7 @@ function App() {
       const activeGame = appMode === "training" ? trainingGame : game;
       const piece = activeGame.get(square);
       if (!piece) return;
-      if (appMode === "training" && piece.color !== "w") return;
+      if (appMode === "training" && piece.color !== (selectedLesson.side === "black" ? "b" : "w")) return;
       if (appMode === "play" && piece.color !== (humanColor === "white" ? "w" : "b")) return;
       setSelectedSquare(square);
       return;
@@ -466,7 +551,9 @@ function App() {
     if (!moved) {
       const activeGame = appMode === "training" ? trainingGame : game;
       const piece = activeGame.get(square);
-      if (piece && (appMode === "training" ? piece.color === "w" : piece.color === (humanColor === "white" ? "w" : "b"))) {
+      if (piece && (appMode === "training"
+        ? piece.color === (selectedLesson.side === "black" ? "b" : "w")
+        : piece.color === (humanColor === "white" ? "w" : "b"))) {
         setSelectedSquare(square);
       } else {
         setSelectedSquare(null);
@@ -609,10 +696,21 @@ function App() {
         </div>
         <div className="session-card">
           <span>目前模式</span>
-          <strong>{appMode === "training" ? "訓練" : analysisData.length > 0 ? "復盤" : "對局"}</strong>
+          <strong>{appMode === "learning" ? "學習專區" : appMode === "training" ? "課程練習" : analysisData.length > 0 ? "復盤" : "對局"}</strong>
         </div>
       </header>
 
+      {appMode === "learning" ? (
+        <LearningDashboard
+          phases={TRAINING_PHASES}
+          lessons={TRAINING_LESSONS}
+          progress={learningProgress}
+          stats={learningStats}
+          plan={learningPlan}
+          onStartLesson={startRecommendedLesson}
+          onReturnToGame={() => setAppMode("play")}
+        />
+      ) : (
       <main className={`coach-workspace ${analysisData.length > 0 ? "has-evaluation" : ""}`}>
 
         {/* 勝率條 - 只在賽後分析時顯示 */}
@@ -638,7 +736,7 @@ function App() {
           <div className="board-console">
             <div className="board-console__topline">
               <div>
-                <span>你執</span>
+                <span>{appMode === "training" ? "練習方" : "你執"}</span>
                 <strong>{boardOrientation === "white" ? "白方" : "黑方"}</strong>
               </div>
               <div>
@@ -675,12 +773,12 @@ function App() {
           )}
 
           <div className="status-strip" aria-live="polite">
-            {appMode === "training" ? "訓練模式：照提示走白方，黑方會自動回應" : status}
+            {appMode === "training" ? `課程練習：你執${selectedLesson.side === "black" ? "黑方" : "白方"}，先思考再使用提示` : status}
           </div>
 
           <div className="control-bar">
             <button className={`btn ${appMode === "play" ? "btn-primary" : "btn-muted"}`} onClick={() => setAppMode("play")}>對局</button>
-            <button className={`btn ${appMode === "training" ? "btn-success" : "btn-muted"}`} onClick={() => { setAppMode("training"); resetTraining(selectedLessonId); }}>訓練模式</button>
+            <button className="btn btn-success" onClick={openLearningArea}>學習專區</button>
             <button className="btn btn-primary" onClick={() => { const ng = new Chess(); setGame(ng); setStatus("新局開始"); setAnalysisData([]); setCurrentMoveIndex(-1); setIsResigned(false); setChatHistory([]); if (humanColor === "black") makeAIMove(ng.fen()); }}>新局</button>
             {appMode === "play" && (
               <button
@@ -753,7 +851,15 @@ function App() {
               history={trainingHistory}
               expectedMove={expectedTrainingMove}
               complete={trainingComplete}
+              mistakes={trainingMistakes}
+              hints={trainingHints}
+              hintLevel={hintLevel}
+              lessonProgress={getLessonProgress(learningProgress, selectedLesson.id)}
+              nextLesson={nextLesson}
+              onHint={revealTrainingHint}
               onReset={() => resetTraining(selectedLessonId)}
+              onNext={() => nextLesson && resetTraining(nextLesson.id)}
+              onBack={openLearningArea}
             />
           ) : (
           <>
@@ -954,6 +1060,7 @@ function App() {
 
         </aside>
       </main>
+      )}
     </div>
   );
 }
@@ -970,16 +1077,39 @@ function OpeningTrainingPanel({
   history,
   expectedMove,
   complete,
-  onReset
+  mistakes,
+  hints,
+  hintLevel,
+  lessonProgress,
+  nextLesson,
+  onHint,
+  onReset,
+  onNext,
+  onBack
 }) {
-  const progress = Math.round((history.length / selectedLesson.moves.length) * 100);
+  const initialTurn = selectedLesson.startFen ? new Chess(selectedLesson.startFen).turn() : "w";
+  const learnerTurn = selectedLesson.side === "black" ? "b" : "w";
+  const learnerOffset = initialTurn === learnerTurn ? 0 : 1;
+  const totalLearnerMoves = selectedLesson.moves.filter((_, index) => index % 2 === learnerOffset).length;
+  const completedLearnerMoves = history.filter((_, index) => index % 2 === learnerOffset).length;
+  const progress = totalLearnerMoves
+    ? Math.min(100, Math.round((completedLearnerMoves / totalLearnerMoves) * 100))
+    : 0;
 
   return (
     <div className="training-card">
       <div className="training-card__header">
-        <div className="panel-kicker">訓練模式</div>
+        <div className="training-header-row">
+          <div className="panel-kicker">課程練習</div>
+          <button className="text-button" onClick={onBack}>返回學習專區</button>
+        </div>
         <div className="training-title">{selectedLesson.opening}</div>
         <div className="training-subtitle">{selectedLesson.variation}</div>
+        <div className="lesson-chip-row">
+          <span>{LESSON_TYPE_LABELS[selectedLesson.type] || "課程"}</span>
+          <span>{selectedLesson.side === "black" ? "執黑" : "執白"}</span>
+          <span>難度 {selectedLesson.difficulty}</span>
+        </div>
       </div>
 
       <div className="training-card__body">
@@ -1019,8 +1149,8 @@ function OpeningTrainingPanel({
 
         <div className="training-metrics">
           <div className="metric-card">
-            <span>下一步白方</span>
-            <strong>{complete ? "完成" : expectedMove}</strong>
+            <span>{complete ? "課程狀態" : "目前任務"}</span>
+            <strong>{complete ? "完成" : hintLevel >= 2 ? expectedMove : selectedLesson.type === "puzzle" ? "找出最佳手" : "運用本課觀念"}</strong>
           </div>
           <div className="metric-card">
             <span>進度</span>
@@ -1036,6 +1166,18 @@ function OpeningTrainingPanel({
           {feedback.text}
         </div>
 
+        {!complete && (
+          <button className="btn btn-secondary hint-button" onClick={onHint} disabled={hintLevel >= 2}>
+            {hintLevel === 0 ? "給我觀念提示" : hintLevel === 1 ? "顯示走法提示" : "提示已全部開啟"}
+          </button>
+        )}
+
+        <div className="attempt-summary" aria-label="本次練習統計">
+          <span>錯誤 {mistakes}</span>
+          <span>提示 {hints}</span>
+          <span>熟練度 {lessonProgress.mastery}/5</span>
+        </div>
+
         <div>
           <div className="setting-label">目前棋譜</div>
           <div className="move-line">
@@ -1045,14 +1187,23 @@ function OpeningTrainingPanel({
 
         <div>
           <div className="setting-label">學習重點</div>
-          <ul className="idea-list">
-            {selectedLesson.ideas.map((idea) => (
-              <li key={idea}>{idea}</li>
-            ))}
-          </ul>
+          {complete ? (
+            <ul className="idea-list">
+              {selectedLesson.ideas.map((idea) => (
+                <li key={idea}>{idea}</li>
+              ))}
+            </ul>
+          ) : (
+            <p className="locked-learning-copy">完成課程後會整理完整學習重點；作答前先依目標判斷。</p>
+          )}
         </div>
 
-        <button className="btn btn-primary" onClick={onReset}>重練這條變體</button>
+        <div className="training-actions">
+          <button className="btn btn-secondary" onClick={onReset}>重練這堂課</button>
+          {complete && nextLesson && (
+            <button className="btn btn-primary" onClick={onNext}>下一課：{nextLesson.variation}</button>
+          )}
+        </div>
       </div>
     </div>
   );
