@@ -788,6 +788,14 @@ button:disabled {
   font-weight: 850;
 }
 
+.chart-loading {
+  min-height: 196px;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  font-weight: 750;
+}
+
 .training-card {
   overflow: hidden;
 }

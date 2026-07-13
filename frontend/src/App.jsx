@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { lazy, Suspense, useState, useEffect, useRef } from "react";
 import { Chess } from "chess.js";
 import { Chessboard } from "react-chessboard";
 import axios from "axios";
@@ -13,8 +13,8 @@ import {
   recordLessonResult,
   saveLearningProgress
 } from "./learningProgress";
-// 引入圖表套件
-import { ComposedChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine, ReferenceDot, ReferenceArea, Area, Scatter } from 'recharts';
+
+const EvaluationChart = lazy(() => import("./EvaluationChart"));
 
 // 預設走同網域 /api，由 Vite/Nginx 代理到後端；分離部署時可用 VITE_API_URL 覆蓋。
 const API_URL = import.meta.env.VITE_API_URL || "/api";
@@ -154,6 +154,7 @@ function App() {
   const [status, setStatus] = useState("準備開始新棋局");
   const [isResigned, setIsResigned] = useState(false);
   const [history, setHistory] = useState([]);
+  const [historyStatus, setHistoryStatus] = useState("loading");
 
   // --- 新增/修改狀態 ---
   // chatHistory: 儲存對話紀錄 { role: 'user' | 'model', text: string }
@@ -175,7 +176,9 @@ function App() {
 
   // 1. 初始化載入歷史
   useEffect(() => {
-    fetchHistory();
+    const controller = new AbortController();
+    fetchHistory(controller.signal);
+    return () => controller.abort();
   }, []);
 
   // 聊天室自動捲動到底部
@@ -187,12 +190,15 @@ function App() {
     saveLearningProgress(learningProgress);
   }, [learningProgress]);
 
-  async function fetchHistory() {
+  async function fetchHistory(signal) {
     try {
-      const res = await axios.get(`${API_URL}/games`);
+      const res = await axios.get(`${API_URL}/games`, { signal });
       setHistory(res.data);
+      setHistoryStatus("ready");
     } catch (err) {
-      console.error("無法讀取歷史紀錄", err);
+      if (axios.isCancel(err) || err?.code === "ERR_CANCELED") return;
+      setHistory([]);
+      setHistoryStatus("unavailable");
     }
   }
 
@@ -646,44 +652,11 @@ function App() {
     );
   }
 
-  function getMoveDotColor(classification) {
-    if (classification === "blunder") return "#ef4444";
-    if (classification === "mistake") return "#ff7f50";
-    if (classification === "inaccuracy") return "#f4a259";
-    return null;
-  }
-
-  function renderEvalDot({ cx, cy, payload }) {
-    const color = getMoveDotColor(payload?.classification);
-    if (!payload?.move || !color) return null;
-    return (
-      <circle
-        cx={cx}
-        cy={cy}
-        r={payload.classification === "blunder" ? 7 : 6}
-        fill={color}
-        stroke="#ffffff"
-        strokeWidth={payload.classification === "blunder" ? 2 : 1}
-      />
-    );
-  }
-
   function formatChartScore(score, isMate = Math.abs(score) > 15000) {
     if (isMate) {
       return score >= 0 ? "白方將死勝勢" : "黑方將死勝勢";
     }
     return `白方評分：${(score / 100).toFixed(2)}`;
-  }
-
-  function renderEvalTooltip({ active, payload, label }) {
-    if (!active || !payload || payload.length === 0) return null;
-    const point = payload[0].payload;
-    return (
-      <div className="chart-tooltip">
-        <div className="chart-tooltip__label">第 {label} 步</div>
-        <div className="chart-tooltip__value">{point.evalLabel}</div>
-      </div>
-    );
   }
 
   return (
@@ -916,77 +889,13 @@ function App() {
 
           {/* 📊 分析圖表 (如果有數據) */}
           {appMode === "play" && analysisData.length > 0 && (
-            <div className="analysis-card">
-              <div className="chart-header">
-                <span>局勢走勢（白方視角）</span>
-                <span>0 線</span>
-              </div>
-              <ResponsiveContainer width="100%" height={142}>
-                <ComposedChart
-                  data={analysisData}
-                  margin={{ top: 8, right: 10, bottom: 8, left: 10 }}
-                  onClick={(e) => { if (e && e.activePayload) setCurrentMoveIndex(e.activePayload[0].payload.move_number); }}
-                >
-                  <defs>
-                    <linearGradient id="blackAdvantageArea" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#33312d" stopOpacity={1}/>
-                      <stop offset="100%" stopColor="#4a4741" stopOpacity={0.96}/>
-                    </linearGradient>
-                  </defs>
-                  <XAxis dataKey="move_number" hide />
-                  <YAxis hide domain={[-1000, 1000]} />
-                  <Tooltip 
-                    cursor={{ stroke: "#8f8a83", strokeWidth: 1 }}
-                    content={renderEvalTooltip}
-                  />
-                  
-                  <ReferenceArea y1={-1000} y2={1000} fill="#3a3833" fillOpacity={1} />
-
-                  {/* 中線 (0分線) */}
-                  <ReferenceLine y={0} stroke="#beb9b1" strokeWidth={3} />
-                  
-                  <Area 
-                    type="monotone" 
-                    dataKey="displayScore" 
-                    baseValue={-1000}
-                    stroke="#f7f6f3"
-                    strokeWidth={5}
-                    fill="#f7f6f3"
-                    fillOpacity={1}
-                    isAnimationActive={false}
-                  />
-                  
-                  <Line 
-                    type="monotone" 
-                    dataKey="displayScore" 
-                    stroke="#f7f6f3"
-                    dot={false} 
-                    strokeWidth={5}
-                    isAnimationActive={false}
-                    activeDot={{ r: 7, fill: "#ffffff", stroke: "#4a4741", strokeWidth: 2 }}
-                  />
-
-                  <Scatter
-                    data={analysisData.filter((d) => d.move && d.classification !== "good")}
-                    dataKey="displayScore"
-                    shape={renderEvalDot}
-                    isAnimationActive={false}
-                  />
-                  
-                  {/* 當前位置標記 */}
-                  {currentMoveIndex !== -1 && analysisData[currentMoveIndex] && (
-                    <ReferenceDot 
-                      x={analysisData[currentMoveIndex].move_number} 
-                      y={analysisData[currentMoveIndex].displayScore} 
-                      r={8} 
-                      fill="transparent" 
-                      stroke="#ffffff"
-                      strokeWidth={3}
-                    />
-                  )}
-                </ComposedChart>
-              </ResponsiveContainer>
-            </div>
+            <Suspense fallback={<div className="analysis-card chart-loading" role="status">正在載入局勢圖表…</div>}>
+              <EvaluationChart
+                analysisData={analysisData}
+                currentMoveIndex={currentMoveIndex}
+                onMoveSelect={setCurrentMoveIndex}
+              />
+            </Suspense>
           )}
 
           {appMode === "play" && analysisData.length > 0 && (
@@ -1032,8 +941,14 @@ function App() {
             <h3>
               最近棋局
             </h3>
-            {history.length === 0 ? (
-              <p className="empty-state">尚無紀錄</p>
+            {historyStatus !== "ready" || history.length === 0 ? (
+              <p className="empty-state" aria-live="polite">
+                {historyStatus === "loading"
+                  ? "讀取紀錄中…"
+                  : historyStatus === "unavailable"
+                    ? "後端未連線，歷史紀錄暫不可用"
+                    : "尚無紀錄"}
+              </p>
             ) : (
               <ul className="history-list">
                 {history.map((h) => (
