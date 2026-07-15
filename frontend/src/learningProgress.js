@@ -6,11 +6,12 @@ export function createEmptyLearningProgress() {
   return { version: 1, lessons: {} };
 }
 
-export function loadLearningProgress(storage = globalThis.localStorage) {
-  if (!storage) return createEmptyLearningProgress();
-
+export function loadLearningProgress(storage) {
   try {
-    const raw = storage.getItem(LEARNING_PROGRESS_STORAGE_KEY);
+    const targetStorage = storage === undefined ? globalThis.localStorage : storage;
+    if (!targetStorage) return createEmptyLearningProgress();
+
+    const raw = targetStorage.getItem(LEARNING_PROGRESS_STORAGE_KEY);
     if (!raw) return createEmptyLearningProgress();
     const parsed = JSON.parse(raw);
     if (parsed?.version !== 1 || !parsed.lessons || typeof parsed.lessons !== "object") {
@@ -22,10 +23,12 @@ export function loadLearningProgress(storage = globalThis.localStorage) {
   }
 }
 
-export function saveLearningProgress(progress, storage = globalThis.localStorage) {
-  if (!storage) return;
+export function saveLearningProgress(progress, storage) {
   try {
-    storage.setItem(LEARNING_PROGRESS_STORAGE_KEY, JSON.stringify(progress));
+    const targetStorage = storage === undefined ? globalThis.localStorage : storage;
+    if (!targetStorage) return;
+
+    targetStorage.setItem(LEARNING_PROGRESS_STORAGE_KEY, JSON.stringify(progress));
   } catch {
     // Learning remains usable when storage is unavailable or full.
   }

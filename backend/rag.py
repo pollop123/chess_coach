@@ -412,11 +412,10 @@ def _avoid_text(teaching_analysis, displayed_move=None):
     return "避免只看單一步威脅；走棋前先檢查將軍、吃子與對手反擊。"
 
 
-def format_grounded_advice(generated_advice, engine_best_move, teaching_analysis=None, verified_reply=None):
-    """Normalize model prose into a stable contract and lock verified move fields."""
-    # Model prose is useful as drafting context, but none of its claims are
-    # independently verifiable here. Every displayed section therefore comes
-    # from deterministic engine/board evidence.
+def format_grounded_advice(_generated_advice, engine_best_move, teaching_analysis=None, verified_reply=None):
+    """Build the stable advice contract entirely from verified move fields."""
+    # Keep the first argument for compatibility with existing callers. Model
+    # prose is deliberately ignored because none of its claims are verified.
     aligned_teaching = align_teaching_analysis(teaching_analysis, engine_best_move)
     summary = _summary_text(aligned_teaching)
     reason = _reason_text(aligned_teaching)
@@ -830,11 +829,11 @@ class ChessRAG:
 應避免：只引用候選手 warnings 或高風險走法
 一句話心法：一個可帶到下一盤的判斷原則
 """
-        generated_advice = strip_unverified_opening_claims(
-            self.call_gemini_with_fallback(final_prompt)
-        )
+        # The public six-section contract is fully derived from verified board
+        # and engine data. Do not pay for a model draft that is intentionally
+        # excluded from every displayed section.
         grounded_advice = format_grounded_advice(
-            generated_advice,
+            "",
             engine_best_move_text,
             teaching_analysis=teaching_analysis,
             verified_reply=verified_reply,
