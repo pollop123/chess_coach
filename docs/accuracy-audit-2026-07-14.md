@@ -11,7 +11,7 @@
 > 心法，以及缺少獨立 Stockfish accuracy gate。評估函式亦已拆成獨立
 > `backend/evaluation/` 模組，並保留舊評分行為作為後續改良基線。
 >
-> 修正後驗證：Backend 120 tests、reason benchmark 24/24、teaching
+> 修正後驗證：Backend 125 tests、reason benchmark 24/24、teaching
 > structure benchmark 8/8、21 課程語義驗證與 14 課程 Stockfish 檢查均
 > 通過。23 局面、50,000 nodes 的獨立 Stockfish benchmark 為 top-3
 > 60.9%、最佳著 recall 78.3%；戰術 100%，但 positional top-3 20%、

@@ -179,6 +179,34 @@ PYTHONPATH=backend .venv/bin/python backend/teaching_benchmark.py --json
 
 目前基準涵蓋開局、戰術、殘局與失誤警告。若調整 `get_teaching_analysis` 或引擎評估，先跑這個基準確認教學輸出沒有退步，再用 Stockfish 校準檢查實戰走棋品質。
 
+候選手準確性另有兩種 Stockfish benchmark profile：
+
+```bash
+# 日常修改：8 個代表局面、depth 2、最多 3 個候選手，不啟用殘局自動加深
+PYTHONPATH=backend .venv/bin/python backend/teaching_accuracy_benchmark.py --profile smoke
+
+# 只檢查目前修改的主題；例如 positional 會跑全部 5 個局面棋題
+PYTHONPATH=backend .venv/bin/python backend/teaching_accuracy_benchmark.py \
+  --profile smoke --topic positional
+
+# commit／merge 前：完整 23 局面與 50,000 Stockfish nodes
+PYTHONPATH=backend .venv/bin/python backend/teaching_accuracy_benchmark.py \
+  --profile release
+
+# 對外宣稱高準確性前才強制正式門檻；目前尚未達標，會以非零狀態退出
+PYTHONPATH=backend .venv/bin/python backend/teaching_accuracy_benchmark.py \
+  --profile release --require-release-ready
+```
+
+也可從 `frontend/` 執行 `npm run validate:teaching-smoke`；額外參數可用
+`npm run validate:teaching-smoke -- --topic positional` 傳入。
+
+Stockfish oracle 會依引擎版本、nodes、FEN、MultiPV 與候選走法快取在
+`backend/.cache/teaching_accuracy_stockfish.json`。修改自製引擎不需要清除
+這份快取；更換 Stockfish 或 nodes 時會自動失效。需要強制重算可加
+`--refresh-cache`，完全停用則使用 `--no-cache`。Smoke profile 只供快速方向
+檢查，不能取代完整 release corpus。
+
 ### Docker 相關指令
 
 ```bash

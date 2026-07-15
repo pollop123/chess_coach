@@ -3,14 +3,119 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import os
 from dataclasses import dataclass
+from pathlib import Path
+from time import perf_counter
+from typing import Any
 
 import chess
 import chess.engine
 
 import chess_engine
 from validate_training_lessons import find_stockfish
+
+
+PROFILE_RELEASE = "release"
+PROFILE_SMOKE = "smoke"
+DEFAULT_RELEASE_NODES = 50_000
+DEFAULT_SMOKE_NODES = 10_000
+DEFAULT_CACHE_PATH = Path(__file__).resolve().parent / ".cache" / "teaching_accuracy_stockfish.json"
+SMOKE_POSITION_NAMES = (
+    "two_knights_tactic",
+    "queen_safety",
+    "starting_position",
+    "italian_two_knights",
+    "center_pressure",
+    "fen_only_middlegame",
+    "rook_activity",
+    "king_opposition",
+)
+
+
+class StockfishOracleCache:
+    """Persistent cache for deterministic, node-limited Stockfish queries."""
+
+    SCHEMA_VERSION = 1
+
+    def __init__(
+        self,
+        path: str | Path = DEFAULT_CACHE_PATH,
+        *,
+        enabled: bool = True,
+        refresh: bool = False,
+    ) -> None:
+        self.path = Path(path)
+        self.enabled = enabled
+        self.refresh = refresh
+        self.entries: dict[str, dict[str, Any]] = {}
+        self.hits = 0
+        self.misses = 0
+        self.writes = 0
+        self._dirty = False
+        if enabled:
+            self._load()
+
+    @staticmethod
+    def _digest(query: dict[str, Any]) -> str:
+        payload = json.dumps(query, sort_keys=True, separators=(",", ":"))
+        return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+    def _load(self) -> None:
+        try:
+            payload = json.loads(self.path.read_text(encoding="utf-8"))
+        except (OSError, ValueError, TypeError):
+            return
+        if payload.get("schema_version") != self.SCHEMA_VERSION:
+            return
+        entries = payload.get("entries")
+        if isinstance(entries, dict):
+            self.entries = entries
+
+    def get(self, query: dict[str, Any]) -> Any | None:
+        if not self.enabled or self.refresh:
+            self.misses += 1
+            return None
+        entry = self.entries.get(self._digest(query))
+        if not isinstance(entry, dict) or entry.get("query") != query:
+            self.misses += 1
+            return None
+        self.hits += 1
+        return entry.get("value")
+
+    def set(self, query: dict[str, Any], value: Any) -> None:
+        if not self.enabled:
+            return
+        self.entries[self._digest(query)] = {"query": query, "value": value}
+        self.writes += 1
+        self._dirty = True
+
+    def save(self) -> None:
+        if not self.enabled or not self._dirty:
+            return
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        temporary_path = self.path.with_suffix(f"{self.path.suffix}.tmp")
+        payload = {
+            "schema_version": self.SCHEMA_VERSION,
+            "entries": self.entries,
+        }
+        temporary_path.write_text(
+            json.dumps(payload, ensure_ascii=False, sort_keys=True),
+            encoding="utf-8",
+        )
+        os.replace(temporary_path, self.path)
+        self._dirty = False
+
+    def stats(self) -> dict[str, int | bool | str]:
+        return {
+            "enabled": self.enabled,
+            "path": str(self.path),
+            "hits": self.hits,
+            "misses": self.misses,
+            "writes": self.writes,
+        }
 
 
 @dataclass(frozen=True)
@@ -92,6 +197,136 @@ POSITIONS = (
 )
 
 
+def select_positions(
+    profile: str = PROFILE_RELEASE,
+    topics: tuple[str, ...] | list[str] | None = None,
+) -> tuple[AccuracyPosition, ...]:
+    selected_topics = set(topics or ())
+    selected = tuple(
+        position
+        for position in POSITIONS
+        if not selected_topics or position.topic in selected_topics
+    )
+    if profile == PROFILE_RELEASE or selected_topics:
+        return selected
+    smoke_names = set(SMOKE_POSITION_NAMES)
+    return tuple(position for position in selected if position.name in smoke_names)
+
+
+def profile_search_settings(position: AccuracyPosition, profile: str) -> dict[str, int | bool]:
+    if profile == PROFILE_SMOKE:
+        return {
+            "depth": min(2, position.depth),
+            "candidate_count": min(3, position.candidate_count),
+            "adaptive_depth": False,
+        }
+    return {
+        "depth": position.depth,
+        "candidate_count": position.candidate_count,
+        "adaptive_depth": True,
+    }
+
+
+def stockfish_signature(engine: chess.engine.SimpleEngine) -> str:
+    identity = engine.id or {}
+    return "|".join(
+        f"{key}={identity[key]}" for key in sorted(identity)
+    ) or "unknown-stockfish"
+
+
+def _oracle_query(
+    *,
+    engine_signature: str,
+    board: chess.Board,
+    nodes: int,
+    kind: str,
+    multipv: int | None = None,
+    move: chess.Move | None = None,
+) -> dict[str, Any]:
+    return {
+        "engine": engine_signature,
+        "fen": board.fen(),
+        "nodes": nodes,
+        "kind": kind,
+        "multipv": multipv,
+        "move": move.uci() if move else None,
+        "score_perspective": "side_to_move",
+        "mate_score": 100_000,
+    }
+
+
+def oracle_top_lines(
+    engine: chess.engine.SimpleEngine,
+    board: chess.Board,
+    nodes: int,
+    multipv: int,
+    cache: StockfishOracleCache,
+    engine_signature: str,
+) -> tuple[list[chess.Move], list[int]]:
+    query = _oracle_query(
+        engine_signature=engine_signature,
+        board=board,
+        nodes=nodes,
+        kind="top_lines",
+        multipv=multipv,
+    )
+    cached = cache.get(query)
+    if isinstance(cached, dict):
+        try:
+            moves = [chess.Move.from_uci(value) for value in cached["moves"]]
+            scores = [int(value) for value in cached["scores"]]
+            if len(moves) == len(scores) and all(move in board.legal_moves for move in moves):
+                return moves, scores
+        except (KeyError, TypeError, ValueError):
+            pass
+
+    analysis = engine.analyse(
+        board,
+        chess.engine.Limit(nodes=nodes),
+        multipv=multipv,
+    )
+    moves = [item["pv"][0] for item in analysis if item.get("pv")]
+    scores = [
+        item["score"].pov(board.turn).score(mate_score=100_000) or 0
+        for item in analysis
+        if item.get("pv")
+    ]
+    cache.set(
+        query,
+        {"moves": [move.uci() for move in moves], "scores": scores},
+    )
+    return moves, scores
+
+
+def oracle_forced_score(
+    engine: chess.engine.SimpleEngine,
+    board: chess.Board,
+    move: chess.Move,
+    nodes: int,
+    cache: StockfishOracleCache,
+    engine_signature: str,
+) -> int:
+    query = _oracle_query(
+        engine_signature=engine_signature,
+        board=board,
+        nodes=nodes,
+        kind="forced_move",
+        move=move,
+    )
+    cached = cache.get(query)
+    if isinstance(cached, int):
+        return cached
+
+    analysis = engine.analyse(
+        board,
+        chess.engine.Limit(nodes=nodes),
+        root_moves=[move],
+    )
+    score = analysis["score"].pov(board.turn).score(mate_score=100_000) or 0
+    cache.set(query, int(score))
+    return int(score)
+
+
 def inversion_rate(scores_in_reported_order: list[int], tolerance_cp: int = 20) -> float:
     comparisons = 0
     inversions = 0
@@ -165,78 +400,113 @@ def candidate_consistency(candidates: list[dict], forced_scores: list[int]) -> d
     }
 
 
-def run(stockfish_path: str, nodes: int = 50_000) -> dict:
+def run(
+    stockfish_path: str,
+    nodes: int = DEFAULT_RELEASE_NODES,
+    *,
+    profile: str = PROFILE_RELEASE,
+    topics: tuple[str, ...] | list[str] | None = None,
+    cache_path: str | Path = DEFAULT_CACHE_PATH,
+    use_cache: bool = True,
+    refresh_cache: bool = False,
+) -> dict:
+    if profile not in {PROFILE_RELEASE, PROFILE_SMOKE}:
+        raise ValueError(f"Unknown benchmark profile: {profile}")
+
+    benchmark_positions = select_positions(profile, topics)
+    if not benchmark_positions:
+        raise ValueError("No benchmark positions matched the selected profile/topics")
+
+    started_at = perf_counter()
+    cache = StockfishOracleCache(
+        cache_path,
+        enabled=use_cache,
+        refresh=refresh_cache,
+    )
     results = []
-    with chess.engine.SimpleEngine.popen_uci(stockfish_path) as engine:
-        for position in POSITIONS:
-            board = chess.Board(position.fen)
-            oracle = engine.analyse(
-                board,
-                chess.engine.Limit(nodes=nodes),
-                multipv=min(3, board.legal_moves.count()),
-            )
-            oracle_top = [item["pv"][0] for item in oracle if item.get("pv")]
-            oracle_best = oracle_top[0]
-            oracle_scores = [
-                item["score"].pov(board.turn).score(mate_score=100_000) or 0
-                for item in oracle
-            ]
-
-            base = chess_engine.get_analysis(board, depth=position.depth)
-            teaching = chess_engine.get_teaching_analysis(
-                board,
-                base,
-                candidate_count=position.candidate_count,
-                depth=position.depth,
-            )
-            candidates = teaching.get("candidates") or []
-            candidate_moves = [chess.Move.from_uci(item["move"]) for item in candidates]
-            forced_scores = []
-            for move in candidate_moves:
-                forced = engine.analyse(
+    try:
+        with chess.engine.SimpleEngine.popen_uci(stockfish_path) as engine:
+            engine_identity = stockfish_signature(engine)
+            for position in benchmark_positions:
+                board = chess.Board(position.fen)
+                multipv = min(3, board.legal_moves.count())
+                oracle_top, oracle_scores = oracle_top_lines(
+                    engine,
                     board,
-                    chess.engine.Limit(nodes=nodes),
-                    root_moves=[move],
+                    nodes,
+                    multipv,
+                    cache,
+                    engine_identity,
                 )
-                forced_scores.append(
-                    forced["score"].pov(board.turn).score(mate_score=100_000) or 0
-                )
+                oracle_best = oracle_top[0]
 
-            reported_top = candidate_moves[0] if candidate_moves else None
-            consistency = candidate_consistency(candidates, forced_scores)
-            loss_errors = consistency["loss_errors"]
-            oracle_gap = (
-                max(0, oracle_scores[0] - oracle_scores[1])
-                if len(oracle_scores) >= 2
-                else 100_000
-            )
-            oracle_only_move = oracle_gap >= 150
-            reported_only_move = teaching.get("criticality") == "only_move"
-            oracle_top_is_mate = abs(oracle_scores[0]) >= 90_000
-            reported_top_is_mate = bool(candidates and candidates[0].get("score_type") == "mate")
-            mate_type_matches = consistency["type_matches"] and (
-                not oracle_top_is_mate or reported_top_is_mate
-            )
-            results.append({
-                "name": position.name,
-                "topic": position.topic,
-                "oracle_best": board.san(oracle_best),
-                "oracle_top": [board.san(move) for move in oracle_top],
-                "reported_top": board.san(reported_top) if reported_top else None,
-                "top_in_oracle_top3": reported_top in oracle_top,
-                "oracle_best_recalled": oracle_best in candidate_moves,
-                "rank_inversion_rate": round(inversion_rate(forced_scores), 4),
-                "candidate_loss_mae_cp": (
-                    round(sum(loss_errors) / len(loss_errors), 1) if loss_errors else None
-                ),
-                "loss_errors_cp": loss_errors,
-                "mate_type_matches": mate_type_matches,
-                "loss_fields_complete": consistency["loss_fields_complete"],
-                "oracle_only_move": oracle_only_move,
-                "reported_criticality": teaching.get("criticality"),
-                "only_move_matches": oracle_only_move == reported_only_move,
-                "analysis_complete": teaching.get("analysis_complete"),
-            })
+                settings = profile_search_settings(position, profile)
+                base = chess_engine.get_analysis(
+                    board,
+                    depth=int(settings["depth"]),
+                    adaptive_depth=bool(settings["adaptive_depth"]),
+                )
+                teaching = chess_engine.get_teaching_analysis(
+                    board,
+                    base,
+                    candidate_count=int(settings["candidate_count"]),
+                    depth=int(settings["depth"]),
+                )
+                candidates = teaching.get("candidates") or []
+                candidate_moves = [chess.Move.from_uci(item["move"]) for item in candidates]
+                forced_scores = [
+                    oracle_forced_score(
+                        engine,
+                        board,
+                        move,
+                        nodes,
+                        cache,
+                        engine_identity,
+                    )
+                    for move in candidate_moves
+                ]
+
+                reported_top = candidate_moves[0] if candidate_moves else None
+                consistency = candidate_consistency(candidates, forced_scores)
+                loss_errors = consistency["loss_errors"]
+                oracle_gap = (
+                    max(0, oracle_scores[0] - oracle_scores[1])
+                    if len(oracle_scores) >= 2
+                    else 100_000
+                )
+                oracle_only_move = oracle_gap >= 150
+                reported_only_move = teaching.get("criticality") == "only_move"
+                oracle_top_is_mate = abs(oracle_scores[0]) >= 90_000
+                reported_top_is_mate = bool(
+                    candidates and candidates[0].get("score_type") == "mate"
+                )
+                mate_type_matches = consistency["type_matches"] and (
+                    not oracle_top_is_mate or reported_top_is_mate
+                )
+                results.append({
+                    "name": position.name,
+                    "topic": position.topic,
+                    "oracle_best": board.san(oracle_best),
+                    "oracle_top": [board.san(move) for move in oracle_top],
+                    "reported_top": board.san(reported_top) if reported_top else None,
+                    "top_in_oracle_top3": reported_top in oracle_top,
+                    "oracle_best_recalled": oracle_best in candidate_moves,
+                    "rank_inversion_rate": round(inversion_rate(forced_scores), 4),
+                    "candidate_loss_mae_cp": (
+                        round(sum(loss_errors) / len(loss_errors), 1)
+                        if loss_errors
+                        else None
+                    ),
+                    "loss_errors_cp": loss_errors,
+                    "mate_type_matches": mate_type_matches,
+                    "loss_fields_complete": consistency["loss_fields_complete"],
+                    "oracle_only_move": oracle_only_move,
+                    "reported_criticality": teaching.get("criticality"),
+                    "only_move_matches": oracle_only_move == reported_only_move,
+                    "analysis_complete": teaching.get("analysis_complete"),
+                })
+    finally:
+        cache.save()
 
     count = len(results)
     top3_rate = sum(item["top_in_oracle_top3"] for item in results) / count
@@ -305,8 +575,12 @@ def run(stockfish_path: str, nodes: int = 50_000) -> dict:
     )
     return {
         "mode": "stockfish_accuracy",
+        "profile": profile,
+        "topics": sorted(set(topics or ())),
         "stockfish": stockfish_path,
         "nodes": nodes,
+        "duration_seconds": round(perf_counter() - started_at, 3),
+        "oracle_cache": cache.stats(),
         "positions": count,
         "top1_in_oracle_top3_rate": round(top3_rate, 3),
         "oracle_best_recall_rate": round(recall_rate, 3),
@@ -345,7 +619,30 @@ def run(stockfish_path: str, nodes: int = 50_000) -> dict:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--stockfish")
-    parser.add_argument("--nodes", type=int, default=50_000)
+    parser.add_argument(
+        "--profile",
+        choices=(PROFILE_SMOKE, PROFILE_RELEASE),
+        default=PROFILE_RELEASE,
+        help="smoke uses fewer positions/candidates and disables adaptive depth",
+    )
+    parser.add_argument(
+        "--topic",
+        action="append",
+        choices=("opening", "tactics", "positional", "endgame"),
+        help="limit the run to one or more topics; may be repeated",
+    )
+    parser.add_argument(
+        "--nodes",
+        type=int,
+        help="Stockfish nodes per query (defaults: smoke=10000, release=50000)",
+    )
+    parser.add_argument("--cache-path", default=str(DEFAULT_CACHE_PATH))
+    parser.add_argument("--no-cache", action="store_true")
+    parser.add_argument(
+        "--refresh-cache",
+        action="store_true",
+        help="ignore matching reads and replace them with fresh Stockfish results",
+    )
     parser.add_argument("--json", action="store_true")
     parser.add_argument(
         "--require-release-ready",
@@ -353,17 +650,45 @@ def main() -> int:
         help="Exit non-zero when the strict release gate is not satisfied.",
     )
     args = parser.parse_args()
+    if args.no_cache and args.refresh_cache:
+        parser.error("--no-cache and --refresh-cache cannot be used together")
+    if args.require_release_ready and (
+        args.profile != PROFILE_RELEASE or args.topic
+    ):
+        parser.error("--require-release-ready requires the full release corpus")
+
     stockfish_path = find_stockfish(args.stockfish)
     if not stockfish_path:
         parser.error("Stockfish was not found; pass --stockfish or set STOCKFISH_PATH")
-    report = run(stockfish_path, nodes=args.nodes)
+    nodes = args.nodes or (
+        DEFAULT_SMOKE_NODES
+        if args.profile == PROFILE_SMOKE
+        else DEFAULT_RELEASE_NODES
+    )
+    report = run(
+        stockfish_path,
+        nodes=nodes,
+        profile=args.profile,
+        topics=args.topic,
+        cache_path=args.cache_path,
+        use_cache=not args.no_cache,
+        refresh_cache=args.refresh_cache,
+    )
     if args.json:
         print(json.dumps(report, ensure_ascii=False, indent=2))
     else:
         print(
-            f"Teaching accuracy: top3={report['top1_in_oracle_top3_rate']:.0%} "
+            f"Teaching accuracy ({report['profile']}, {report['positions']} positions, "
+            f"{report['duration_seconds']:.1f}s): "
+            f"top3={report['top1_in_oracle_top3_rate']:.0%} "
             f"recall={report['oracle_best_recall_rate']:.0%} "
             f"inversions={report['average_rank_inversion_rate']:.1%}"
+        )
+        cache_stats = report["oracle_cache"]
+        print(
+            "  Oracle cache: "
+            f"hits={cache_stats['hits']} misses={cache_stats['misses']} "
+            f"writes={cache_stats['writes']}"
         )
         for item in report["results"]:
             print(
