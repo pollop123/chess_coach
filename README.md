@@ -17,6 +17,9 @@
   - Centipawn 格式化顯示（如 +1.50）
   - Sigmoid 勝率計算（0-100%）
   - 將死檢測（顯示 M3 等步數）
+  - 可插拔的兵型、子力活動、車活動與王活動 evaluator
+  - 以 phase units 平滑控制中後盤權重，權重為 0 的實驗特徵不進入搜尋成本
+  - Stockfish gate 目前只啟用有淨收益的王活動；其餘特徵保留供後續校準
   
 - **搜尋優化**：
   - 迭代加深搜尋（Iterative Deepening）
@@ -355,6 +358,12 @@ npm run build
 .
 ├── backend/
 │   ├── chess_engine.py      # Minimax 引擎與評估系統
+│   ├── evaluation/          # 可組合、可校準的局面評估元件
+│   │   ├── evaluator.py      # 加總、phase taper 與特徵權重 gate
+│   │   ├── pawn_structure.py # 疊兵、孤兵、通路兵與連結兵
+│   │   ├── piece_activity.py # mobility、象對與騎士前哨
+│   │   ├── rook_activity.py  # 開放線、七橫線與雙車連結
+│   │   └── king_activity.py  # 殘局王接近與對王
 │   ├── rag.py               # RAG 教練邏輯
 │   ├── api.py               # FastAPI 端點
 │   ├── lichess_bot.py       # Lichess Bot 客戶端
