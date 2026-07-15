@@ -5,10 +5,12 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import datetime
 import chess
+import chess.engine
 import chess.pgn
 import io
 import math
 import os
+import shutil
 import time
 
 # 匯入你的核心引擎
@@ -300,26 +302,133 @@ def analyze_game(request: BoardRequest):
         "nodes_searched": analysis['nodes']
     }
 
-# 2. 🔥 完整賽局分析 (你的新功能，適合賽後復盤)
-@app.post("/analyze_full")
-def analyze_full_game(request: AnalysisRequest):
-    pgn_io = io.StringIO(request.pgn)
-    game = chess.pgn.read_game(pgn_io)
-    if not game:
-        raise HTTPException(status_code=400, detail="Invalid PGN")
+def _classify_cp_loss(cp_loss):
+    if cp_loss < 50:
+        return "good"
+    if cp_loss < 150:
+        return "inaccuracy"
+    if cp_loss < 300:
+        return "mistake"
+    return "blunder"
 
+
+def _find_stockfish_path():
+    configured_path = os.getenv("STOCKFISH_PATH")
+    if configured_path and os.path.isfile(configured_path) and os.access(configured_path, os.X_OK):
+        return configured_path
+
+    discovered_path = shutil.which("stockfish")
+    if discovered_path:
+        return discovered_path
+
+    docker_path = "/usr/games/stockfish"
+    if os.path.isfile(docker_path) and os.access(docker_path, os.X_OK):
+        return docker_path
+    return None
+
+
+def _stockfish_score(info, color=chess.WHITE):
+    score = info.get("score")
+    if score is None:
+        raise ValueError("Stockfish did not return a score")
+    centipawns = score.pov(color).score(mate_score=100_000)
+    if centipawns is None:
+        raise ValueError("Stockfish returned an unusable score")
+    return int(centipawns)
+
+
+def _stockfish_wdl(info, color=chess.WHITE):
+    pov_wdl = info.get("wdl")
+    if pov_wdl is None:
+        return None
+    wdl = pov_wdl.pov(color)
+    white_win = round(wdl.wins / 10, 1)
+    draw = round(wdl.draws / 10, 1)
+    black_win = round(wdl.losses / 10, 1)
+    return {
+        "white_win": white_win,
+        "draw": draw,
+        "black_win": black_win,
+        "expected_score": round(white_win + draw / 2, 1),
+    }
+
+
+def _analyze_full_with_stockfish(game, perspective, stockfish_path, nodes):
+    board = game.board()
+    evaluations = []
+    orient = lambda value: value if perspective == "white" else -value
+    limit = chess.engine.Limit(nodes=nodes)
+    engine = chess.engine.SimpleEngine.popen_uci(stockfish_path)
+
+    try:
+        if "UCI_ShowWDL" not in engine.options:
+            raise RuntimeError("Installed Stockfish does not support UCI_ShowWDL")
+        engine.configure({"UCI_ShowWDL": True})
+
+        start_info = engine.analyse(board, limit)
+        start_eval = _stockfish_score(start_info)
+        evaluations.append({
+            "move_number": 0,
+            "fen": board.fen(),
+            "score": start_eval,
+            "score_for": orient(start_eval),
+            "perspective": perspective,
+            "wdl": _stockfish_wdl(start_info),
+            "analysis_source": "stockfish",
+        })
+
+        for move_count, move in enumerate(game.mainline_moves(), start=1):
+            side = "white" if board.turn == chess.WHITE else "black"
+            mover = board.turn
+            best_info = engine.analyse(board, limit)
+            played_info = engine.analyse(board, limit, root_moves=[move])
+
+            best_eval = _stockfish_score(best_info)
+            move_eval = _stockfish_score(played_info)
+            best_for_mover = _stockfish_score(best_info, mover)
+            played_for_mover = _stockfish_score(played_info, mover)
+            cp_loss = max(0, best_for_mover - played_for_mover)
+            best_pv = best_info.get("pv") or []
+
+            board.push(move)
+            is_checkmate = board.is_checkmate()
+            mate_threat = (
+                is_checkmate
+                or abs(move_eval) > chess_engine.MATE_THRESHOLD
+                or abs(best_eval) > chess_engine.MATE_THRESHOLD
+            )
+
+            evaluations.append({
+                "move_number": move_count,
+                "side_to_move": side,
+                "move": move.uci(),
+                "best_move": best_pv[0].uci() if best_pv else None,
+                "fen": board.fen(),
+                "score": move_eval,
+                "score_for": orient(move_eval),
+                "best_eval_for": orient(best_eval),
+                "raw_cp_loss": int(best_for_mover - played_for_mover),
+                "cp_loss": int(cp_loss),
+                "classification": _classify_cp_loss(cp_loss),
+                "mate_threat": mate_threat,
+                "is_checkmate": is_checkmate,
+                "perspective": perspective,
+                "wdl": _stockfish_wdl(played_info),
+                "analysis_source": "stockfish",
+            })
+    finally:
+        engine.quit()
+
+    return evaluations
+
+
+def _analyze_full_with_custom_engine(game, perspective, depth):
     board = game.board()
     evaluations = []
     chess_engine.begin_search_generation(deadline=time.monotonic() + 20.0)
-    
-    # 設定視角
-    persp = (getattr(request, "perspective", "white") or "white").lower()
-    if persp not in ("white","black"):
-        persp = "white"
-    
-    # 定義分數轉換函數 (如果是黑方視角，分數要反轉顯示)
-    def orient(v):
-        return v if persp == "white" else -v
+
+    def orient(value):
+        return value if perspective == "white" else -value
 
     def search_position(search_board, search_depth):
         if search_board.is_game_over():
@@ -337,13 +446,15 @@ def analyze_full_game(request: AnalysisRequest):
             return chess_engine.evaluate_board(search_board), None
 
     # 初始局面評分
-    start_eval, _ = search_position(board, request.depth)
+    start_eval, _ = search_position(board, depth)
     evaluations.append({
         "move_number": 0,
         "fen": board.fen(),
         "score": start_eval,
         "score_for": orient(start_eval),
-        "perspective": persp
+        "perspective": perspective,
+        "wdl": None,
+        "analysis_source": "custom",
     })
 
     move_count = 1
@@ -352,11 +463,11 @@ def analyze_full_game(request: AnalysisRequest):
         
         # 1. 計算這一步之前的「最佳建議」
         # 賽後趨勢用純搜尋，不使用開局庫的固定 +0.15，避免圖表前段失真。
-        best_eval, best_move = search_position(board, request.depth)
+        best_eval, best_move = search_position(board, depth)
 
         # 2. 執行「實際走的那一步」
         board.push(move)
-        move_eval, _ = search_position(board, request.depth - 1)
+        move_eval, _ = search_position(board, depth - 1)
         fen_after = board.fen()
         is_checkmate = board.is_checkmate()
 
@@ -366,11 +477,7 @@ def analyze_full_game(request: AnalysisRequest):
         raw_cp_loss = best_eval - move_eval if side == "white" else move_eval - best_eval
         cp_loss = max(0, raw_cp_loss)
         
-        # 4. 判斷好壞棋
-        if cp_loss < 50: classification = "good"
-        elif cp_loss < 150: classification = "inaccuracy"
-        elif cp_loss < 300: classification = "mistake"
-        else: classification = "blunder"
+        classification = _classify_cp_loss(cp_loss)
 
         mate_threat = is_checkmate or abs(move_eval) > chess_engine.MATE_THRESHOLD or abs(best_eval) > chess_engine.MATE_THRESHOLD
 
@@ -388,11 +495,35 @@ def analyze_full_game(request: AnalysisRequest):
             "classification": classification,
             "mate_threat": mate_threat,
             "is_checkmate": is_checkmate,
-            "perspective": persp
+            "perspective": perspective,
+            "wdl": None,
+            "analysis_source": "custom",
         })
         move_count += 1
 
     return evaluations
+
+
+# 完整賽局分析：優先使用 Stockfish 作賽後裁判；遊戲走子仍由自製引擎負責。
+@app.post("/analyze_full")
+def analyze_full_game(request: AnalysisRequest):
+    game = chess.pgn.read_game(io.StringIO(request.pgn))
+    if not game:
+        raise HTTPException(status_code=400, detail="Invalid PGN")
+
+    perspective = (request.perspective or "white").lower()
+    if perspective not in ("white", "black"):
+        perspective = "white"
+
+    stockfish_path = _find_stockfish_path()
+    if stockfish_path:
+        nodes = max(100, int(os.getenv("STOCKFISH_REVIEW_NODES", "4000")))
+        try:
+            return _analyze_full_with_stockfish(game, perspective, stockfish_path, nodes)
+        except Exception as exc:
+            print(f"Stockfish 賽後分析失敗，改用自製引擎: {exc}")
+
+    return _analyze_full_with_custom_engine(game, perspective, request.depth)
 
 # 3. 儲存比賽
 @app.post("/games", response_model=GameResponse)
@@ -443,6 +574,7 @@ def explain_position(request: ExplainRequest):
     pv_line = None
     pv_score = None
     analysis = None
+    teaching_analysis = None
     
     try:
         board = chess.Board(request.fen)
@@ -454,6 +586,11 @@ def explain_position(request: ExplainRequest):
             )
             pv_line = analysis['pv']
             pv_score = analysis['score']
+            teaching_analysis = chess_engine.get_teaching_analysis(
+                board,
+                analysis,
+                time_limit=0.8,
+            )
             print(f"PV Line: {pv_line} | Score: {analysis['eval_display']} | Win%: {analysis['winning_chance']}% | From Book: {analysis.get('from_book', False)}")
     except Exception as e:
         print(f"引擎分析失敗: {e}")
@@ -467,7 +604,8 @@ def explain_position(request: ExplainRequest):
             user_question,
             pv_line=pv_line,
             pv_score=pv_score,
-            analysis_result=analysis  # 🔥 傳遞完整分析結果
+            analysis_result=analysis,
+            teaching_analysis=teaching_analysis,
         )
     except Exception as e:
         print(f"RAG 分析失敗: {e}")

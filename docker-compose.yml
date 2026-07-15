@@ -9,6 +9,8 @@ services:
       # API Key 不要寫死，要在雲端平台的變數設定中填寫
       - GOOGLE_API_KEY=${GOOGLE_API_KEY}
       - DATABASE_URL=sqlite:////data/games.db
+      - STOCKFISH_PATH=/usr/games/stockfish
+      - STOCKFISH_REVIEW_NODES=${STOCKFISH_REVIEW_NODES:-4000}
     volumes:
       - backend_data:/data
 

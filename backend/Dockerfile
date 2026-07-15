@@ -3,8 +3,14 @@ FROM python:3.10-slim
 
 WORKDIR /app
 
-# 安裝系統依賴 (有些 Python 套件需要編譯)
-RUN apt-get update && apt-get install -y build-essential && rm -rf /var/lib/apt/lists/*
+# 安裝系統依賴與賽後分析用 Stockfish。遊戲走子仍使用專案自製引擎。
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    stockfish \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV STOCKFISH_PATH=/usr/games/stockfish \
+    STOCKFISH_REVIEW_NODES=4000
 
 # 先複製 requirements 並安裝
 COPY requirements.txt .

@@ -1,13 +1,34 @@
-import { useState, useEffect, useRef } from "react";
+import { lazy, Suspense, useState, useEffect, useRef } from "react";
 import { Chess } from "chess.js";
 import { Chessboard } from "react-chessboard";
 import axios from "axios";
 import { TRAINING_LESSONS, TRAINING_PHASES } from "./trainingLessons";
-// 引入圖表套件
-import { ComposedChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine, ReferenceDot, ReferenceArea, Area, Scatter } from 'recharts';
+import { LearningDashboard } from "./LearningDashboard";
+import {
+  buildLearningPlan,
+  getLearningStats,
+  getLessonProgress,
+  getNextLesson,
+  loadLearningProgress,
+  recordLessonResult,
+  saveLearningProgress
+} from "./learningProgress";
+
+const EvaluationChart = lazy(() => import("./EvaluationChart"));
 
 // 預設走同網域 /api，由 Vite/Nginx 代理到後端；分離部署時可用 VITE_API_URL 覆蓋。
 const API_URL = import.meta.env.VITE_API_URL || "/api";
+const MATE_SCORE_THRESHOLD = 15000;
+
+function calculateEvaluationBarShare(score) {
+  if (Math.abs(score) > MATE_SCORE_THRESHOLD) return score > 0 ? 100 : 0;
+  return Math.round((1000 / (1 + Math.exp(-0.00368 * score)))) / 10;
+}
+
+function formatEvaluationScore(score) {
+  if (Math.abs(score) > MATE_SCORE_THRESHOLD) return score > 0 ? "白方將死" : "黑方將死";
+  return `${score > 0 ? "+" : ""}${(score / 100).toFixed(2)}`;
+}
 
 const BOT_DIFFICULTIES = [
   { id: "newbie", label: "新手", description: "不用開局庫，低深度" },
@@ -31,6 +52,13 @@ const WEAKNESS_LABELS = {
   promotion: "通路兵升變",
   center: "中心控制",
   conversion: "優勢轉換"
+};
+
+const LESSON_TYPE_LABELS = {
+  opening: "主線課",
+  puzzle: "局面題",
+  guided: "引導課",
+  endgame: "殘局課"
 };
 
 function countPiecesFromFen(fen) {
@@ -76,6 +104,7 @@ function tagsForReviewMove(item) {
 }
 
 function getPracticeRecommendations(analysisData, humanColor, lessons) {
+  const eligibleLessons = lessons.filter((lesson) => lesson.recommendationVerified);
   const humanSide = humanColor === "black" ? "black" : "white";
   const reviewMoves = analysisData
     .filter((item) => item.move && item.side_to_move === humanSide)
@@ -92,11 +121,11 @@ function getPracticeRecommendations(analysisData, humanColor, lessons) {
   if (tagWeights.size === 0) {
     return {
       weaknesses: [],
-      recommendations: [lessons.find((lesson) => lesson.id === "italian-giuoco-piano") || lessons[0]].filter(Boolean)
+      recommendations: [eligibleLessons.find((lesson) => lesson.id === "italian-giuoco-piano") || eligibleLessons[0]].filter(Boolean)
     };
   }
 
-  const rankedLessons = lessons
+  const rankedLessons = eligibleLessons
     .map((lesson) => {
       const score = (lesson.tags || []).reduce((sum, tag) => sum + (tagWeights.get(tag) || 0), 0)
         + (tagWeights.get(lesson.phase) || 0);
@@ -114,7 +143,7 @@ function getPracticeRecommendations(analysisData, humanColor, lessons) {
     weaknesses,
     recommendations: rankedLessons.length
       ? rankedLessons.slice(0, 2).map((item) => item.lesson)
-      : [lessons.find((lesson) => lesson.id === "middlegame-center-pressure") || lessons[0]].filter(Boolean)
+      : [eligibleLessons.find((lesson) => lesson.id === "middlegame-center-pressure") || eligibleLessons[0]].filter(Boolean)
   };
 }
 
@@ -126,12 +155,18 @@ function App() {
   const [selectedLessonId, setSelectedLessonId] = useState(TRAINING_LESSONS[0].id);
   const [trainingFeedback, setTrainingFeedback] = useState({
     tone: "neutral",
-    text: "選擇一條變體，照棋盤提示走白方主線。黑方會自動走出該變體的回應。"
+    text: "先觀察局面再走棋；需要時可逐步開啟提示。"
   });
+  const [learningProgress, setLearningProgress] = useState(() => loadLearningProgress());
+  const [trainingMistakes, setTrainingMistakes] = useState(0);
+  const [trainingHints, setTrainingHints] = useState(0);
+  const [hintLevel, setHintLevel] = useState(0);
+  const [trainingResultRecorded, setTrainingResultRecorded] = useState(false);
   const [selectedSquare, setSelectedSquare] = useState(null);
   const [status, setStatus] = useState("準備開始新棋局");
   const [isResigned, setIsResigned] = useState(false);
   const [history, setHistory] = useState([]);
+  const [historyStatus, setHistoryStatus] = useState("loading");
 
   // --- 新增/修改狀態 ---
   // chatHistory: 儲存對話紀錄 { role: 'user' | 'model', text: string }
@@ -148,25 +183,36 @@ function App() {
   const [botStyle, setBotStyle] = useState("balanced");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
-  // 用來自動捲動聊天室
-  const chatEndRef = useRef(null);
+  // 只捲動聊天室本身，避免 scrollIntoView 帶著整個頁面跳到底部。
+  const chatFeedRef = useRef(null);
 
   // 1. 初始化載入歷史
   useEffect(() => {
-    fetchHistory();
+    const controller = new AbortController();
+    fetchHistory(controller.signal);
+    return () => controller.abort();
   }, []);
 
   // 聊天室自動捲動到底部
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    const chatFeed = chatFeedRef.current;
+    if (!chatFeed) return;
+    chatFeed.scrollTo({ top: chatFeed.scrollHeight, behavior: "smooth" });
   }, [chatHistory]);
 
-  async function fetchHistory() {
+  useEffect(() => {
+    saveLearningProgress(learningProgress);
+  }, [learningProgress]);
+
+  async function fetchHistory(signal) {
     try {
-      const res = await axios.get(`${API_URL}/games`);
+      const res = await axios.get(`${API_URL}/games`, { signal });
       setHistory(res.data);
+      setHistoryStatus("ready");
     } catch (err) {
-      console.error("無法讀取歷史紀錄", err);
+      if (axios.isCancel(err) || err?.code === "ERR_CANCELED") return;
+      setHistory([]);
+      setHistoryStatus("unavailable");
     }
   }
 
@@ -236,6 +282,7 @@ function App() {
       });
 
       setAnalysisData(processedData);
+      setCurrentMoveIndex(processedData.length > 0 ? processedData.length - 1 : -1);
       setStatus("✅ 分析完成！");
     } catch (err) {
       console.error("分析失敗", err);
@@ -258,16 +305,45 @@ function App() {
   const displayFen = (currentMoveIndex !== -1 && analysisData.length > 0)
     ? analysisData[currentMoveIndex].fen
     : game.fen();
+  const selectedReviewIndex = currentMoveIndex >= 0 ? currentMoveIndex : analysisData.length - 1;
+  const selectedReviewPoint = selectedReviewIndex >= 0 ? analysisData[selectedReviewIndex] : null;
+  const selectedWhiteScore = selectedReviewPoint?.rawScore ?? 0;
+  const selectedWdl = selectedReviewPoint?.wdl ?? null;
+  const selectedEvaluationShare = selectedWdl?.expected_score ?? calculateEvaluationBarShare(selectedWhiteScore);
   const phaseLessons = TRAINING_LESSONS.filter((lesson) => lesson.phase === trainingPhase);
   const selectedLesson = TRAINING_LESSONS.find((lesson) => lesson.id === selectedLessonId) || phaseLessons[0] || TRAINING_LESSONS[0];
   const trainingHistory = trainingGame.history();
   const expectedTrainingMove = selectedLesson.moves[trainingHistory.length];
   const trainingComplete = trainingHistory.length >= selectedLesson.moves.length;
   const boardFen = appMode === "training" ? trainingGame.fen() : displayFen;
-  const boardOrientation = appMode === "training" ? "white" : humanColor;
+  const boardOrientation = appMode === "training" ? selectedLesson.side : humanColor;
   const selectedDifficulty = BOT_DIFFICULTIES.find((difficulty) => difficulty.id === botDifficulty) || BOT_DIFFICULTIES[2];
   const selectedStyle = BOT_STYLES.find((style) => style.id === botStyle) || BOT_STYLES[0];
   const practiceRecommendations = getPracticeRecommendations(analysisData, humanColor, TRAINING_LESSONS);
+  const learningStats = getLearningStats(learningProgress, TRAINING_LESSONS);
+  const learningPlan = buildLearningPlan(
+    TRAINING_LESSONS,
+    learningProgress,
+    analysisData.length > 0 ? practiceRecommendations.recommendations : []
+  );
+  const nextLesson = getNextLesson(TRAINING_LESSONS, selectedLesson.id, learningProgress);
+
+  useEffect(() => {
+    if (appMode !== "training" || !trainingComplete || trainingResultRecorded) return;
+    setLearningProgress((current) => recordLessonResult(current, selectedLesson.id, {
+      completed: true,
+      mistakes: trainingMistakes,
+      hintsUsed: trainingHints
+    }));
+    setTrainingResultRecorded(true);
+  }, [
+    appMode,
+    selectedLesson.id,
+    trainingComplete,
+    trainingHints,
+    trainingMistakes,
+    trainingResultRecorded
+  ]);
 
   // 🔥 核心修改：發送訊息給 AI 教練
   // manualQuestion: 如果有的話，代表是玩家手動打字；如果沒有，代表是按「分析按鈕」
@@ -327,7 +403,12 @@ function App() {
   }
 
   function createTrainingGame(lesson) {
-    return lesson?.startFen ? new Chess(lesson.startFen) : new Chess();
+    const training = lesson?.startFen ? new Chess(lesson.startFen) : new Chess();
+    const learnerTurn = lesson?.side === "black" ? "b" : "w";
+    if (lesson?.moves?.length && training.turn() !== learnerTurn) {
+      training.move(lesson.moves[0]);
+    }
+    return training;
   }
 
   function resetTraining(nextLessonId = selectedLessonId) {
@@ -336,9 +417,13 @@ function App() {
     setSelectedLessonId(lesson.id);
     setTrainingGame(createTrainingGame(lesson));
     setSelectedSquare(null);
+    setTrainingMistakes(0);
+    setTrainingHints(0);
+    setHintLevel(0);
+    setTrainingResultRecorded(false);
     setTrainingFeedback({
       tone: "neutral",
-      text: `${lesson.opening}：${lesson.variation}。先走 ${lesson.moves[0]}，目標是：${lesson.goal}`
+      text: `${lesson.opening}：${lesson.variation}。先觀察局面，目標是：${lesson.goal}`
     });
   }
 
@@ -353,12 +438,33 @@ function App() {
     resetTraining(firstLesson.id);
   }
 
+  function openLearningArea() {
+    setSelectedSquare(null);
+    setAppMode("learning");
+  }
+
+  function revealTrainingHint() {
+    if (trainingComplete) return;
+    const nextLevel = Math.min(2, hintLevel + 1);
+    setHintLevel(nextLevel);
+    setTrainingHints((count) => count + 1);
+    const learnerMoveIndex = Math.max(0, Math.floor(trainingHistory.length / 2));
+    const idea = selectedLesson.ideas[Math.min(learnerMoveIndex, selectedLesson.ideas.length - 1)];
+    setTrainingFeedback({
+      tone: "neutral",
+      text: nextLevel === 1
+        ? `觀念提示：${idea}`
+        : `走法提示：這一步要找 ${expectedTrainingMove}。想想它如何達成本課目標。`
+    });
+  }
+
   function playTrainingMove(sourceSquare, targetSquare) {
     if (trainingComplete) {
       setTrainingFeedback({ tone: "neutral", text: "這條變體已完成。可以重練，或切換其他變體。" });
       return false;
     }
-    if (trainingGame.turn() !== "w") return false;
+    const learnerTurn = selectedLesson.side === "black" ? "b" : "w";
+    if (trainingGame.turn() !== learnerTurn) return false;
 
     const nextGame = cloneChess(trainingGame);
     let move = null;
@@ -371,9 +477,14 @@ function App() {
 
     const expectedMove = selectedLesson.moves[trainingHistory.length];
     if (move.san !== expectedMove) {
+      const nextMistakeCount = trainingMistakes + 1;
+      setTrainingMistakes(nextMistakeCount);
+      const ideaIndex = Math.min(Math.floor(trainingHistory.length / 2), selectedLesson.ideas.length - 1);
       setTrainingFeedback({
         tone: "warn",
-        text: `這步 ${move.san} 是合法棋，但本變體這裡要練的是 ${expectedMove}。先照主線走，重點是建立「中心、出子、保王」的節奏。`
+        text: nextMistakeCount >= 2
+          ? `這步 ${move.san} 是合法棋，但沒有命中本題重點。可以開啟第二層提示查看走法。`
+          : `再想一次：${selectedLesson.ideas[ideaIndex]}`
       });
       return false;
     }
@@ -398,7 +509,7 @@ function App() {
       tone: remaining <= 0 ? "success" : "success",
       text: remaining <= 0
         ? `完成 ${selectedLesson.variation}。重點：${selectedLesson.goal}`
-        : `正確：${move.san}。${selectedLesson.ideas[ideaIndex]} 下一步白方要找 ${selectedLesson.moves[nextGame.history().length]}。`
+        : `正確：${move.san}。${selectedLesson.ideas[ideaIndex]} 輪到你時再找下一個符合目標的走法。`
     });
     return true;
   }
@@ -451,7 +562,7 @@ function App() {
       const activeGame = appMode === "training" ? trainingGame : game;
       const piece = activeGame.get(square);
       if (!piece) return;
-      if (appMode === "training" && piece.color !== "w") return;
+      if (appMode === "training" && piece.color !== (selectedLesson.side === "black" ? "b" : "w")) return;
       if (appMode === "play" && piece.color !== (humanColor === "white" ? "w" : "b")) return;
       setSelectedSquare(square);
       return;
@@ -466,7 +577,9 @@ function App() {
     if (!moved) {
       const activeGame = appMode === "training" ? trainingGame : game;
       const piece = activeGame.get(square);
-      if (piece && (appMode === "training" ? piece.color === "w" : piece.color === (humanColor === "white" ? "w" : "b"))) {
+      if (piece && (appMode === "training"
+        ? piece.color === (selectedLesson.side === "black" ? "b" : "w")
+        : piece.color === (humanColor === "white" ? "w" : "b"))) {
         setSelectedSquare(square);
       } else {
         setSelectedSquare(null);
@@ -527,13 +640,20 @@ function App() {
     document.body.removeChild(element);
   }
 
-  // 勝率條組件
-  function EvaluationBar({ winningChance, evalDisplay }) {
-    const whiteHeight = winningChance;
-    const blackHeight = 100 - winningChance;
+  // 局勢條：Stockfish 可用時顯示 WDL，否則只以評分做視覺比例，不宣稱勝率。
+  function EvaluationBar({ whiteShare, evalDisplay, wdl, analysisSource }) {
+    const whiteHeight = Math.max(0, Math.min(100, whiteShare));
+    const blackHeight = 100 - whiteHeight;
+    const ariaDescription = wdl
+      ? `白勝 ${wdl.white_win.toFixed(1)}%，和棋 ${wdl.draw.toFixed(1)}%，黑勝 ${wdl.black_win.toFixed(1)}%`
+      : "目前僅提供局面評分，未提供勝和負機率";
 
     return (
-      <div className="eval-bar">
+      <div
+        className="eval-bar"
+        role="img"
+        aria-label={`白方局勢評估 ${evalDisplay}，${ariaDescription}`}
+      >
         <div className="eval-bar__track">
           {/* 白方區域 */}
           <div className="eval-bar__white" style={{ height: `${whiteHeight}%`, flexBasis: `${whiteHeight}%` }}>
@@ -545,6 +665,8 @@ function App() {
 
           {/* 中間線 */}
           <div className="eval-bar__midline"></div>
+          <span className="eval-bar__side is-black" aria-hidden="true">黑</span>
+          <span className="eval-bar__side is-white" aria-hidden="true">白</span>
         </div>
 
         {/* 評分顯示 */}
@@ -552,32 +674,18 @@ function App() {
           {evalDisplay}
         </div>
         
-        <div className="eval-bar__chance">
-          {winningChance.toFixed(1)}%
-        </div>
+        {wdl ? (
+          <div className="eval-bar__wdl" title="Stockfish UCI_ShowWDL">
+            <span>白勝 {wdl.white_win.toFixed(1)}%</span>
+            <span>和棋 {wdl.draw.toFixed(1)}%</span>
+            <span>黑勝 {wdl.black_win.toFixed(1)}%</span>
+          </div>
+        ) : (
+          <div className="eval-bar__chance" title={analysisSource === "custom" ? "自製引擎評分" : undefined}>
+            僅評分
+          </div>
+        )}
       </div>
-    );
-  }
-
-  function getMoveDotColor(classification) {
-    if (classification === "blunder") return "#ef4444";
-    if (classification === "mistake") return "#ff7f50";
-    if (classification === "inaccuracy") return "#f4a259";
-    return null;
-  }
-
-  function renderEvalDot({ cx, cy, payload }) {
-    const color = getMoveDotColor(payload?.classification);
-    if (!payload?.move || !color) return null;
-    return (
-      <circle
-        cx={cx}
-        cy={cy}
-        r={payload.classification === "blunder" ? 7 : 6}
-        fill={color}
-        stroke="#ffffff"
-        strokeWidth={payload.classification === "blunder" ? 2 : 1}
-      />
     );
   }
 
@@ -586,17 +694,6 @@ function App() {
       return score >= 0 ? "白方將死勝勢" : "黑方將死勝勢";
     }
     return `白方評分：${(score / 100).toFixed(2)}`;
-  }
-
-  function renderEvalTooltip({ active, payload, label }) {
-    if (!active || !payload || payload.length === 0) return null;
-    const point = payload[0].payload;
-    return (
-      <div className="chart-tooltip">
-        <div className="chart-tooltip__label">第 {label} 步</div>
-        <div className="chart-tooltip__value">{point.evalLabel}</div>
-      </div>
-    );
   }
 
   return (
@@ -609,27 +706,30 @@ function App() {
         </div>
         <div className="session-card">
           <span>目前模式</span>
-          <strong>{appMode === "training" ? "訓練" : analysisData.length > 0 ? "復盤" : "對局"}</strong>
+          <strong>{appMode === "learning" ? "學習專區" : appMode === "training" ? "課程練習" : analysisData.length > 0 ? "復盤" : "對局"}</strong>
         </div>
       </header>
 
+      {appMode === "learning" ? (
+        <LearningDashboard
+          phases={TRAINING_PHASES}
+          lessons={TRAINING_LESSONS}
+          progress={learningProgress}
+          stats={learningStats}
+          plan={learningPlan}
+          onStartLesson={startRecommendedLesson}
+          onReturnToGame={() => setAppMode("play")}
+        />
+      ) : (
       <main className={`coach-workspace ${analysisData.length > 0 ? "has-evaluation" : ""}`}>
 
         {/* 勝率條 - 只在賽後分析時顯示 */}
         {analysisData.length > 0 && (
           <EvaluationBar 
-            winningChance={
-              currentMoveIndex >= 0 && analysisData[currentMoveIndex]
-                ? (analysisData[currentMoveIndex].playerScore > 0 
-                    ? 50 + Math.min(analysisData[currentMoveIndex].playerScore / 50, 50) 
-                    : 50 + Math.max(analysisData[currentMoveIndex].playerScore / 50, -50))
-                : 50
-            }
-            evalDisplay={
-              currentMoveIndex >= 0 && analysisData[currentMoveIndex]
-                ? (analysisData[currentMoveIndex].playerScore > 0 ? "+" : "") + (analysisData[currentMoveIndex].playerScore / 100).toFixed(2)
-                : "+0.00"
-            }
+            whiteShare={selectedEvaluationShare}
+            evalDisplay={formatEvaluationScore(selectedWhiteScore)}
+            wdl={selectedWdl}
+            analysisSource={selectedReviewPoint?.analysis_source}
           />
         )}
 
@@ -638,7 +738,7 @@ function App() {
           <div className="board-console">
             <div className="board-console__topline">
               <div>
-                <span>你執</span>
+                <span>{appMode === "training" ? "練習方" : "你執"}</span>
                 <strong>{boardOrientation === "white" ? "白方" : "黑方"}</strong>
               </div>
               <div>
@@ -675,12 +775,12 @@ function App() {
           )}
 
           <div className="status-strip" aria-live="polite">
-            {appMode === "training" ? "訓練模式：照提示走白方，黑方會自動回應" : status}
+            {appMode === "training" ? `課程練習：你執${selectedLesson.side === "black" ? "黑方" : "白方"}，先思考再使用提示` : status}
           </div>
 
           <div className="control-bar">
             <button className={`btn ${appMode === "play" ? "btn-primary" : "btn-muted"}`} onClick={() => setAppMode("play")}>對局</button>
-            <button className={`btn ${appMode === "training" ? "btn-success" : "btn-muted"}`} onClick={() => { setAppMode("training"); resetTraining(selectedLessonId); }}>訓練模式</button>
+            <button className="btn btn-success" onClick={openLearningArea}>學習專區</button>
             <button className="btn btn-primary" onClick={() => { const ng = new Chess(); setGame(ng); setStatus("新局開始"); setAnalysisData([]); setCurrentMoveIndex(-1); setIsResigned(false); setChatHistory([]); if (humanColor === "black") makeAIMove(ng.fen()); }}>新局</button>
             {appMode === "play" && (
               <button
@@ -753,7 +853,15 @@ function App() {
               history={trainingHistory}
               expectedMove={expectedTrainingMove}
               complete={trainingComplete}
+              mistakes={trainingMistakes}
+              hints={trainingHints}
+              hintLevel={hintLevel}
+              lessonProgress={getLessonProgress(learningProgress, selectedLesson.id)}
+              nextLesson={nextLesson}
+              onHint={revealTrainingHint}
               onReset={() => resetTraining(selectedLessonId)}
+              onNext={() => nextLesson && resetTraining(nextLesson.id)}
+              onBack={openLearningArea}
             />
           ) : (
           <>
@@ -771,7 +879,7 @@ function App() {
             </div>
 
             {/* 訊息列表 */}
-            <div className="chat-feed">
+            <div className="chat-feed" ref={chatFeedRef}>
               {chatHistory.map((msg, idx) => (
                 <div key={idx} className={`chat-bubble ${msg.role === "user" ? "is-user" : "is-model"}`}>
                   {msg.text}
@@ -782,7 +890,6 @@ function App() {
                   教練正在思考...
                 </div>
               )}
-              <div ref={chatEndRef} />
             </div>
 
             {/* 輸入框 */}
@@ -810,77 +917,13 @@ function App() {
 
           {/* 📊 分析圖表 (如果有數據) */}
           {appMode === "play" && analysisData.length > 0 && (
-            <div className="analysis-card">
-              <div className="chart-header">
-                <span>局勢走勢（白方視角）</span>
-                <span>0 線</span>
-              </div>
-              <ResponsiveContainer width="100%" height={142}>
-                <ComposedChart
-                  data={analysisData}
-                  margin={{ top: 8, right: 10, bottom: 8, left: 10 }}
-                  onClick={(e) => { if (e && e.activePayload) setCurrentMoveIndex(e.activePayload[0].payload.move_number); }}
-                >
-                  <defs>
-                    <linearGradient id="blackAdvantageArea" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#33312d" stopOpacity={1}/>
-                      <stop offset="100%" stopColor="#4a4741" stopOpacity={0.96}/>
-                    </linearGradient>
-                  </defs>
-                  <XAxis dataKey="move_number" hide />
-                  <YAxis hide domain={[-1000, 1000]} />
-                  <Tooltip 
-                    cursor={{ stroke: "#8f8a83", strokeWidth: 1 }}
-                    content={renderEvalTooltip}
-                  />
-                  
-                  <ReferenceArea y1={-1000} y2={1000} fill="#3a3833" fillOpacity={1} />
-
-                  {/* 中線 (0分線) */}
-                  <ReferenceLine y={0} stroke="#beb9b1" strokeWidth={3} />
-                  
-                  <Area 
-                    type="monotone" 
-                    dataKey="displayScore" 
-                    baseValue={-1000}
-                    stroke="#f7f6f3"
-                    strokeWidth={5}
-                    fill="#f7f6f3"
-                    fillOpacity={1}
-                    isAnimationActive={false}
-                  />
-                  
-                  <Line 
-                    type="monotone" 
-                    dataKey="displayScore" 
-                    stroke="#f7f6f3"
-                    dot={false} 
-                    strokeWidth={5}
-                    isAnimationActive={false}
-                    activeDot={{ r: 7, fill: "#ffffff", stroke: "#4a4741", strokeWidth: 2 }}
-                  />
-
-                  <Scatter
-                    data={analysisData.filter((d) => d.move && d.classification !== "good")}
-                    dataKey="displayScore"
-                    shape={renderEvalDot}
-                    isAnimationActive={false}
-                  />
-                  
-                  {/* 當前位置標記 */}
-                  {currentMoveIndex !== -1 && analysisData[currentMoveIndex] && (
-                    <ReferenceDot 
-                      x={analysisData[currentMoveIndex].move_number} 
-                      y={analysisData[currentMoveIndex].displayScore} 
-                      r={8} 
-                      fill="transparent" 
-                      stroke="#ffffff"
-                      strokeWidth={3}
-                    />
-                  )}
-                </ComposedChart>
-              </ResponsiveContainer>
-            </div>
+            <Suspense fallback={<div className="analysis-card chart-loading" role="status">正在載入局勢圖表…</div>}>
+              <EvaluationChart
+                analysisData={analysisData}
+                currentMoveIndex={currentMoveIndex}
+                onMoveSelect={setCurrentMoveIndex}
+              />
+            </Suspense>
           )}
 
           {appMode === "play" && analysisData.length > 0 && (
@@ -899,7 +942,7 @@ function App() {
 
               <p className="practice-summary">
                 {practiceRecommendations.weaknesses.length
-                  ? "根據這盤的失誤類型，先補最常出現的弱點。"
+                  ? "根據這盤的失誤階段與掉分幅度推測，先補最可能相關的主題。"
                   : "這盤沒有明顯反覆失誤，建議用基礎開局題維持節奏。"}
               </p>
 
@@ -926,8 +969,14 @@ function App() {
             <h3>
               最近棋局
             </h3>
-            {history.length === 0 ? (
-              <p className="empty-state">尚無紀錄</p>
+            {historyStatus !== "ready" || history.length === 0 ? (
+              <p className="empty-state" aria-live="polite">
+                {historyStatus === "loading"
+                  ? "讀取紀錄中…"
+                  : historyStatus === "unavailable"
+                    ? "後端未連線，歷史紀錄暫不可用"
+                    : "尚無紀錄"}
+              </p>
             ) : (
               <ul className="history-list">
                 {history.map((h) => (
@@ -954,6 +1003,7 @@ function App() {
 
         </aside>
       </main>
+      )}
     </div>
   );
 }
@@ -970,16 +1020,39 @@ function OpeningTrainingPanel({
   history,
   expectedMove,
   complete,
-  onReset
+  mistakes,
+  hints,
+  hintLevel,
+  lessonProgress,
+  nextLesson,
+  onHint,
+  onReset,
+  onNext,
+  onBack
 }) {
-  const progress = Math.round((history.length / selectedLesson.moves.length) * 100);
+  const initialTurn = selectedLesson.startFen ? new Chess(selectedLesson.startFen).turn() : "w";
+  const learnerTurn = selectedLesson.side === "black" ? "b" : "w";
+  const learnerOffset = initialTurn === learnerTurn ? 0 : 1;
+  const totalLearnerMoves = selectedLesson.moves.filter((_, index) => index % 2 === learnerOffset).length;
+  const completedLearnerMoves = history.filter((_, index) => index % 2 === learnerOffset).length;
+  const progress = totalLearnerMoves
+    ? Math.min(100, Math.round((completedLearnerMoves / totalLearnerMoves) * 100))
+    : 0;
 
   return (
     <div className="training-card">
       <div className="training-card__header">
-        <div className="panel-kicker">訓練模式</div>
+        <div className="training-header-row">
+          <div className="panel-kicker">課程練習</div>
+          <button className="text-button" onClick={onBack}>返回學習專區</button>
+        </div>
         <div className="training-title">{selectedLesson.opening}</div>
         <div className="training-subtitle">{selectedLesson.variation}</div>
+        <div className="lesson-chip-row">
+          <span>{LESSON_TYPE_LABELS[selectedLesson.type] || "課程"}</span>
+          <span>{selectedLesson.side === "black" ? "執黑" : "執白"}</span>
+          <span>難度 {selectedLesson.difficulty}</span>
+        </div>
       </div>
 
       <div className="training-card__body">
@@ -1019,8 +1092,8 @@ function OpeningTrainingPanel({
 
         <div className="training-metrics">
           <div className="metric-card">
-            <span>下一步白方</span>
-            <strong>{complete ? "完成" : expectedMove}</strong>
+            <span>{complete ? "課程狀態" : "目前任務"}</span>
+            <strong>{complete ? "完成" : hintLevel >= 2 ? expectedMove : selectedLesson.type === "puzzle" ? "找出最佳手" : "運用本課觀念"}</strong>
           </div>
           <div className="metric-card">
             <span>進度</span>
@@ -1036,6 +1109,18 @@ function OpeningTrainingPanel({
           {feedback.text}
         </div>
 
+        {!complete && (
+          <button className="btn btn-secondary hint-button" onClick={onHint} disabled={hintLevel >= 2}>
+            {hintLevel === 0 ? "給我觀念提示" : hintLevel === 1 ? "顯示走法提示" : "提示已全部開啟"}
+          </button>
+        )}
+
+        <div className="attempt-summary" aria-label="本次練習統計">
+          <span>錯誤 {mistakes}</span>
+          <span>提示 {hints}</span>
+          <span>熟練度 {lessonProgress.mastery}/5</span>
+        </div>
+
         <div>
           <div className="setting-label">目前棋譜</div>
           <div className="move-line">
@@ -1045,14 +1130,23 @@ function OpeningTrainingPanel({
 
         <div>
           <div className="setting-label">學習重點</div>
-          <ul className="idea-list">
-            {selectedLesson.ideas.map((idea) => (
-              <li key={idea}>{idea}</li>
-            ))}
-          </ul>
+          {complete ? (
+            <ul className="idea-list">
+              {selectedLesson.ideas.map((idea) => (
+                <li key={idea}>{idea}</li>
+              ))}
+            </ul>
+          ) : (
+            <p className="locked-learning-copy">完成課程後會整理完整學習重點；作答前先依目標判斷。</p>
+          )}
         </div>
 
-        <button className="btn btn-primary" onClick={onReset}>重練這條變體</button>
+        <div className="training-actions">
+          <button className="btn btn-secondary" onClick={onReset}>重練這堂課</button>
+          {complete && nextLesson && (
+            <button className="btn btn-primary" onClick={onNext}>下一課：{nextLesson.variation}</button>
+          )}
+        </div>
       </div>
     </div>
   );

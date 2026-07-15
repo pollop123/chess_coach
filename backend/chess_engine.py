@@ -6,6 +6,21 @@ import threading
 import time
 from dataclasses import dataclass
 
+from evaluation import (
+    BISHOP_TABLE,
+    DEFAULT_EVALUATOR,
+    KING_TABLE_ENDGAME,
+    KING_TABLE_OPENING,
+    KNIGHT_TABLE,
+    MATE_SCORE,
+    PAWN_TABLE,
+    PIECE_VALUES,
+    QUEEN_TABLE,
+    ROOK_TABLE,
+    get_piece_square_value,
+    middlegame_king_exposure_penalty,
+)
+
 # Transposition table shared across iterative-deepening passes and requests.
 transposition_table = {}
 TT_MAX_ENTRIES = 200_000
@@ -25,9 +40,20 @@ search_runtime = threading.local()
 ENGINE_DIR = os.path.dirname(os.path.abspath(__file__))
 BOOK_PATH = os.path.join(ENGINE_DIR, "books", "gm2001.bin")
 
-# --- 評估體系常數 ---
-MATE_SCORE = 20000
+# --- 評估與搜尋合約常數 ---
 MATE_THRESHOLD = 15000
+ONLY_MOVE_LOSS_CP = 250
+
+# Backwards-compatible aliases for search helpers and external callers. The
+# authoritative definitions now live under backend/evaluation/.
+piece_values = PIECE_VALUES
+pawntable = PAWN_TABLE
+knightstable = KNIGHT_TABLE
+bishopstable = BISHOP_TABLE
+rookstable = ROOK_TABLE
+queenstable = QUEEN_TABLE
+king_table_opening = KING_TABLE_OPENING
+king_table_endgame = KING_TABLE_ENDGAME
 
 DIFFICULTY_MOVE_PROFILES = {
     "newbie": {"target_loss": 220, "max_loss": 350, "error_rate": 60, "candidates": 18},
@@ -179,88 +205,6 @@ def calculate_winning_chance(score):
     except OverflowError:
         return 100.0 if score > 0 else 0.0
 
-# --- 1. 定義棋子價值 ---
-piece_values = {
-    chess.PAWN: 100,
-    chess.KNIGHT: 320,
-    chess.BISHOP: 330,
-    chess.ROOK: 500,
-    chess.QUEEN: 900,
-    chess.KING: 20000
-}
-
-# --- 2. 位置權重表 (PST) ---
-pawntable = [
-    0,  0,  0,  0,  0,  0,  0,  0,
-    50, 50, 50, 50, 50, 50, 50, 50,
-    10, 10, 20, 30, 30, 20, 10, 10,
-    5,  5, 10, 25, 25, 10,  5,  5,
-    0,  0,  0, 20, 20,  0,  0,  0,
-    5, -5,-10,  0,  0,-10, -5,  5,
-    5, 10, 10,-20,-20, 10, 10,  5,
-    0,  0,  0,  0,  0,  0,  0,  0
-]
-knightstable = [
-    -50,-40,-30,-30,-30,-30,-40,-50,
-    -40,-20,  0,  0,  0,  0,-20,-40,
-    -30,  0, 10, 15, 15, 10,  0,-30,
-    -30,  5, 15, 20, 20, 15,  5,-30,
-    -30,  0, 15, 20, 20, 15,  0,-30,
-    -30,  5, 10, 15, 15, 10,  5,-30,
-    -40,-20,  0,  5,  5,  0,-20,-40,
-    -50,-40,-30,-30,-30,-30,-40,-50
-]
-bishopstable = [
-    -20,-10,-10,-10,-10,-10,-10,-20,
-    -10,  0,  0,  0,  0,  0,  0,-10,
-    -10,  0,  5, 10, 10,  5,  0,-10,
-    -10,  5,  5, 10, 10,  5,  5,-10,
-    -10,  0, 10, 10, 10, 10,  0,-10,
-    -10, 10, 10, 10, 10, 10, 10,-10,
-    -10,  5,  0,  0,  0,  0,  5,-10,
-    -20,-10,-10,-10,-10,-10,-10,-20
-]
-rookstable = [
-     0, -15,  0,  5,  5,  0, -15,  0,
-    -5,  0,  0,  0,  0,  0,  0, -5,
-    -5,  0,  0,  0,  0,  0,  0, -5,
-    -5,  0,  0,  0,  0,  0,  0, -5,
-    -5,  0,  0,  0,  0,  0,  0, -5,
-    -5,  0,  0,  0,  0,  0,  0, -5,
-    -10, -10,  0,  0,  0,  0, -10, -10, 
-     0,  0,  0,  10, 10,  5,  0,  0
-]
-queenstable = [
-    -20,-10,-10, -5, -5,-10,-10,-20,
-    -10,  0,  0,  0,  0,  0,  0,-10,
-    -10,  0,  5,  5,  5,  5,  0,-10,
-     -5,  0,  5,  5,  5,  5,  0, -5,
-      0,  0,  5,  5,  5,  5,  0, -5,
-    -10,  5,  5,  5,  5,  5,  0,-10,
-    -10,  0,  5,  0,  0,  0,  0,-10,
-    -20,-10,-10, -5, -5,-10,-10,-20
-]
-king_table_opening = [
-    20, 30, 10,  0,  0, 10, 30, 20,
-    20, 20,  0,  0,  0,  0, 20, 20,
-    -10,-20,-20,-20,-20,-20,-20,-10,
-    -20,-30,-30,-40,-40,-30,-30,-20,
-    -30,-40,-40,-50,-50,-40,-40,-30,
-    -30,-40,-40,-50,-50,-40,-40,-30,
-    -30,-40,-40,-50,-50,-40,-40,-30,
-    -30,-40,-40,-50,-50,-40,-40,-30
-]
-king_table_endgame = [
-    -50,-30,-30,-30,-30,-30,-30,-50,
-    -30,-30,  0,  0,  0,  0,-30,-30,
-    -30,-10, 20, 30, 30, 20,-10,-30,
-    -30,-10, 30, 40, 40, 30,-10,-30,
-    -30,-10, 30, 40, 40, 30,-10,-30,
-    -30,-10, 20, 30, 30, 20,-10,-30,
-    -30,-20,-10,  0,  0,-10,-20,-30,
-    -50,-40,-30,-20,-20,-30,-40,-50
-]
-
 def order_moves(board, tt_best_move=None):
     moves = list(board.legal_moves)
     
@@ -317,97 +261,14 @@ def build_book_line(reader, board, first_move, max_plies=6):
 
     return line
 
-def get_piece_square_value(piece_type, square, color, is_endgame):
-    if color == chess.WHITE:
-        square = chess.square_mirror(square)
-
-    if piece_type == chess.PAWN: return pawntable[square]
-    elif piece_type == chess.KNIGHT: return knightstable[square]
-    elif piece_type == chess.BISHOP: return bishopstable[square]
-    elif piece_type == chess.ROOK: return rookstable[square]
-    elif piece_type == chess.QUEEN: return queenstable[square]
-    elif piece_type == chess.KING:
-        return king_table_endgame[square] if is_endgame else king_table_opening[square]
-    return 0
-
-def middlegame_king_exposure_penalty(board, color):
-    king_square = board.king(color)
-    if king_square is None:
-        return 0
-
-    total_pieces = len(board.piece_map())
-    if total_pieces < 14:
-        return 0
-
-    home_rank = 0 if color == chess.WHITE else 7
-    king_rank = chess.square_rank(king_square)
-    if king_rank == home_rank:
-        return 0
-
-    enemy = not color
-    king_zone = [king_square, *chess.SquareSet(chess.BB_KING_ATTACKS[king_square])]
-    attacked_zone = sum(1 for square in king_zone if board.is_attacked_by(enemy, square))
-    return 180 + min(120, (total_pieces - 14) * 8) + attacked_zone * 20
-
 def evaluate_board(board, ply_from_root=0):
-    if board.is_checkmate():
-        score = MATE_SCORE - ply_from_root
-        return -score if board.turn == chess.WHITE else score
-        
-    if board.is_stalemate() or board.is_insufficient_material():
-        return 0
+    """Compatibility score entrypoint used by search and API fallbacks."""
+    return DEFAULT_EVALUATOR.score(board, ply_from_root)
 
-    white_queens = len(board.pieces(chess.QUEEN, chess.WHITE))
-    black_queens = len(board.pieces(chess.QUEEN, chess.BLACK))
-    minor_pieces = len(board.pieces(chess.KNIGHT, chess.WHITE)) + \
-                   len(board.pieces(chess.BISHOP, chess.WHITE)) + \
-                   len(board.pieces(chess.KNIGHT, chess.BLACK)) + \
-                   len(board.pieces(chess.BISHOP, chess.BLACK))
-    
-    is_endgame = (white_queens == 0 and black_queens == 0) or (minor_pieces <= 2)
-    score = 0
-    
-    for square in chess.SQUARES:
-        piece = board.piece_at(square)
-        if piece:
-            value = piece_values[piece.piece_type]
-            pst_value = get_piece_square_value(piece.piece_type, square, piece.color, is_endgame)
-            
-            if piece.color == chess.WHITE:
-                score += value + pst_value
-            else:
-                score -= (value + pst_value)
 
-    if not is_endgame:
-        if board.has_castling_rights(chess.WHITE): score += 20
-        if board.has_castling_rights(chess.BLACK): score -= 20
-        score -= middlegame_king_exposure_penalty(board, chess.WHITE)
-        score += middlegame_king_exposure_penalty(board, chess.BLACK)
-
-    if is_endgame:
-        winning_side = None
-        if score > 200: winning_side = chess.WHITE
-        elif score < -200: winning_side = chess.BLACK
-        
-        if winning_side is not None:
-            losing_king = board.king(not winning_side)
-            winning_king = board.king(winning_side)
-            if losing_king and winning_king:
-                lr, lf = chess.square_rank(losing_king), chess.square_file(losing_king)
-                dist_center = max(3 - lr, lr - 4) + max(3 - lf, lf - 4)
-                wr, wf = chess.square_rank(winning_king), chess.square_file(winning_king)
-                dist_kings = abs(lr - wr) + abs(lf - wf)
-                mop_score = (4 * dist_center) + (14 - dist_kings)
-                if winning_side == chess.WHITE: score += mop_score * 10
-                else: score -= mop_score * 10
-
-    # 🔥 Contempt Factor
-    if board.is_repetition(2):
-        if score > 500: return -1000
-        if score < -500: return 1000
-        return 0
-
-    return score
+def evaluate_position(board, ply_from_root=0):
+    """Return the modular evaluator's score, phase, and component breakdown."""
+    return DEFAULT_EVALUATOR.evaluate(board, ply_from_root)
 
 def quiescence_search(board, alpha, beta, q_depth=0, ply_from_root=0):
     visit_search_node()
@@ -792,6 +653,138 @@ def _move_attacks_king_zone(board, move):
         board.pop()
 
 
+def _king_zone_pressure(board, attacker, king_color):
+    king_square = board.king(king_color)
+    if king_square is None:
+        return 0
+    king_zone = [king_square, *chess.SquareSet(chess.BB_KING_ATTACKS[king_square])]
+    return sum(board.is_attacked_by(attacker, square) for square in king_zone)
+
+
+def _move_increases_enemy_king_pressure(board, move):
+    mover = board.turn
+    before = _king_zone_pressure(board, mover, not mover)
+    board.push(move)
+    try:
+        after = _king_zone_pressure(board, mover, not mover)
+        return after > before
+    finally:
+        board.pop()
+
+
+def _move_improves_own_king_safety(board, move):
+    mover = board.turn
+    before = _king_zone_pressure(board, not mover, mover)
+    board.push(move)
+    try:
+        after = _king_zone_pressure(board, not mover, mover)
+        return after < before
+    finally:
+        board.pop()
+
+
+def _move_controls_center(board, move):
+    mover = board.turn
+    board.push(move)
+    try:
+        piece = board.piece_at(move.to_square)
+        if not piece or piece.color != mover:
+            return False
+        center = chess.SquareSet(chess.BB_CENTER)
+        return bool(board.attacks(move.to_square) & center)
+    finally:
+        board.pop()
+
+
+def _captured_piece(board, move):
+    if not board.is_capture(move):
+        return None
+    if board.is_en_passant(move):
+        captured_square = move.to_square - 8 if board.turn == chess.WHITE else move.to_square + 8
+        return board.piece_at(captured_square)
+    return board.piece_at(move.to_square)
+
+
+def _move_wins_material_after_recapture(board, move):
+    captured_piece = _captured_piece(board, move)
+    moving_piece = board.piece_at(move.from_square)
+    if not captured_piece or not moving_piece:
+        return False
+    captured_value = piece_values[captured_piece.piece_type]
+    moving_value = piece_values[moving_piece.piece_type]
+    board.push(move)
+    try:
+        can_recapture_mover = any(
+            board.is_capture(reply)
+            and reply.to_square == move.to_square
+            and board.piece_at(reply.to_square)
+            and board.piece_at(reply.to_square).color != board.turn
+            for reply in board.legal_moves
+        )
+    finally:
+        board.pop()
+    net_gain = captured_value - moving_value if can_recapture_mover else captured_value
+    return net_gain >= 100
+
+
+def _move_rescues_attacked_major_piece(board, move):
+    mover = board.turn
+    moving_piece = board.piece_at(move.from_square)
+    if not moving_piece or moving_piece.piece_type not in {chess.ROOK, chess.QUEEN}:
+        return False
+    before = board.copy(stack=False)
+    before.turn = not mover
+    has_legal_capture_before = any(
+        reply.to_square == move.from_square and before.is_capture(reply)
+        for reply in before.legal_moves
+    )
+    if not has_legal_capture_before:
+        return False
+    board.push(move)
+    try:
+        has_legal_capture_after = any(
+            reply.to_square == move.to_square and board.is_capture(reply)
+            for reply in board.legal_moves
+        )
+        return not has_legal_capture_after
+    finally:
+        board.pop()
+
+
+def _valuable_targets_attacked_by_moving_piece(board, move):
+    mover = board.turn
+    board.push(move)
+    try:
+        targets = []
+        for square in board.attacks(move.to_square):
+            piece = board.piece_at(square)
+            if (
+                piece
+                and piece.color != mover
+                and piece.piece_type in {chess.KNIGHT, chess.BISHOP, chess.ROOK, chess.QUEEN}
+            ):
+                targets.append((square, piece.piece_type))
+        return targets
+    finally:
+        board.pop()
+
+
+def _move_creates_valuable_piece_fork(board, move):
+    moving_piece = board.piece_at(move.from_square)
+    if not moving_piece:
+        return False
+    before_targets = {
+        (square, board.piece_at(square).piece_type)
+        for square in board.attacks(move.from_square)
+        if board.piece_at(square)
+        and board.piece_at(square).color != board.turn
+        and board.piece_at(square).piece_type
+        in {chess.KNIGHT, chess.BISHOP, chess.ROOK, chess.QUEEN}
+    }
+    after_targets = set(_valuable_targets_attacked_by_moving_piece(board, move))
+    return len(after_targets) >= 2 and len(after_targets) > len(before_targets)
+
+
 def _move_allows_immediate_mate(board, move):
     board.push(move)
     try:
@@ -816,7 +809,15 @@ def _is_teaching_endgame(board):
         + len(board.pieces(chess.KNIGHT, chess.BLACK))
         + len(board.pieces(chess.BISHOP, chess.BLACK))
     )
-    return len(board.piece_map()) <= 8 or (white_queens == 0 and black_queens == 0) or minor_pieces <= 2
+    rooks = len(board.pieces(chess.ROOK, chess.WHITE)) + len(board.pieces(chess.ROOK, chess.BLACK))
+    total_pieces = len(board.piece_map())
+    non_pawn_army = white_queens + black_queens + rooks + minor_pieces
+    return total_pieces <= 10 or (
+        white_queens == 0
+        and black_queens == 0
+        and non_pawn_army <= 4
+        and total_pieces <= 14
+    )
 
 
 def _move_themes(board, move, reason=None):
@@ -824,7 +825,7 @@ def _move_themes(board, move, reason=None):
     moving_piece = board.piece_at(move.from_square)
     is_endgame = _is_teaching_endgame(board)
 
-    if len(board.move_stack) < 10 and not is_endgame:
+    if detect_game_phase(board) == "opening" and not is_endgame:
         themes.add("opening_principle")
 
     if moving_piece and moving_piece.piece_type in {chess.KNIGHT, chess.BISHOP}:
@@ -835,35 +836,47 @@ def _move_themes(board, move, reason=None):
         if move.from_square in starting_squares:
             themes.add("development")
 
-    from_file = chess.square_file(move.from_square)
-    from_rank = chess.square_rank(move.from_square)
-    to_file = chess.square_file(move.to_square)
-    to_rank = chess.square_rank(move.to_square)
-    moves_from_or_to_center = (
-        2 <= to_file <= 5 and 2 <= to_rank <= 5
-    ) or (
-        2 <= from_file <= 5 and 2 <= from_rank <= 5
-    )
-    if moves_from_or_to_center or (
-        moving_piece and moving_piece.piece_type == chess.PAWN and move.to_square in {chess.D4, chess.E4, chess.D5, chess.E5}
-    ):
+    tactical_reasons = {
+        "checkmate", "check", "wins_material", "promotes_or_supports_promotion",
+        "creates_valuable_piece_fork",
+    }
+    if reason not in tactical_reasons and _move_controls_center(board, move):
         themes.add("center_control")
 
-    if board.gives_check(move) or board.is_capture(move) or move.promotion or reason == "checkmate":
+    if reason in tactical_reasons:
         themes.add("tactics")
 
-    if _move_attacks_king_zone(board, move):
+    if reason in {"checkmate", "check", "attacks_enemy_king"}:
+        themes.add("king_attack")
+
+    if reason in {"castle", "resolves_check", "improves_king_safety"}:
         themes.add("king_safety")
 
     if is_endgame or move.promotion:
         themes.add("endgame")
+    if is_endgame:
+        queens = len(board.pieces(chess.QUEEN, chess.WHITE)) + len(board.pieces(chess.QUEEN, chess.BLACK))
+        rooks = len(board.pieces(chess.ROOK, chess.WHITE)) + len(board.pieces(chess.ROOK, chess.BLACK))
+        minors = sum(
+            len(board.pieces(piece_type, color))
+            for piece_type in (chess.KNIGHT, chess.BISHOP)
+            for color in (chess.WHITE, chess.BLACK)
+        )
+        if queens:
+            themes.add("queen_endgame")
+        elif rooks:
+            themes.add("rook_endgame")
+        elif minors:
+            themes.add("minor_piece_endgame")
+        else:
+            themes.add("pawn_endgame")
 
     return sorted(themes)
 
 
 def _move_reason(board, move, warnings):
     moving_piece = board.piece_at(move.from_square)
-    captured_piece = board.piece_at(move.to_square) if board.is_capture(move) else None
+    was_in_check = board.is_check()
 
     board.push(move)
     try:
@@ -872,10 +885,20 @@ def _move_reason(board, move, warnings):
     finally:
         board.pop()
 
-    if captured_piece and piece_values.get(captured_piece.piece_type, 0) >= 300:
+    if board.is_castling(move):
+        return "castle"
+    if was_in_check:
+        return "resolves_check"
+    if move.promotion:
+        return "promotes_or_supports_promotion"
+    if board.gives_check(move):
+        return "check"
+    if _move_wins_material_after_recapture(board, move):
         return "wins_material"
-    if "hangs_major_piece" not in warnings and moving_piece and moving_piece.piece_type in {chess.ROOK, chess.QUEEN}:
+    if "hangs_major_piece" not in warnings and _move_rescues_attacked_major_piece(board, move):
         return "avoids_major_piece_loss"
+    if _move_creates_valuable_piece_fork(board, move):
+        return "creates_valuable_piece_fork"
     if moving_piece and moving_piece.piece_type in {chess.KNIGHT, chess.BISHOP}:
         starting_squares = {
             chess.B1, chess.G1, chess.C1, chess.F1,
@@ -883,13 +906,46 @@ def _move_reason(board, move, warnings):
         }
         if move.from_square in starting_squares:
             return "develops_piece"
-    if move.to_square in {chess.D4, chess.E4, chess.D5, chess.E5}:
+    if _move_controls_center(board, move):
         return "controls_center"
-    if _move_attacks_king_zone(board, move):
+    if _move_improves_own_king_safety(board, move):
         return "improves_king_safety"
-    if move.promotion:
-        return "promotes_or_supports_promotion"
+    if _move_increases_enemy_king_pressure(board, move):
+        return "attacks_enemy_king"
     return "best_engine_score"
+
+
+REASON_EVIDENCE = {
+    "checkmate": "verified",
+    "check": "verified",
+    "castle": "verified",
+    "resolves_check": "verified",
+    "promotes_or_supports_promotion": "verified",
+    "wins_material": "supported",
+    "avoids_major_piece_loss": "supported",
+    "creates_valuable_piece_fork": "verified",
+    "improves_king_safety": "supported",
+    "attacks_enemy_king": "supported",
+    "best_engine_score": "supported",
+    "develops_piece": "heuristic",
+    "controls_center": "heuristic",
+}
+
+
+def _reason_evidence(reason):
+    return REASON_EVIDENCE.get(reason, "heuristic")
+
+
+def _theme_evidence(theme, reason):
+    if theme in {"queen_endgame", "rook_endgame", "minor_piece_endgame", "pawn_endgame"}:
+        return "verified"
+    if theme in {"tactics", "king_attack"} and reason in {
+        "checkmate", "check", "promotes_or_supports_promotion", "creates_valuable_piece_fork"
+    }:
+        return "verified"
+    if theme in {"king_safety", "only_move"}:
+        return "supported"
+    return "heuristic"
 
 
 def _candidate_moves(board, best_move, candidate_count):
@@ -918,6 +974,10 @@ def _candidate_score(board, depth):
     return score
 
 
+def _teaching_score_type(score):
+    return "mate" if abs(score) >= MATE_THRESHOLD else "centipawn"
+
+
 def get_teaching_analysis(
     board,
     base_analysis,
@@ -934,9 +994,12 @@ def get_teaching_analysis(
     deadline = started_at + time_limit if time_limit else None
     begin_search_generation(deadline=deadline)
 
+    planned_moves = _candidate_moves(board, best_move, candidate_count)
     candidates = []
-    for move in _candidate_moves(board, best_move, candidate_count):
+    analysis_complete = True
+    for move in planned_moves:
         if deadline is not None and time.monotonic() >= deadline:
+            analysis_complete = False
             break
 
         san = board.san(move)
@@ -951,14 +1014,12 @@ def get_teaching_analysis(
         try:
             score = _candidate_score(search_board, base_depth)
         except SearchTimeout:
+            analysis_complete = False
             break
-
-        if "hangs_major_piece" in warnings:
-            mover_sign = 1 if mover == chess.WHITE else -1
-            score -= mover_sign * 500
 
         reason = _move_reason(board, move, warnings)
         themes = _move_themes(board, move, reason)
+        theme_evidence = {theme: _theme_evidence(theme, reason) for theme in themes}
         pv = [move.uci(), *get_pv_line(search_board, base_depth)]
         perspective_score = score if mover == chess.WHITE else -score
         candidates.append({
@@ -966,43 +1027,54 @@ def get_teaching_analysis(
             "move": move.uci(),
             "san": san,
             "score_cp": int(score),
+            "score_type": _teaching_score_type(score),
+            "score_status": "complete",
             "display": format_evaluation(score),
             "perspective_score": perspective_score,
+            "base_engine_choice": bool(best_move and move == best_move),
             "pv": pv,
             "warnings": warnings,
             "themes": themes,
+            "theme_evidence": theme_evidence,
             "reason": reason,
+            "reason_evidence": _reason_evidence(reason),
         })
 
-    best_candidate = None
-    other_candidates = []
-    for item in candidates:
-        if best_move and item["move_obj"] == best_move:
-            best_candidate = item
-        else:
-            other_candidates.append(item)
-    other_candidates.sort(key=lambda item: item["perspective_score"], reverse=True)
-    candidates = ([best_candidate] if best_candidate else []) + other_candidates
+    candidates.sort(key=lambda item: item["perspective_score"], reverse=True)
     if not candidates and best_move and best_move in board.legal_moves:
         score = int(base_analysis.get("score") or 0)
+        analysis_complete = False
         candidates.append({
             "move_obj": best_move,
             "move": best_move.uci(),
             "san": board.san(best_move),
             "score_cp": score,
+            "score_type": _teaching_score_type(score),
+            "score_status": "base_only",
             "display": format_evaluation(score),
             "perspective_score": score if mover == chess.WHITE else -score,
+            "base_engine_choice": True,
             "pv": [best_move.uci()],
             "warnings": [],
             "themes": _move_themes(board, best_move),
             "reason": _move_reason(board, best_move, []),
         })
+        candidates[0]["reason_evidence"] = _reason_evidence(candidates[0]["reason"])
+        candidates[0]["theme_evidence"] = {
+            theme: _theme_evidence(theme, candidates[0]["reason"])
+            for theme in candidates[0]["themes"]
+        }
 
     best_perspective = candidates[0]["perspective_score"] if candidates else 0
+    best_score_type = candidates[0]["score_type"] if candidates else "centipawn"
     for index, item in enumerate(candidates, start=1):
         item["rank"] = index
-        item["loss_cp"] = int(max(0, best_perspective - item["perspective_score"]))
-        if item["loss_cp"] >= 150 and "large_eval_drop" not in item["warnings"]:
+        comparison_loss = int(max(0, best_perspective - item["perspective_score"]))
+        item["comparison_loss"] = comparison_loss
+        comparable_cp = best_score_type == "centipawn" and item["score_type"] == "centipawn"
+        item["loss_cp"] = comparison_loss if comparable_cp else None
+        item["near_equal"] = comparable_cp and comparison_loss <= 25
+        if comparison_loss >= 150 and "large_eval_drop" not in item["warnings"]:
             item["warnings"].append("large_eval_drop")
 
     if candidates and candidates[0]["reason"] == "checkmate":
@@ -1010,26 +1082,36 @@ def get_teaching_analysis(
             if item["reason"] != "checkmate" and "misses_mate" not in item["warnings"]:
                 item["warnings"].append("misses_mate")
 
-    position_themes = set()
+    all_candidate_themes = set()
     mistake_warnings = set()
     for item in candidates:
-        position_themes.update(item["themes"])
+        all_candidate_themes.update(item["themes"])
         mistake_warnings.update(item["warnings"])
+    position_themes = set(candidates[0]["themes"] if candidates else [])
 
-    if len(candidates) >= 2 and candidates[1]["loss_cp"] >= 150:
+    comparison_complete = analysis_complete and len(candidates) == len(planned_moves)
+    if not comparison_complete:
+        criticality = "partial"
+    elif len(candidates) >= 2 and candidates[1]["comparison_loss"] >= ONLY_MOVE_LOSS_CP:
         criticality = "only_move"
         position_themes.add("only_move")
-    elif mistake_warnings or (len(candidates) >= 2 and candidates[-1]["loss_cp"] >= 150):
+    elif mistake_warnings or (len(candidates) >= 2 and candidates[-1]["comparison_loss"] >= 150):
         criticality = "sharp"
     else:
         criticality = "normal"
 
     best_reason = candidates[0]["reason"] if candidates else "best_engine_score"
+    position_theme_evidence = dict(
+        candidates[0].get("theme_evidence", {}) if candidates else {}
+    )
+    if "only_move" in position_themes:
+        position_theme_evidence["only_move"] = "supported"
     public_candidates = []
     for item in candidates:
         public_item = dict(item)
         public_item.pop("move_obj", None)
         public_item.pop("perspective_score", None)
+        public_item.pop("comparison_loss", None)
         public_candidates.append(public_item)
 
     if board.fen() != original_fen:
@@ -1039,8 +1121,17 @@ def get_teaching_analysis(
         "candidates": public_candidates,
         "criticality": criticality,
         "position_themes": sorted(position_themes),
+        "candidate_themes": sorted(all_candidate_themes),
         "best_move_reason": best_reason,
+        "best_move_evidence": _reason_evidence(best_reason),
+        "position_theme_evidence": position_theme_evidence,
         "mistake_warnings": sorted(mistake_warnings),
+        "analysis_complete": comparison_complete,
+        "evaluated_candidate_count": sum(
+            item.get("score_status") == "complete" for item in candidates
+        ),
+        "returned_candidate_count": len(candidates),
+        "requested_candidate_count": len(planned_moves),
     }
 
 
@@ -1238,13 +1329,13 @@ def detect_game_phase(board):
         if (piece := board.piece_at(square)) and piece.piece_type in (chess.KNIGHT, chess.BISHOP)
     )
     
-    if total_pieces <= 6:
+    if _is_teaching_endgame(board):
         return "endgame"
     elif (
-        board.fullmove_number <= 3
-        and total_pieces >= 24
+        board.fullmove_number <= 10
+        and total_pieces >= 20
         and (white_queens > 0 or black_queens > 0)
-        and undeveloped_minor_pieces >= 3
+        and undeveloped_minor_pieces >= 1
     ):
         return "opening"
     else:

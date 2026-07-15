@@ -4,7 +4,7 @@ export const TRAINING_PHASES = [
   { id: "endgame", label: "殘局" }
 ];
 
-export const TRAINING_LESSONS = [
+const LESSON_CATALOG = [
   {
     id: "italian-giuoco-piano",
     phase: "opening",
@@ -99,16 +99,17 @@ export const TRAINING_LESSONS = [
   {
     id: "middlegame-center-pressure",
     phase: "middlegame",
-    tags: ["middlegame", "tactics", "calculation", "center"],
+    type: "guided",
+    tags: ["middlegame", "center", "development", "activity"],
     opening: "中局判斷",
-    variation: "中心壓力：發展后支援攻擊",
-    goal: "在戰術還沒直接成立時，找能增加壓力又不丟子的發展手。",
-    startFen: "r1bqkb1r/ppp2ppp/2n5/3np1N1/2B5/8/PPPP1PPP/RNBQK2R w KQkq - 0 6",
-    moves: ["Qf3"],
+    variation: "中心壓力：Re1 支援突破",
+    goal: "在完成王翼發展後，用車支援中心兵，為後續突破做準備。",
+    startFen: "r1bqk2r/ppp2ppp/2np1n2/2b1p3/2B1P3/3P1N2/PPP2PPP/RNBQ1RK1 w kq - 0 6",
+    moves: ["Re1"],
     ideas: [
-      "Qf3 支援 f7 壓力，也連結騎士與主教的攻擊方向。",
-      "中局不一定每步都是將殺；有時候好棋是把更多子力帶進同一個目標。",
-      "如果攻擊還沒成熟，不要只靠一隻棋子衝進去。"
+      "Re1 先保護 e4，讓白方之後更有餘裕準備 c3、d4。",
+      "中局不一定每步都是戰術；先讓子力共同支援中心，通常比單子冒進可靠。",
+      "這個局面有多個近似等價的穩健走法，Re1 是可接受的計畫手，不是唯一解。"
     ]
   },
   {
@@ -129,15 +130,16 @@ export const TRAINING_LESSONS = [
   {
     id: "middlegame-hanging-queen",
     phase: "middlegame",
+    type: "guided",
     tags: ["tactics", "calculation", "king_safety"],
     opening: "中局判斷",
     variation: "后的位置安全",
     goal: "在攻擊前先確認大子不會被低價子或王翼子力追掉。",
     startFen: "7r/4k2p/8/7Q/8/8/8/4K3 w - - 0 1",
-    moves: ["Qh3"],
+    moves: ["Qe5+"],
     ideas: [
       "后很強，但一旦站到容易被追打的位置，攻擊就會變成送子。",
-      "Qh3 先把后帶回安全格，保留後續將軍與側翼壓力。",
+      "Qe5+ 把后轉到中央，同時用將軍取得節奏並保留攻勢。",
       "復盤出現大幅掉分時，先問自己：我的后、車是否被直接攻擊？"
     ]
   },
@@ -159,6 +161,7 @@ export const TRAINING_LESSONS = [
   {
     id: "middlegame-center-break",
     phase: "middlegame",
+    type: "guided",
     tags: ["middlegame", "center", "calculation"],
     opening: "中局判斷",
     variation: "中心突破：d4",
@@ -174,6 +177,7 @@ export const TRAINING_LESSONS = [
   {
     id: "middlegame-pin-pressure",
     phase: "middlegame",
+    type: "guided",
     tags: ["tactics", "calculation", "king_safety"],
     opening: "中局戰術",
     variation: "牽制壓力：Bb5",
@@ -193,17 +197,19 @@ export const TRAINING_LESSONS = [
     opening: "殘局訓練",
     variation: "后王配合：縮小國王空間",
     goal: "用國王支援后的控制，讓對方國王沒有逃生格。",
-    startFen: "7k/6Q1/5K2/8/8/8/8/8 w - - 0 1",
-    moves: ["Kf7#"],
+    startFen: "7k/8/5KQ1/8/8/8/8/8 w - - 0 1",
+    moves: ["Qg7#"],
     ideas: [
       "后很強，但殘局將殺通常需要國王一起控制逃生格。",
-      "Kf7# 不是單純追王，而是用國王封住黑王周圍格子。",
+      "Qg7# 利用白王控制 g7 周圍的關鍵格，讓黑王無法吃后或逃走。",
       "后王殺王的核心是縮小空間，不是一直無目的將軍。"
     ]
   },
   {
     id: "endgame-pawn-promotion",
     phase: "endgame",
+    type: "guided",
+    engineMaxCpLoss: 250,
     tags: ["endgame", "promotion", "conversion"],
     opening: "殘局訓練",
     variation: "通路兵升變",
@@ -219,21 +225,23 @@ export const TRAINING_LESSONS = [
   {
     id: "endgame-rook-activity",
     phase: "endgame",
+    type: "guided",
     tags: ["endgame", "conversion", "activity"],
     opening: "殘局訓練",
     variation: "車的活躍性",
     goal: "在車兵殘局中把車放到主動位置，限制對方王與兵。",
-    startFen: "8/5pk1/6p1/3R4/7P/6P1/5PK1/3r4 w - - 0 1",
+    startFen: "8/5pk1/6p1/3R4/7P/6P1/5PK1/r7 w - - 0 1",
     moves: ["Rd7"],
     ideas: [
       "車兵殘局裡，主動車通常比被動守兵更重要。",
-      "Rd7 讓白車進入第七排，攻擊兵並限制黑王。",
+      "Rd7 讓白車進入第七排，同時攻擊 f7 兵並限制黑王。這是近似等價的主動走法，不是唯一解。",
       "如果復盤殘局常慢慢丟優勢，先練車的活躍位置。"
     ]
   },
   {
     id: "endgame-king-opposition",
     phase: "endgame",
+    type: "guided",
     tags: ["endgame", "conversion", "king_safety"],
     opening: "殘局訓練",
     variation: "王兵殘局：靠近中心",
@@ -249,6 +257,7 @@ export const TRAINING_LESSONS = [
   {
     id: "endgame-king-activation",
     phase: "endgame",
+    type: "guided",
     tags: ["endgame", "conversion", "activity"],
     opening: "殘局訓練",
     variation: "王的活躍化",
@@ -264,16 +273,113 @@ export const TRAINING_LESSONS = [
   {
     id: "endgame-lucena-bridge",
     phase: "endgame",
+    type: "guided",
     tags: ["endgame", "promotion", "conversion"],
     opening: "殘局訓練",
     variation: "車兵升變：架橋概念",
     goal: "在車兵殘局中用車遮擋將軍，幫通路兵完成升變。",
-    startFen: "4K3/4P3/8/8/8/8/4r3/4R1k1 w - - 0 1",
-    moves: ["Rg1+"],
+    startFen: "1K1k4/1P6/8/8/8/8/r7/2R5 w - - 4 1",
+    moves: ["Rd1+", "Ke7", "Rd4", "Ke6", "Kc7", "Rc2+", "Kb6", "Rh2", "Rb4"],
     ideas: [
-      "車兵升變常需要先處理對方車的將軍騷擾。",
-      "Rg1+ 把車放到能遮擋與反將的位置，準備讓兵前進。",
-      "這題不是背完整理論，而是理解車要幫兵擋住檢查線。"
+      "Rd1+ 先把防守方國王趕離升變區，再讓自己的王離開兵前方。",
+      "Rd4 把車預先放到第四橫線；黑車側面將軍時，白王便能逐步靠近。",
+      "最後 Rb4 用車擋住側面將軍，這就是 Lucena 的『架橋』，接著 b 兵可以升變。"
+    ]
+  },
+  {
+    id: "sicilian-black-setup",
+    phase: "opening",
+    type: "opening",
+    difficulty: 2,
+    side: "black",
+    tags: ["opening", "development", "center"],
+    opening: "西西里防禦",
+    variation: "黑方基本發展",
+    goal: "用 ...c5 從側翼反擊中心，再以 ...d6、...Nf6 完成穩健發展。",
+    moves: ["e4", "c5", "Nf3", "d6", "d4", "cxd4", "Nxd4", "Nf6"],
+    ideas: [
+      "...c5 不直接占據中心，而是立刻向 d4 施壓。",
+      "...d6 支援中心並替后翼主教保留發展選擇。",
+      "交換 d4 兵後用 ...Nf6 攻擊 e4，黑方要靠子力活動平衡空間。"
+    ]
+  },
+  {
+    id: "caro-kann-black-center",
+    phase: "opening",
+    type: "opening",
+    difficulty: 2,
+    side: "black",
+    prerequisites: ["sicilian-black-setup"],
+    tags: ["opening", "development", "center"],
+    opening: "卡羅康防禦",
+    variation: "中心交換與主教出子",
+    goal: "用 ...c6、...d5 建立中心，交換後讓后翼主教在兵鏈外發展。",
+    moves: ["e4", "c6", "d4", "d5", "Nc3", "dxe4", "Nxe4", "Bf5"],
+    ideas: [
+      "...c6 的目的不是被動防守，而是準備以 ...d5 挑戰白方中心。",
+      "...dxe4 後要接續發展，不能只顧著守住多出來的兵。",
+      "...Bf5 先把主教放到兵鏈外，是卡羅康常見的發展重點。"
+    ]
+  },
+  {
+    id: "black-back-rank-mate",
+    phase: "middlegame",
+    type: "puzzle",
+    difficulty: 1,
+    side: "black",
+    tags: ["tactics", "checkmate", "king_safety"],
+    opening: "黑方戰術",
+    variation: "底線將殺：Ra1",
+    goal: "從黑方視角辨識白王被自己的兵封住時，車可以直接切入底線。",
+    startFen: "r5k1/5ppp/8/8/8/8/5PPP/6K1 b - - 0 1",
+    moves: ["Ra1#"],
+    ideas: [
+      "先檢查白王是否有逃生格，再確認車進入底線不會被吃。",
+      "從黑方視角練題，可以避免只習慣替白方尋找戰術。",
+      "強迫手的順序仍然是將軍、吃子、威脅。"
     ]
   }
 ];
+
+// Only unchanged, independently reviewed lesson lines may be used by the postgame recommender.
+// Opening lines are manually reviewed; non-opening lines were checked with Stockfish 18 at 50k nodes.
+const VERIFIED_LESSON_LINES = {
+  "italian-giuoco-piano": "opening|start|e4 e5 Nf3 Nc6 Bc4 Bc5 c3 Nf6 d3 d6 O-O",
+  "italian-two-knights": "opening|start|e4 e5 Nf3 Nc6 Bc4 Nf6 d3 Bc5 c3 d6 O-O",
+  "italian-evans-gambit": "opening|start|e4 e5 Nf3 Nc6 Bc4 Bc5 b4 Bxb4 c3 Ba5 d4",
+  "london-system-development": "opening|start|d4 d5 Nf3 Nf6 Bf4 e6 e3 c5 c3 Nc6 Nbd2",
+  "sicilian-alapin-center": "opening|start|e4 c5 c3 Nf6 e5 Nd5 d4 cxd4 Nf3 Nc6 cxd4",
+  "middlegame-scholar-mate": "puzzle|r1bqkb1r/pppp1ppp/2n2n2/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR w KQkq - 4 4|Qxf7#",
+  "middlegame-center-pressure": "guided|r1bqk2r/ppp2ppp/2np1n2/2b1p3/2B1P3/3P1N2/PPP2PPP/RNBQ1RK1 w kq - 0 6|Re1",
+  "middlegame-two-knights-fork": "puzzle|r1bqkb1r/ppp2ppp/2n5/3np1N1/2B5/8/PPPP1PPP/RNBQK2R w KQkq - 0 6|Nxf7",
+  "middlegame-hanging-queen": "guided|7r/4k2p/8/7Q/8/8/8/4K3 w - - 0 1|Qe5+",
+  "middlegame-back-rank-mate": "puzzle|6k1/5ppp/8/8/8/8/5PPP/R5K1 w - - 0 1|Ra8#",
+  "middlegame-center-break": "guided|r1bqk2r/pppp1ppp/2n2n2/2b1p3/2B1P3/2P2N2/PP1P1PPP/RNBQ1RK1 w kq - 4 5|d4",
+  "middlegame-pin-pressure": "guided|r1bqkbnr/pppp1ppp/2n5/4p3/4P3/2N2N2/PPPP1PPP/R1BQKB1R w KQkq - 2 3|Bb5",
+  "endgame-queen-mate-net": "puzzle|7k/8/5KQ1/8/8/8/8/8 w - - 0 1|Qg7#",
+  "endgame-pawn-promotion": "guided|8/4P3/4K3/8/8/8/8/4k3 w - - 0 1|e8=Q",
+  "endgame-rook-activity": "guided|8/5pk1/6p1/3R4/7P/6P1/5PK1/r7 w - - 0 1|Rd7",
+  "endgame-king-opposition": "guided|8/8/4k3/8/4P3/4K3/8/8 w - - 0 1|Kf4",
+  "endgame-king-activation": "guided|8/8/5k2/8/4P3/4K3/8/8 w - - 0 1|Kd4",
+  "endgame-lucena-bridge": "guided|1K1k4/1P6/8/8/8/8/r7/2R5 w - - 4 1|Rd1+ Ke7 Rd4 Ke6 Kc7 Rc2+ Kb6 Rh2 Rb4",
+  "sicilian-black-setup": "opening|start|e4 c5 Nf3 d6 d4 cxd4 Nxd4 Nf6",
+  "caro-kann-black-center": "opening|start|e4 c6 d4 d5 Nc3 dxe4 Nxe4 Bf5",
+  "black-back-rank-mate": "puzzle|r5k1/5ppp/8/8/8/8/5PPP/6K1 b - - 0 1|Ra1#"
+};
+
+function lessonLineSignature(lesson) {
+  return `${lesson.type}|${lesson.startFen || "start"}|${lesson.moves.join(" ")}`;
+}
+
+export const TRAINING_LESSONS = LESSON_CATALOG.map((lesson) => ({
+  type: lesson.phase === "opening" ? "opening" : "puzzle",
+  difficulty: lesson.phase === "endgame" ? 2 : 1,
+  side: "white",
+  prerequisites: [],
+  ...lesson,
+  recommendationVerified: VERIFIED_LESSON_LINES[lesson.id] === lessonLineSignature({
+    type: lesson.type || (lesson.phase === "opening" ? "opening" : "puzzle"),
+    startFen: lesson.startFen,
+    moves: lesson.moves
+  })
+}));
