@@ -1,9 +1,11 @@
 import unittest
 from unittest.mock import Mock, patch
 
+import chess
+import chess.engine
 from fastapi.testclient import TestClient
 
-from api import app
+from api import _stockfish_wdl, app
 
 
 class ApiEndpointTests(unittest.TestCase):
@@ -139,7 +141,8 @@ class ApiEndpointTests(unittest.TestCase):
             teaching_analysis,
         )
 
-    def test_analyze_full_after_make_move(self):
+    @patch("api._find_stockfish_path", return_value=None)
+    def test_analyze_full_after_make_move(self, _find_stockfish_path):
         move_response = self.client.post(
             "/make_move",
             json={"fen": self.make_move_fen, "time_limit": 0.05, "difficulty": "newbie"},
@@ -151,7 +154,28 @@ class ApiEndpointTests(unittest.TestCase):
             json={"pgn": "1. e4 e5 2. Nf3 Nc6", "depth": 1, "perspective": "white"},
         )
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.json()), 5)
+        data = response.json()
+        self.assertEqual(len(data), 5)
+        self.assertTrue(all(item["analysis_source"] == "custom" for item in data))
+        self.assertTrue(all(item["wdl"] is None for item in data))
+
+    def test_stockfish_wdl_is_white_perspective_and_percent_based(self):
+        info = {
+            "wdl": chess.engine.PovWdl(
+                chess.engine.Wdl(wins=71, draws=923, losses=6),
+                chess.WHITE,
+            )
+        }
+
+        self.assertEqual(
+            _stockfish_wdl(info),
+            {
+                "white_win": 7.1,
+                "draw": 92.3,
+                "black_win": 0.6,
+                "expected_score": 53.2,
+            },
+        )
 
     def test_invalid_fen_returns_400(self):
         response = self.client.post("/get_analysis", json={"fen": "invalid fen"})

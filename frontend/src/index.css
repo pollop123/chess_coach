@@ -158,7 +158,7 @@ button:disabled {
 }
 
 .coach-workspace.has-evaluation {
-  grid-template-columns: 44px minmax(320px, 520px) minmax(320px, 420px);
+  grid-template-columns: 72px minmax(320px, 520px) minmax(320px, 420px);
 }
 
 .board-panel,
@@ -523,25 +523,44 @@ button:disabled {
 }
 
 .analysis-card {
-  height: 170px;
+  height: 200px;
   overflow: hidden;
   background: #f7f8f4;
 }
 
 .chart-header {
-  height: 28px;
-  padding: 0 12px;
+  min-height: 46px;
+  padding: 7px 12px 5px;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid var(--line);
   color: #272f2e;
-  font-size: 0.78rem;
-  font-weight: 800;
 }
 
-.chart-header span:last-child {
+.chart-title {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.chart-title strong {
+  font-size: 0.82rem;
+  font-weight: 850;
+}
+
+.chart-title span,
+.chart-summary {
   color: #69746f;
+  font-size: 0.68rem;
   font-weight: 700;
+}
+
+.chart-summary {
+  max-width: 54%;
+  color: var(--forest);
+  text-align: right;
 }
 
 .practice-card {
@@ -700,14 +719,14 @@ button:disabled {
 }
 
 .eval-bar {
-  width: 44px;
+  width: 72px;
   display: flex;
   flex-direction: column;
   align-items: center;
 }
 
 .eval-bar__track {
-  width: 100%;
+  width: 44px;
   height: min(520px, calc(100vw - 40px));
   max-height: 520px;
   min-height: 320px;
@@ -744,6 +763,27 @@ button:disabled {
   transform: translateY(-50%);
 }
 
+.eval-bar__side {
+  position: absolute;
+  z-index: 1;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.66rem;
+  font-weight: 900;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.eval-bar__side.is-black {
+  top: 7px;
+  color: rgba(255, 255, 255, 0.86);
+}
+
+.eval-bar__side.is-white {
+  bottom: 7px;
+  color: #26312e;
+}
+
 .eval-bar__score {
   margin-top: 10px;
   color: var(--muted);
@@ -763,8 +803,21 @@ button:disabled {
 .eval-bar__chance {
   margin-top: 3px;
   color: var(--muted);
-  font-size: 0.74rem;
+  font-size: 0.68rem;
   font-weight: 750;
+  white-space: nowrap;
+}
+
+.eval-bar__wdl {
+  margin-top: 5px;
+  display: grid;
+  gap: 1px;
+  color: var(--muted);
+  font-size: 0.64rem;
+  font-weight: 750;
+  line-height: 1.35;
+  text-align: center;
+  white-space: nowrap;
 }
 
 .chart-tooltip {
@@ -786,6 +839,23 @@ button:disabled {
 
 .chart-tooltip__value {
   font-weight: 850;
+}
+
+.chart-tooltip__judgement {
+  margin-top: 3px;
+  font-weight: 800;
+}
+
+.chart-tooltip__judgement.is-inaccuracy {
+  color: #9a6b25;
+}
+
+.chart-tooltip__judgement.is-mistake {
+  color: #b35f16;
+}
+
+.chart-tooltip__judgement.is-blunder {
+  color: #b23531;
 }
 
 .chart-loading {
@@ -1333,7 +1403,7 @@ button:disabled {
     height: 34px;
     min-height: 34px;
     max-height: 34px;
-    flex-direction: row;
+    flex-direction: row-reverse;
   }
 
   .eval-bar__white,
@@ -1349,6 +1419,26 @@ button:disabled {
     width: 2px;
     height: auto;
     transform: translateX(-50%);
+  }
+
+  .eval-bar__side {
+    top: 50%;
+    bottom: auto;
+    transform: translateY(-50%);
+  }
+
+  .eval-bar__side.is-black {
+    left: 8px;
+  }
+
+  .eval-bar__side.is-white {
+    right: 8px;
+    left: auto;
+  }
+
+  .eval-bar__wdl {
+    display: flex;
+    gap: 12px;
   }
 
   .side-panel {

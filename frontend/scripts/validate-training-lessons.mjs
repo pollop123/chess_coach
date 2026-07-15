@@ -13,6 +13,49 @@ function assert(condition, message) {
   }
 }
 
+function validatePositionSemantics(board, lessonId, fen) {
+  const pieces = board.board().flat().filter(Boolean);
+  const whitePieces = pieces.filter((piece) => piece.color === "w");
+  const blackPieces = pieces.filter((piece) => piece.color === "b");
+  const whiteKings = whitePieces.filter((piece) => piece.type === "k");
+  const blackKings = blackPieces.filter((piece) => piece.type === "k");
+  const whitePawns = whitePieces.filter((piece) => piece.type === "p");
+  const blackPawns = blackPieces.filter((piece) => piece.type === "p");
+
+  assert(whiteKings.length === 1, `${lessonId} must have exactly one white king`);
+  assert(blackKings.length === 1, `${lessonId} must have exactly one black king`);
+  assert(whitePieces.length <= 16 && blackPieces.length <= 16, `${lessonId} has too many pieces`);
+  assert(whitePawns.length <= 8 && blackPawns.length <= 8, `${lessonId} has too many pawns`);
+  assert(
+    [...whitePawns, ...blackPawns].every((piece) => !/[18]$/.test(piece.square)),
+    `${lessonId} has a pawn on the first or eighth rank`
+  );
+
+  const movingColor = board.turn();
+  const nonMovingKing = movingColor === "w" ? blackKings[0] : whiteKings[0];
+  assert(
+    !board.isAttacked(nonMovingKing.square, movingColor),
+    `${lessonId} is invalid because the non-moving king is already in check`
+  );
+
+  const castling = (fen || "").split(" ")[2] || "-";
+  const requiredPieces = {
+    K: [["e1", "k", "w"], ["h1", "r", "w"]],
+    Q: [["e1", "k", "w"], ["a1", "r", "w"]],
+    k: [["e8", "k", "b"], ["h8", "r", "b"]],
+    q: [["e8", "k", "b"], ["a8", "r", "b"]]
+  };
+  for (const right of castling === "-" ? [] : castling) {
+    for (const [square, type, color] of requiredPieces[right] || []) {
+      const piece = board.get(square);
+      assert(
+        piece?.type === type && piece?.color === color,
+        `${lessonId} has impossible ${right} castling rights`
+      );
+    }
+  }
+}
+
 assert(TRAINING_LESSONS.length >= 16, `expected at least 16 lessons, got ${TRAINING_LESSONS.length}`);
 
 for (const lesson of TRAINING_LESSONS) {
@@ -29,6 +72,8 @@ for (const lesson of TRAINING_LESSONS) {
   assert(Array.isArray(lesson.ideas) && lesson.ideas.length >= 2, `${lesson.id} needs learning ideas`);
 
   const board = lesson.startFen ? new Chess(lesson.startFen) : new Chess();
+  validatePositionSemantics(board, lesson.id, lesson.startFen || board.fen());
+  assert(lesson.recommendationVerified, `${lesson.id} changed since its accuracy verification`);
   for (const san of lesson.moves) {
     const move = board.move(san);
     assert(move, `${lesson.id} has illegal SAN ${san} from ${board.fen()}`);

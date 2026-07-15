@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import patch
 
 import chess
 
@@ -36,8 +37,7 @@ class TeachingBenchmarkTests(unittest.TestCase):
         result = teaching_benchmark.run_position(position)
 
         self.assertEqual(result["name"], "opening_development")
-        self.assertIn(result["best_san"], position.expected_best_san)
-        self.assertTrue(result["matched_best"])
+        self.assertTrue(result["structure_valid"])
         self.assertIn("opening_principle", result["position_themes"])
         self.assertIn("development", result["position_themes"])
         self.assertTrue(result["passed"])
@@ -55,9 +55,37 @@ class TeachingBenchmarkTests(unittest.TestCase):
         report = teaching_benchmark.run()
 
         self.assertEqual(report["positions"], len(teaching_benchmark.POSITIONS))
+        self.assertEqual(report["mode"], "structure")
         self.assertIn("pass_rate", report)
-        self.assertGreater(report["passed"], 0)
+        self.assertEqual(report["passed"], report["positions"])
         self.assertIsInstance(report["failures"], list)
+
+    def test_structure_benchmark_rejects_partial_candidate_subset(self):
+        position = teaching_benchmark.POSITIONS_BY_NAME["opening_development"]
+        partial = {
+            "candidates": [{
+                "rank": 1,
+                "san": "Nf3",
+                "score_status": "complete",
+                "score_type": "centipawn",
+                "loss_cp": 0,
+                "warnings": [],
+            }],
+            "analysis_complete": False,
+            "evaluated_candidate_count": 1,
+            "requested_candidate_count": 8,
+            "position_themes": [],
+            "mistake_warnings": [],
+            "criticality": "partial",
+        }
+        with (
+            patch.object(teaching_benchmark.chess_engine, "get_analysis", return_value={}),
+            patch.object(teaching_benchmark.chess_engine, "get_teaching_analysis", return_value=partial),
+        ):
+            result = teaching_benchmark.run_position(position)
+
+        self.assertFalse(result["structure_valid"])
+        self.assertFalse(result["passed"])
 
 
 if __name__ == "__main__":

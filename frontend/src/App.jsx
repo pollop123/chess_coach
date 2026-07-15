@@ -18,6 +18,17 @@ const EvaluationChart = lazy(() => import("./EvaluationChart"));
 
 // 預設走同網域 /api，由 Vite/Nginx 代理到後端；分離部署時可用 VITE_API_URL 覆蓋。
 const API_URL = import.meta.env.VITE_API_URL || "/api";
+const MATE_SCORE_THRESHOLD = 15000;
+
+function calculateEvaluationBarShare(score) {
+  if (Math.abs(score) > MATE_SCORE_THRESHOLD) return score > 0 ? 100 : 0;
+  return Math.round((1000 / (1 + Math.exp(-0.00368 * score)))) / 10;
+}
+
+function formatEvaluationScore(score) {
+  if (Math.abs(score) > MATE_SCORE_THRESHOLD) return score > 0 ? "白方將死" : "黑方將死";
+  return `${score > 0 ? "+" : ""}${(score / 100).toFixed(2)}`;
+}
 
 const BOT_DIFFICULTIES = [
   { id: "newbie", label: "新手", description: "不用開局庫，低深度" },
@@ -93,6 +104,7 @@ function tagsForReviewMove(item) {
 }
 
 function getPracticeRecommendations(analysisData, humanColor, lessons) {
+  const eligibleLessons = lessons.filter((lesson) => lesson.recommendationVerified);
   const humanSide = humanColor === "black" ? "black" : "white";
   const reviewMoves = analysisData
     .filter((item) => item.move && item.side_to_move === humanSide)
@@ -109,11 +121,11 @@ function getPracticeRecommendations(analysisData, humanColor, lessons) {
   if (tagWeights.size === 0) {
     return {
       weaknesses: [],
-      recommendations: [lessons.find((lesson) => lesson.id === "italian-giuoco-piano") || lessons[0]].filter(Boolean)
+      recommendations: [eligibleLessons.find((lesson) => lesson.id === "italian-giuoco-piano") || eligibleLessons[0]].filter(Boolean)
     };
   }
 
-  const rankedLessons = lessons
+  const rankedLessons = eligibleLessons
     .map((lesson) => {
       const score = (lesson.tags || []).reduce((sum, tag) => sum + (tagWeights.get(tag) || 0), 0)
         + (tagWeights.get(lesson.phase) || 0);
@@ -131,7 +143,7 @@ function getPracticeRecommendations(analysisData, humanColor, lessons) {
     weaknesses,
     recommendations: rankedLessons.length
       ? rankedLessons.slice(0, 2).map((item) => item.lesson)
-      : [lessons.find((lesson) => lesson.id === "middlegame-center-pressure") || lessons[0]].filter(Boolean)
+      : [eligibleLessons.find((lesson) => lesson.id === "middlegame-center-pressure") || eligibleLessons[0]].filter(Boolean)
   };
 }
 
@@ -171,8 +183,8 @@ function App() {
   const [botStyle, setBotStyle] = useState("balanced");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
-  // 用來自動捲動聊天室
-  const chatEndRef = useRef(null);
+  // 只捲動聊天室本身，避免 scrollIntoView 帶著整個頁面跳到底部。
+  const chatFeedRef = useRef(null);
 
   // 1. 初始化載入歷史
   useEffect(() => {
@@ -183,7 +195,9 @@ function App() {
 
   // 聊天室自動捲動到底部
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    const chatFeed = chatFeedRef.current;
+    if (!chatFeed) return;
+    chatFeed.scrollTo({ top: chatFeed.scrollHeight, behavior: "smooth" });
   }, [chatHistory]);
 
   useEffect(() => {
@@ -268,6 +282,7 @@ function App() {
       });
 
       setAnalysisData(processedData);
+      setCurrentMoveIndex(processedData.length > 0 ? processedData.length - 1 : -1);
       setStatus("✅ 分析完成！");
     } catch (err) {
       console.error("分析失敗", err);
@@ -290,6 +305,11 @@ function App() {
   const displayFen = (currentMoveIndex !== -1 && analysisData.length > 0)
     ? analysisData[currentMoveIndex].fen
     : game.fen();
+  const selectedReviewIndex = currentMoveIndex >= 0 ? currentMoveIndex : analysisData.length - 1;
+  const selectedReviewPoint = selectedReviewIndex >= 0 ? analysisData[selectedReviewIndex] : null;
+  const selectedWhiteScore = selectedReviewPoint?.rawScore ?? 0;
+  const selectedWdl = selectedReviewPoint?.wdl ?? null;
+  const selectedEvaluationShare = selectedWdl?.expected_score ?? calculateEvaluationBarShare(selectedWhiteScore);
   const phaseLessons = TRAINING_LESSONS.filter((lesson) => lesson.phase === trainingPhase);
   const selectedLesson = TRAINING_LESSONS.find((lesson) => lesson.id === selectedLessonId) || phaseLessons[0] || TRAINING_LESSONS[0];
   const trainingHistory = trainingGame.history();
@@ -620,13 +640,20 @@ function App() {
     document.body.removeChild(element);
   }
 
-  // 勝率條組件
-  function EvaluationBar({ winningChance, evalDisplay }) {
-    const whiteHeight = winningChance;
-    const blackHeight = 100 - winningChance;
+  // 局勢條：Stockfish 可用時顯示 WDL，否則只以評分做視覺比例，不宣稱勝率。
+  function EvaluationBar({ whiteShare, evalDisplay, wdl, analysisSource }) {
+    const whiteHeight = Math.max(0, Math.min(100, whiteShare));
+    const blackHeight = 100 - whiteHeight;
+    const ariaDescription = wdl
+      ? `白勝 ${wdl.white_win.toFixed(1)}%，和棋 ${wdl.draw.toFixed(1)}%，黑勝 ${wdl.black_win.toFixed(1)}%`
+      : "目前僅提供局面評分，未提供勝和負機率";
 
     return (
-      <div className="eval-bar">
+      <div
+        className="eval-bar"
+        role="img"
+        aria-label={`白方局勢評估 ${evalDisplay}，${ariaDescription}`}
+      >
         <div className="eval-bar__track">
           {/* 白方區域 */}
           <div className="eval-bar__white" style={{ height: `${whiteHeight}%`, flexBasis: `${whiteHeight}%` }}>
@@ -638,6 +665,8 @@ function App() {
 
           {/* 中間線 */}
           <div className="eval-bar__midline"></div>
+          <span className="eval-bar__side is-black" aria-hidden="true">黑</span>
+          <span className="eval-bar__side is-white" aria-hidden="true">白</span>
         </div>
 
         {/* 評分顯示 */}
@@ -645,9 +674,17 @@ function App() {
           {evalDisplay}
         </div>
         
-        <div className="eval-bar__chance">
-          {winningChance.toFixed(1)}%
-        </div>
+        {wdl ? (
+          <div className="eval-bar__wdl" title="Stockfish UCI_ShowWDL">
+            <span>白勝 {wdl.white_win.toFixed(1)}%</span>
+            <span>和棋 {wdl.draw.toFixed(1)}%</span>
+            <span>黑勝 {wdl.black_win.toFixed(1)}%</span>
+          </div>
+        ) : (
+          <div className="eval-bar__chance" title={analysisSource === "custom" ? "自製引擎評分" : undefined}>
+            僅評分
+          </div>
+        )}
       </div>
     );
   }
@@ -689,18 +726,10 @@ function App() {
         {/* 勝率條 - 只在賽後分析時顯示 */}
         {analysisData.length > 0 && (
           <EvaluationBar 
-            winningChance={
-              currentMoveIndex >= 0 && analysisData[currentMoveIndex]
-                ? (analysisData[currentMoveIndex].playerScore > 0 
-                    ? 50 + Math.min(analysisData[currentMoveIndex].playerScore / 50, 50) 
-                    : 50 + Math.max(analysisData[currentMoveIndex].playerScore / 50, -50))
-                : 50
-            }
-            evalDisplay={
-              currentMoveIndex >= 0 && analysisData[currentMoveIndex]
-                ? (analysisData[currentMoveIndex].playerScore > 0 ? "+" : "") + (analysisData[currentMoveIndex].playerScore / 100).toFixed(2)
-                : "+0.00"
-            }
+            whiteShare={selectedEvaluationShare}
+            evalDisplay={formatEvaluationScore(selectedWhiteScore)}
+            wdl={selectedWdl}
+            analysisSource={selectedReviewPoint?.analysis_source}
           />
         )}
 
@@ -850,7 +879,7 @@ function App() {
             </div>
 
             {/* 訊息列表 */}
-            <div className="chat-feed">
+            <div className="chat-feed" ref={chatFeedRef}>
               {chatHistory.map((msg, idx) => (
                 <div key={idx} className={`chat-bubble ${msg.role === "user" ? "is-user" : "is-model"}`}>
                   {msg.text}
@@ -861,7 +890,6 @@ function App() {
                   教練正在思考...
                 </div>
               )}
-              <div ref={chatEndRef} />
             </div>
 
             {/* 輸入框 */}
@@ -914,7 +942,7 @@ function App() {
 
               <p className="practice-summary">
                 {practiceRecommendations.weaknesses.length
-                  ? "根據這盤的失誤類型，先補最常出現的弱點。"
+                  ? "根據這盤的失誤階段與掉分幅度推測，先補最可能相關的主題。"
                   : "這盤沒有明顯反覆失誤，建議用基礎開局題維持節奏。"}
               </p>
 

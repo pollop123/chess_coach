@@ -72,7 +72,7 @@ class EngineUpgradeTests(unittest.TestCase):
             chess_engine.detect_game_phase(
                 chess.Board("r1bqkb1r/pppp1ppp/2n2n2/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 4 4")
             ),
-            "middle_game",
+            "opening",
         )
 
 

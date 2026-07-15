@@ -87,24 +87,14 @@ POSITIONS = (
     TeachingPosition(
         name="rook_endgame_activity",
         topic="endgame",
-        fen="8/5pk1/6p1/3R4/7P/6P1/5PK1/3r4 w - - 0 1",
-        expected_best_san=("Rd7", "Rd6", "Rd8"),
+        fen="8/5pk1/6p1/3R4/7P/6P1/5PK1/r7 w - - 0 1",
+        expected_best_san=("Rd7", "Rb5", "Rc5", "h5"),
         expected_themes=("endgame",),
         note="Rook endgame positions should at least be classified as endgames.",
     ),
 )
 
 POSITIONS_BY_NAME = {position.name: position for position in POSITIONS}
-
-
-def _expected_base_move(position):
-    board = chess.Board(position.fen)
-    for san in position.expected_best_san:
-        try:
-            return board.parse_san(san)
-        except ValueError:
-            continue
-    return next(iter(board.legal_moves), None)
 
 
 def _warning_set(teaching_analysis):
@@ -116,12 +106,7 @@ def _warning_set(teaching_analysis):
 
 def run_position(position: TeachingPosition) -> dict:
     board = chess.Board(position.fen)
-    expected_move = _expected_base_move(position)
-    base_analysis = {
-        "best_move": expected_move,
-        "score": 0,
-        "depth": position.depth,
-    }
+    base_analysis = chess_engine.get_analysis(board, depth=position.depth)
     teaching = chess_engine.get_teaching_analysis(
         board,
         base_analysis,
@@ -138,6 +123,19 @@ def run_position(position: TeachingPosition) -> dict:
     matched_themes = expected_themes.issubset(position_themes)
     matched_warnings = expected_warnings.issubset(warnings_found)
     matched_criticality = teaching.get("criticality") in position.expected_criticality
+    candidates = teaching.get("candidates") or []
+    legal_sans = {board.san(move) for move in board.legal_moves}
+    ranks = [item.get("rank") for item in candidates]
+    complete_scores = [item.get("score_status") == "complete" for item in candidates]
+    structure_valid = bool(candidates) and all(
+        item.get("san") in legal_sans for item in candidates
+    ) and ranks == list(range(1, len(candidates) + 1)) and all(complete_scores)
+    structure_valid = structure_valid and bool(teaching.get("analysis_complete"))
+    structure_valid = structure_valid and (
+        teaching.get("evaluated_candidate_count") == teaching.get("requested_candidate_count")
+    )
+    if candidates and candidates[0].get("score_type") == "centipawn":
+        structure_valid = structure_valid and candidates[0].get("loss_cp") == 0
 
     return {
         "name": position.name,
@@ -155,7 +153,8 @@ def run_position(position: TeachingPosition) -> dict:
         "expected_warnings": sorted(expected_warnings),
         "matched_warnings": matched_warnings,
         "candidate_count": len(teaching.get("candidates") or []),
-        "passed": matched_best and matched_themes and matched_warnings and matched_criticality,
+        "structure_valid": structure_valid,
+        "passed": structure_valid,
         "note": position.note,
     }
 
@@ -175,6 +174,7 @@ def run(positions=POSITIONS) -> dict:
         topic_result["pass_rate"] = round(topic_result["passed"] / topic_result["positions"], 3)
 
     return {
+        "mode": "structure",
         "positions": len(results),
         "passed": len(results) - len(failures),
         "failed": len(failures),
