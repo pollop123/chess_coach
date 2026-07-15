@@ -33,6 +33,8 @@ search_stats = {
     "tt_hits": 0,
     "tt_cutoffs": 0,
     "pvs_researches": 0,
+    "lmr_reductions": 0,
+    "lmr_researches": 0,
     "candidate_cache_hits": 0,
     "candidate_bound_skips": 0,
 }
@@ -157,6 +159,8 @@ def begin_search_generation(deadline=None):
         tt_hits=0,
         tt_cutoffs=0,
         pvs_researches=0,
+        lmr_reductions=0,
+        lmr_researches=0,
         candidate_cache_hits=0,
         candidate_bound_skips=0,
     )
@@ -179,6 +183,8 @@ def reset_transposition_table():
         tt_hits=0,
         tt_cutoffs=0,
         pvs_researches=0,
+        lmr_reductions=0,
+        lmr_researches=0,
         candidate_cache_hits=0,
         candidate_bound_skips=0,
     )
@@ -317,6 +323,22 @@ def quiescence_search(board, alpha, beta, q_depth=0, ply_from_root=0):
         if score < beta: beta = score
     return beta
 
+
+def can_late_move_reduce(board, move, depth, move_index):
+    """Return whether a deliberately conservative one-ply LMR is safe to try."""
+    if depth < 4 or move_index < 4 or board.is_check():
+        return False
+    if board.is_capture(move) or move.promotion or board.gives_check(move):
+        return False
+    moving_piece = board.piece_at(move.from_square)
+    if (
+        moving_piece
+        and moving_piece.piece_type == chess.PAWN
+        and chess.square_rank(move.to_square) in {1, 6}
+    ):
+        return False
+    return True
+
 def minimax(
     board,
     depth,
@@ -325,6 +347,7 @@ def minimax(
     maximizing_player,
     ply_from_root=0,
     repetition_counts=None,
+    use_lmr=True,
 ):
     visit_search_node()
     if repetition_counts is None:
@@ -378,24 +401,34 @@ def minimax(
     if maximizing_player:
         max_eval = -math.inf
         for move_index, move in enumerate(moves):
+            reduce_move = use_lmr and can_late_move_reduce(board, move, depth, move_index)
             board.push(move)
             child_hash = push_repetition(repetition_counts, board)
             try:
                 if move_index == 0:
                     eval_score, _ = minimax(
                         board, depth - 1, alpha, beta, False, ply_from_root + 1,
-                        repetition_counts
+                        repetition_counts, use_lmr=use_lmr
                     )
                 else:
+                    search_depth = depth - 2 if reduce_move else depth - 1
+                    if reduce_move:
+                        search_stats["lmr_reductions"] += 1
                     eval_score, _ = minimax(
-                        board, depth - 1, alpha, alpha + 1, False, ply_from_root + 1,
-                        repetition_counts
+                        board, search_depth, alpha, alpha + 1, False, ply_from_root + 1,
+                        repetition_counts, use_lmr=use_lmr
                     )
+                    if reduce_move and eval_score > alpha:
+                        search_stats["lmr_researches"] += 1
+                        eval_score, _ = minimax(
+                            board, depth - 1, alpha, alpha + 1, False, ply_from_root + 1,
+                            repetition_counts, use_lmr=use_lmr
+                        )
                     if alpha < eval_score < beta:
                         search_stats["pvs_researches"] += 1
                         eval_score, _ = minimax(
                             board, depth - 1, alpha, beta, False, ply_from_root + 1,
-                            repetition_counts
+                            repetition_counts, use_lmr=use_lmr
                         )
             finally:
                 pop_repetition(repetition_counts, child_hash)
@@ -418,24 +451,34 @@ def minimax(
     else:
         min_eval = math.inf
         for move_index, move in enumerate(moves):
+            reduce_move = use_lmr and can_late_move_reduce(board, move, depth, move_index)
             board.push(move)
             child_hash = push_repetition(repetition_counts, board)
             try:
                 if move_index == 0:
                     eval_score, _ = minimax(
                         board, depth - 1, alpha, beta, True, ply_from_root + 1,
-                        repetition_counts
+                        repetition_counts, use_lmr=use_lmr
                     )
                 else:
+                    search_depth = depth - 2 if reduce_move else depth - 1
+                    if reduce_move:
+                        search_stats["lmr_reductions"] += 1
                     eval_score, _ = minimax(
-                        board, depth - 1, beta - 1, beta, True, ply_from_root + 1,
-                        repetition_counts
+                        board, search_depth, beta - 1, beta, True, ply_from_root + 1,
+                        repetition_counts, use_lmr=use_lmr
                     )
+                    if reduce_move and eval_score < beta:
+                        search_stats["lmr_researches"] += 1
+                        eval_score, _ = minimax(
+                            board, depth - 1, beta - 1, beta, True, ply_from_root + 1,
+                            repetition_counts, use_lmr=use_lmr
+                        )
                     if alpha < eval_score < beta:
                         search_stats["pvs_researches"] += 1
                         eval_score, _ = minimax(
                             board, depth - 1, alpha, beta, True, ply_from_root + 1,
-                            repetition_counts
+                            repetition_counts, use_lmr=use_lmr
                         )
             finally:
                 pop_repetition(repetition_counts, child_hash)
@@ -471,6 +514,7 @@ def get_pv_line(board, depth):
         else:
             break
     return pv_line
+
 
 def major_piece_loss_after_move(board, move):
     """Return True when a style candidate permits an immediate bad major-piece trade."""
@@ -1143,6 +1187,7 @@ def get_analysis(
     adaptive_depth=True,
     style="balanced",
     difficulty="advanced",
+    use_lmr=True,
 ):
     """
     深度分析棋盤局面
@@ -1155,6 +1200,7 @@ def get_analysis(
         adaptive_depth: 是否在殘局自動加深
         style: balanced 或 trickster
         difficulty: newbie、beginner、intermediate 或 advanced
+        use_lmr: 是否對排序後段的安靜走法嘗試保守型 late-move reduction
     
     Returns:
         dict: {
@@ -1187,6 +1233,8 @@ def get_analysis(
                         'tt_hits': 0,
                         'tt_cutoffs': 0,
                         'pvs_researches': 0,
+                        'lmr_reductions': 0,
+                        'lmr_researches': 0,
                         'candidate_cache_hits': 0,
                         'candidate_bound_skips': 0,
                         'tt_size': len(transposition_table),
@@ -1229,12 +1277,8 @@ def get_analysis(
                 break
             try:
                 score, move = minimax(
-                    board,
-                    current_depth,
-                    -math.inf,
-                    math.inf,
-                    is_maximizing,
-                    repetition_counts=repetition_counts,
+                    board, current_depth, -math.inf, math.inf, is_maximizing,
+                    repetition_counts=repetition_counts, use_lmr=use_lmr,
                 )
             except SearchTimeout:
                 timed_out = True
@@ -1252,6 +1296,7 @@ def get_analysis(
             math.inf,
             is_maximizing,
             repetition_counts=repetition_counts,
+            use_lmr=use_lmr,
         )
         nodes_searched = search_stats["nodes"]
 
@@ -1301,6 +1346,8 @@ def get_analysis(
         'tt_cutoffs': search_stats["tt_cutoffs"],
         'tt_size': len(transposition_table),
         'pvs_researches': search_stats["pvs_researches"],
+        'lmr_reductions': search_stats["lmr_reductions"],
+        'lmr_researches': search_stats["lmr_researches"],
         'candidate_cache_hits': search_stats["candidate_cache_hits"],
         'candidate_bound_skips': search_stats["candidate_bound_skips"],
         'from_book': False,
