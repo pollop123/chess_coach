@@ -62,4 +62,23 @@ const memoryStorage = {
 saveLearningProgress(progress, memoryStorage);
 assert(loadLearningProgress(memoryStorage).lessons.opening.mastery === 3, "saved progress should round-trip");
 
+const localStorageDescriptor = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
+try {
+  Object.defineProperty(globalThis, "localStorage", {
+    configurable: true,
+    get() { throw new DOMException("Storage is blocked", "SecurityError"); }
+  });
+  assert(
+    Object.keys(loadLearningProgress().lessons).length === 0,
+    "blocked localStorage access should fall back to empty progress"
+  );
+  saveLearningProgress(progress);
+} finally {
+  if (localStorageDescriptor) {
+    Object.defineProperty(globalThis, "localStorage", localStorageDescriptor);
+  } else {
+    delete globalThis.localStorage;
+  }
+}
+
 console.log("Validated learning progress, mastery, spaced review, and recommendation routing.");

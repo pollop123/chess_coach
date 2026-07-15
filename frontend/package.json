@@ -10,6 +10,8 @@
     "validate:lessons:portable": "node scripts/validate-training-lessons.mjs",
     "validate:lessons": "npm run validate:lessons:portable && ../.venv/bin/python ../backend/validate_training_lessons.py",
     "validate:lesson-accuracy": "../.venv/bin/python ../backend/validate_training_lessons.py --require-stockfish --nodes 50000",
+    "validate:teaching-smoke": "../.venv/bin/python ../backend/teaching_accuracy_benchmark.py --profile smoke",
+    "validate:teaching-accuracy": "../.venv/bin/python ../backend/teaching_accuracy_benchmark.py --profile release",
     "validate:learning": "node scripts/validate-learning-progress.mjs",
     "preview": "vite preview"
   },
