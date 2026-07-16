@@ -44,6 +44,61 @@ class LateMoveReductionTests(unittest.TestCase):
         self.assertTrue(tactical_board.is_capture(capture))
         self.assertFalse(chess_engine.can_late_move_reduce(tactical_board, capture, 4, 5))
 
+    def test_transposition_table_is_partitioned_by_lmr_mode(self):
+        board = chess.Board(self.FEN)
+        repetition_counts = chess_engine.build_repetition_counts(board)
+        chess_engine.reset_transposition_table()
+        chess_engine.begin_search_generation()
+        reduced = chess_engine.minimax(
+            board,
+            4,
+            -math.inf,
+            math.inf,
+            board.turn == chess.WHITE,
+            repetition_counts=repetition_counts,
+            use_lmr=True,
+        )
+
+        chess_engine.begin_search_generation()
+        cached_reduced = chess_engine.minimax(
+            board,
+            4,
+            -math.inf,
+            math.inf,
+            board.turn == chess.WHITE,
+            repetition_counts=repetition_counts,
+            use_lmr=True,
+        )
+        self.assertEqual(cached_reduced, reduced)
+        self.assertEqual(chess_engine.search_stats["nodes"], 1)
+
+        chess_engine.begin_search_generation()
+        full_after_reduced = chess_engine.minimax(
+            board,
+            4,
+            -math.inf,
+            math.inf,
+            board.turn == chess.WHITE,
+            repetition_counts=repetition_counts,
+            use_lmr=False,
+        )
+        self.assertGreater(chess_engine.search_stats["nodes"], 1)
+        self.assertIn(chess_engine.tt_key(board, True), chess_engine.transposition_table)
+        self.assertIn(chess_engine.tt_key(board, False), chess_engine.transposition_table)
+
+        chess_engine.reset_transposition_table()
+        chess_engine.begin_search_generation()
+        fresh_full = chess_engine.minimax(
+            board,
+            4,
+            -math.inf,
+            math.inf,
+            board.turn == chess.WHITE,
+            repetition_counts=chess_engine.build_repetition_counts(board),
+            use_lmr=False,
+        )
+        self.assertEqual(full_after_reduced, fresh_full)
+
 
 if __name__ == "__main__":
     unittest.main()

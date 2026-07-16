@@ -88,8 +88,9 @@ def visit_search_node():
         raise SearchTimeout
 
 
-def tt_key(board):
-    return chess.polyglot.zobrist_hash(board), board.halfmove_clock
+def tt_key(board, use_lmr=True):
+    """Partition cached search results by position and selective-search mode."""
+    return chess.polyglot.zobrist_hash(board), board.halfmove_clock, bool(use_lmr)
 
 
 def build_repetition_counts(board):
@@ -360,7 +361,7 @@ def minimax(
 
     alpha_original = alpha
     beta_original = beta
-    key = tt_key(board)
+    key = tt_key(board, use_lmr)
     entry = None if is_repetition else transposition_table.get(key)
     tt_move = entry.best_move if entry else None
 
@@ -500,12 +501,12 @@ def minimax(
         return min_eval, best_move
 
 # 🔥 補上：你漏掉了這個函式
-def get_pv_line(board, depth):
+def get_pv_line(board, depth, use_lmr=True):
     """從置換表 (TT) 重建預測變例 (Principal Variation)"""
     pv_line = []
     curr_board = board.copy()
     for _ in range(depth):
-        entry = transposition_table.get(tt_key(curr_board))
+        entry = transposition_table.get(tt_key(curr_board, use_lmr))
 
         if entry and entry.best_move and entry.best_move in curr_board.legal_moves:
             move = entry.best_move
@@ -1331,7 +1332,7 @@ def get_analysis(
             pass
     
     # 提取 PV Line
-    pv_line = get_pv_line(board, final_depth)
+    pv_line = get_pv_line(board, final_depth, use_lmr=use_lmr)
     
     return {
         'best_move': best_move,
