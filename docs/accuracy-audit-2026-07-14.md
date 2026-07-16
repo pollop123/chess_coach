@@ -11,13 +11,15 @@
 > 心法，以及缺少獨立 Stockfish accuracy gate。評估函式亦已拆成獨立
 > `backend/evaluation/` 模組，並保留舊評分行為作為後續改良基線。
 >
-> 修正後驗證：Backend 125 tests、reason benchmark 24/24、teaching
+> 修正後驗證：Backend 135 tests、reason benchmark 24/24、teaching
 > structure benchmark 8/8、21 課程語義驗證與 14 課程 Stockfish 檢查均
 > 通過。23 局面、50,000 nodes 的獨立 Stockfish benchmark 為 top-3
 > 60.9%、最佳著 recall 78.3%；戰術 100%，但 positional top-3 20%、
 > endgame top-3 40%，因此嚴格 `release_ready` 仍為 `false`。目前下一個
-> 重點是提升自製引擎的局面棋與殘局評估，而不是把本文原始問題視為已
-> 全面達成高準確性。
+> 後續已新增兵型、子力活動、車活動與王活動元件；經獨立消融測試後，
+> 預設搜尋只啟用不降低 top-3/recall 且改善殘局候選 MAE 的王活動，
+> 其餘特徵保留為權重 0 的可校準元件。嚴格 `release_ready` 仍為 `false`，
+> 不應把這次改良宣稱為已全面達成高準確性。
 
 ## 1. 執行摘要
 
