@@ -62,6 +62,20 @@ class EngineUpgradeTests(unittest.TestCase):
         self.assertGreater(chess_engine.calculate_winning_chance(500), 50)
         self.assertLess(chess_engine.calculate_winning_chance(-500), 50)
 
+    def test_tactical_subset_order_matches_full_move_order(self):
+        board = chess.Board("4k3/3q4/8/8/8/8/3R4/4K3 w - - 0 1")
+        tactical = [
+            move
+            for move in board.legal_moves
+            if board.is_capture(move) or move.promotion
+        ]
+
+        expected = [move for move in chess_engine.order_moves(board) if move in tactical]
+        actual = chess_engine.order_moves(board, moves=tactical)
+
+        self.assertTrue(actual)
+        self.assertEqual(actual, expected)
+
     def test_game_phase_detection(self):
         self.assertEqual(chess_engine.detect_game_phase(chess.Board()), "opening")
         self.assertEqual(

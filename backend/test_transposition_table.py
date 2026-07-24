@@ -28,6 +28,50 @@ class TranspositionTableTests(unittest.TestCase):
         self.assertEqual(chess_engine.search_stats["nodes"], nodes_after_deep_search + 1)
         self.assertGreater(chess_engine.search_stats["tt_cutoffs"], 0)
 
+    def test_search_can_bypass_transposition_table_completely(self):
+        board = chess.Board()
+        without_tt = chess_engine.minimax(
+            board,
+            2,
+            -math.inf,
+            math.inf,
+            True,
+            use_tt=False,
+        )
+
+        self.assertEqual(chess_engine.transposition_table, {})
+        self.assertEqual(chess_engine.search_stats["tt_hits"], 0)
+        self.assertEqual(chess_engine.search_stats["tt_cutoffs"], 0)
+
+        chess_engine.reset_transposition_table()
+        chess_engine.begin_search_generation()
+        with_tt = chess_engine.minimax(
+            board,
+            2,
+            -math.inf,
+            math.inf,
+            True,
+            use_tt=True,
+        )
+        self.assertEqual(without_tt, with_tt)
+        self.assertTrue(chess_engine.transposition_table)
+
+    def test_analysis_without_tt_does_not_publish_cached_pv(self):
+        board = chess.Board()
+
+        result = chess_engine.get_analysis(
+            board,
+            depth=2,
+            use_book=False,
+            adaptive_depth=False,
+            use_tt=False,
+        )
+
+        self.assertEqual(result["pv"], [])
+        self.assertEqual(result["tt_hits"], 0)
+        self.assertEqual(result["tt_cutoffs"], 0)
+        self.assertEqual(chess_engine.transposition_table, {})
+
     def test_bound_entry_is_not_treated_as_exact(self):
         board = chess.Board()
         chess_engine.minimax(board, 2, -10, 10, True)

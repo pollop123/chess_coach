@@ -1,4 +1,5 @@
 import unittest
+import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
@@ -16,12 +17,77 @@ from teaching_accuracy_benchmark import (
     accuracy_gate,
     candidate_consistency,
     inversion_rate,
+    load_corpus,
+    limit_positions_per_topic,
     profile_search_settings,
+    parse_feature_weights,
     select_positions,
 )
 
 
 class TeachingAccuracyBenchmarkTests(unittest.TestCase):
+    def test_feature_weight_overrides_support_joint_calibration(self):
+        self.assertEqual(
+            parse_feature_weights(
+                ["pawn_structure=50", "piece_activity=75", "rook_activity=-10"]
+            ),
+            {"pawn_structure": 50, "piece_activity": 75, "rook_activity": -10},
+        )
+
+    def test_feature_weight_overrides_reject_unknown_or_extreme_values(self):
+        with self.assertRaises(ValueError):
+            parse_feature_weights(["mobility=50"])
+        with self.assertRaises(ValueError):
+            parse_feature_weights(["pawn_structure=201"])
+        with self.assertRaises(ValueError):
+            parse_feature_weights(["pawn_structure"])
+
+    def test_external_corpus_filters_whole_game_splits(self):
+        payload = {
+            "schema_version": 1,
+            "positions": [
+                {
+                    "name": "train_position",
+                    "fen": chess.STARTING_FEN,
+                    "topic": "opening",
+                    "game_id": "game_train",
+                    "split": "train",
+                },
+                {
+                    "name": "test_position",
+                    "fen": "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2",
+                    "topic": "opening",
+                    "game_id": "game_test",
+                    "split": "test",
+                },
+            ],
+        }
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "corpus.json"
+            path.write_text(json.dumps(payload), encoding="utf-8")
+
+            positions = load_corpus(path, ["test"])
+
+        self.assertEqual(len(positions), 1)
+        self.assertEqual(positions[0].name, "test_position")
+        self.assertEqual(positions[0].game_id, "game_test")
+        self.assertEqual(positions[0].split, "test")
+
+    def test_screening_limit_is_deterministic_per_topic(self):
+        limited = limit_positions_per_topic(POSITIONS, 2)
+
+        counts = {}
+        for position in limited:
+            counts[position.topic] = counts.get(position.topic, 0) + 1
+        self.assertEqual(counts, {
+            "tactics": 2,
+            "endgame": 2,
+            "opening": 2,
+            "positional": 2,
+        })
+        with self.assertRaises(ValueError):
+            limit_positions_per_topic(POSITIONS, 0)
+
     @staticmethod
     def gate(**overrides):
         values = {

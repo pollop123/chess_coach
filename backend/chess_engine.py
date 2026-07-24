@@ -1,4 +1,5 @@
 import chess
+import itertools
 import math
 import chess.polyglot
 import os
@@ -212,8 +213,8 @@ def calculate_winning_chance(score):
     except OverflowError:
         return 100.0 if score > 0 else 0.0
 
-def order_moves(board, tt_best_move=None):
-    moves = list(board.legal_moves)
+def order_moves(board, tt_best_move=None, moves=None):
+    moves = list(board.legal_moves if moves is None else moves)
     
     def score_move(move):
         if move == tt_best_move:
@@ -277,23 +278,45 @@ def evaluate_position(board, ply_from_root=0):
     """Return the modular evaluator's score, phase, and component breakdown."""
     return DEFAULT_EVALUATOR.evaluate(board, ply_from_root)
 
-def quiescence_search(board, alpha, beta, q_depth=0, ply_from_root=0):
+def quiescence_search(
+    board,
+    alpha,
+    beta,
+    q_depth=0,
+    ply_from_root=0,
+    known_nonterminal=False,
+):
     visit_search_node()
-    if board.is_game_over():
+    if not known_nonterminal and board.is_game_over():
         return evaluate_board(board, ply_from_root)
 
     if q_depth > 10:
-        return evaluate_board(board, ply_from_root)
+        if board.is_check():
+            return DEFAULT_EVALUATOR.score_nonterminal(board, ply_from_root)
+        return DEFAULT_EVALUATOR.score_quiet_nonterminal(board, ply_from_root)
 
     in_check = board.is_check()
-    stand_pat = evaluate_board(board, ply_from_root)
+    if in_check:
+        stand_pat = DEFAULT_EVALUATOR.score_nonterminal(board, ply_from_root)
+    else:
+        stand_pat = DEFAULT_EVALUATOR.score_quiet_nonterminal(
+            board, ply_from_root
+        )
     if in_check:
         tactical_moves = order_moves(board)
     else:
-        tactical_moves = [
-            move for move in order_moves(board)
-            if board.is_capture(move) or move.promotion
-        ]
+        promotion_rank = chess.BB_RANK_8 if board.turn == chess.WHITE else chess.BB_RANK_1
+        quiet_promotions = board.generate_legal_moves(
+            from_mask=board.pawns & board.occupied_co[board.turn],
+            to_mask=promotion_rank & ~board.occupied,
+        )
+        tactical_moves = order_moves(
+            board,
+            moves=itertools.chain(
+                board.generate_legal_captures(),
+                quiet_promotions,
+            ),
+        )
 
     if board.turn == chess.WHITE:
         if not in_check:
@@ -340,6 +363,7 @@ def can_late_move_reduce(board, move, depth, move_index):
         return False
     return True
 
+
 def minimax(
     board,
     depth,
@@ -349,6 +373,7 @@ def minimax(
     ply_from_root=0,
     repetition_counts=None,
     use_lmr=True,
+    use_tt=True,
 ):
     visit_search_node()
     if repetition_counts is None:
@@ -361,8 +386,8 @@ def minimax(
 
     alpha_original = alpha
     beta_original = beta
-    key = tt_key(board, use_lmr)
-    entry = None if is_repetition else transposition_table.get(key)
+    key = tt_key(board, use_lmr) if use_tt else None
+    entry = None if is_repetition or not use_tt else transposition_table.get(key)
     tt_move = entry.best_move if entry else None
 
     if entry:
@@ -380,11 +405,18 @@ def minimax(
                 search_stats["tt_cutoffs"] += 1
                 return cached_score, entry.best_move
 
-    if depth == 0 or board.is_game_over():
-        if board.is_game_over():
+    if depth == 0:
+        game_over = board.is_game_over()
+        if game_over:
             val = evaluate_board(board, ply_from_root)
         else:
-            val = quiescence_search(board, alpha, beta, ply_from_root=ply_from_root)
+            val = quiescence_search(
+                board,
+                alpha,
+                beta,
+                ply_from_root=ply_from_root,
+                known_nonterminal=True,
+            )
         
         if val <= alpha_original:
             flag = TT_UPPER
@@ -392,11 +424,32 @@ def minimax(
             flag = TT_LOWER
         else:
             flag = TT_EXACT
-        if not is_repetition:
+        if use_tt and not is_repetition:
             store_tt(key, depth, val, flag, None, ply_from_root)
         return val, None
 
-    moves = order_moves(board, tt_move) 
+    # At interior nodes, asking ``is_game_over()`` and then ordering moves
+    # generates the same legal move set twice.  Draw-only terminal rules are
+    # cheap to check directly; an empty ordered move list covers mate and
+    # stalemate without another traversal.
+    terminal_without_move_exhaustion = (
+        board.is_variant_end()
+        or board.is_insufficient_material()
+        or board.is_seventyfive_moves()
+        or board.is_fivefold_repetition()
+    )
+    if terminal_without_move_exhaustion:
+        val = evaluate_board(board, ply_from_root)
+        if use_tt and not is_repetition:
+            store_tt(key, depth, val, TT_EXACT, None, ply_from_root)
+        return val, None
+
+    moves = order_moves(board, tt_move)
+    if not moves:
+        val = evaluate_board(board, ply_from_root)
+        if use_tt and not is_repetition:
+            store_tt(key, depth, val, TT_EXACT, None, ply_from_root)
+        return val, None
 
     best_move = None
     if maximizing_player:
@@ -409,7 +462,7 @@ def minimax(
                 if move_index == 0:
                     eval_score, _ = minimax(
                         board, depth - 1, alpha, beta, False, ply_from_root + 1,
-                        repetition_counts, use_lmr=use_lmr
+                        repetition_counts, use_lmr=use_lmr, use_tt=use_tt
                     )
                 else:
                     search_depth = depth - 2 if reduce_move else depth - 1
@@ -417,19 +470,19 @@ def minimax(
                         search_stats["lmr_reductions"] += 1
                     eval_score, _ = minimax(
                         board, search_depth, alpha, alpha + 1, False, ply_from_root + 1,
-                        repetition_counts, use_lmr=use_lmr
+                        repetition_counts, use_lmr=use_lmr, use_tt=use_tt
                     )
                     if reduce_move and eval_score > alpha:
                         search_stats["lmr_researches"] += 1
                         eval_score, _ = minimax(
                             board, depth - 1, alpha, alpha + 1, False, ply_from_root + 1,
-                            repetition_counts, use_lmr=use_lmr
+                            repetition_counts, use_lmr=use_lmr, use_tt=use_tt
                         )
                     if alpha < eval_score < beta:
                         search_stats["pvs_researches"] += 1
                         eval_score, _ = minimax(
                             board, depth - 1, alpha, beta, False, ply_from_root + 1,
-                            repetition_counts, use_lmr=use_lmr
+                            repetition_counts, use_lmr=use_lmr, use_tt=use_tt
                         )
             finally:
                 pop_repetition(repetition_counts, child_hash)
@@ -446,7 +499,7 @@ def minimax(
             flag = TT_LOWER
         else:
             flag = TT_EXACT
-        if not is_repetition:
+        if use_tt and not is_repetition:
             store_tt(key, depth, max_eval, flag, best_move, ply_from_root)
         return max_eval, best_move
     else:
@@ -459,7 +512,7 @@ def minimax(
                 if move_index == 0:
                     eval_score, _ = minimax(
                         board, depth - 1, alpha, beta, True, ply_from_root + 1,
-                        repetition_counts, use_lmr=use_lmr
+                        repetition_counts, use_lmr=use_lmr, use_tt=use_tt
                     )
                 else:
                     search_depth = depth - 2 if reduce_move else depth - 1
@@ -467,19 +520,19 @@ def minimax(
                         search_stats["lmr_reductions"] += 1
                     eval_score, _ = minimax(
                         board, search_depth, beta - 1, beta, True, ply_from_root + 1,
-                        repetition_counts, use_lmr=use_lmr
+                        repetition_counts, use_lmr=use_lmr, use_tt=use_tt
                     )
                     if reduce_move and eval_score < beta:
                         search_stats["lmr_researches"] += 1
                         eval_score, _ = minimax(
                             board, depth - 1, beta - 1, beta, True, ply_from_root + 1,
-                            repetition_counts, use_lmr=use_lmr
+                            repetition_counts, use_lmr=use_lmr, use_tt=use_tt
                         )
                     if alpha < eval_score < beta:
                         search_stats["pvs_researches"] += 1
                         eval_score, _ = minimax(
                             board, depth - 1, alpha, beta, True, ply_from_root + 1,
-                            repetition_counts, use_lmr=use_lmr
+                            repetition_counts, use_lmr=use_lmr, use_tt=use_tt
                         )
             finally:
                 pop_repetition(repetition_counts, child_hash)
@@ -496,9 +549,10 @@ def minimax(
             flag = TT_LOWER
         else:
             flag = TT_EXACT
-        if not is_repetition:
+        if use_tt and not is_repetition:
             store_tt(key, depth, min_eval, flag, best_move, ply_from_root)
         return min_eval, best_move
+
 
 # 🔥 補上：你漏掉了這個函式
 def get_pv_line(board, depth, use_lmr=True):
@@ -1189,6 +1243,7 @@ def get_analysis(
     style="balanced",
     difficulty="advanced",
     use_lmr=True,
+    use_tt=True,
 ):
     """
     深度分析棋盤局面
@@ -1202,6 +1257,7 @@ def get_analysis(
         style: balanced 或 trickster
         difficulty: newbie、beginner、intermediate 或 advanced
         use_lmr: 是否對排序後段的安靜走法嘗試保守型 late-move reduction
+        use_tt: 是否使用置換表查找、排序與剪枝
     
     Returns:
         dict: {
@@ -1280,6 +1336,7 @@ def get_analysis(
                 score, move = minimax(
                     board, current_depth, -math.inf, math.inf, is_maximizing,
                     repetition_counts=repetition_counts, use_lmr=use_lmr,
+                    use_tt=use_tt,
                 )
             except SearchTimeout:
                 timed_out = True
@@ -1298,6 +1355,7 @@ def get_analysis(
             is_maximizing,
             repetition_counts=repetition_counts,
             use_lmr=use_lmr,
+            use_tt=use_tt,
         )
         nodes_searched = search_stats["nodes"]
 
@@ -1332,7 +1390,7 @@ def get_analysis(
             pass
     
     # 提取 PV Line
-    pv_line = get_pv_line(board, final_depth, use_lmr=use_lmr)
+    pv_line = get_pv_line(board, final_depth, use_lmr=use_lmr) if use_tt else []
     
     return {
         'best_move': best_move,

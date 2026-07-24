@@ -21,7 +21,13 @@ from .king_safety import middlegame_king_exposure_penalty
 from .material import get_piece_square_value
 from .models import EvaluationResult
 from .pawn_structure import pawn_structure_score
-from .phase import is_endgame, phase_name, strategic_weight_percent
+from .phase import (
+    endgame_weight_percent,
+    is_endgame,
+    middlegame_weight_percent,
+    phase_name,
+    strategic_weight_percent,
+)
 from .piece_activity import piece_activity_score
 from .rook_activity import rook_activity_score
 
@@ -39,10 +45,12 @@ __all__ = [
     "PositionEvaluator",
     "QUEEN_TABLE",
     "ROOK_TABLE",
+    "endgame_weight_percent",
     "get_piece_square_value",
     "is_endgame",
     "king_activity_score",
     "middlegame_king_exposure_penalty",
+    "middlegame_weight_percent",
     "pawn_structure_score",
     "phase_name",
     "piece_activity_score",
