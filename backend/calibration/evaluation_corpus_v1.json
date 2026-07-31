@@ -1,0 +1,4022 @@
+{
+  "schema_version": 1,
+  "generator": "stockfish_selfplay_with_polyglot_openings",
+  "stockfish": "Stockfish 18",
+  "seed": 20260716,
+  "nodes_per_move": 3000,
+  "games": 40,
+  "target_positions": 500,
+  "positions": [
+    {
+      "name": "generated_000_012",
+      "fen": "rn1qkb1r/pp1b1ppp/3ppn2/6B1/3NP3/2N5/PPP2PPP/R2QKB1R w KQkq - 0 7",
+      "topic": "opening",
+      "game_id": "generated_000",
+      "ply": 12,
+      "split": "train"
+    },
+    {
+      "name": "generated_001_012",
+      "fen": "rnbqkb1r/1p3ppp/p2p1n2/4p3/3NP3/2N5/PPP1BPPP/R1BQK2R w KQkq - 0 7",
+      "topic": "opening",
+      "game_id": "generated_001",
+      "ply": 12,
+      "split": "train"
+    },
+    {
+      "name": "generated_002_012",
+      "fen": "r1bq1rk1/ppp1bppp/2np1n2/4p3/2B1P3/3P1N2/PPP2PPP/RNBQR1K1 w - - 0 7",
+      "topic": "opening",
+      "game_id": "generated_002",
+      "ply": 12,
+      "split": "train"
+    },
+    {
+      "name": "generated_003_012",
+      "fen": "rn1qkb1r/pp1b1ppp/4p2n/1BPpP3/8/4B3/PPP2PPP/RN1QK1NR w KQkq - 4 7",
+      "topic": "opening",
+      "game_id": "generated_003",
+      "ply": 12,
+      "split": "train"
+    },
+    {
+      "name": "generated_004_012",
+      "fen": "r1bqkb1r/pp3ppp/2nppn2/8/2BNP3/2N5/PPP2PPP/R1BQK2R w KQkq - 0 7",
+      "topic": "opening",
+      "game_id": "generated_004",
+      "ply": 12,
+      "split": "train"
+    },
+    {
+      "name": "generated_005_012",
+      "fen": "r1bqkb1r/pp1n1ppp/2n1p3/2ppP3/3P4/2PB4/PP1N1PPP/R1BQK1NR w KQkq - 1 7",
+      "topic": "opening",
+      "game_id": "generated_005",
+      "ply": 12,
+      "split": "train"
+    },
+    {
+      "name": "generated_006_012",
+      "fen": "rnbqk2r/pp2bppp/3ppn2/8/3NP3/2N3P1/PPP2P1P/R1BQKB1R w KQkq - 1 7",
+      "topic": "opening",
+      "game_id": "generated_006",
+      "ply": 12,
+      "split": "train"
+    },
+    {
+      "name": "generated_007_012",
+      "fen": "rnb1k2r/pp1pppbp/6p1/q1p5/2PPn3/2N2NP1/PP2PPBP/R1BQK2R w KQkq - 4 7",
+      "topic": "opening",
+      "game_id": "generated_007",
+      "ply": 12,
+      "split": "train"
+    },
+    {
+      "name": "generated_008_012",
+      "fen": "r1bqk2r/pp1nbppp/2pp1n2/4p3/2PPP3/2N2N2/PP2BPPP/R1BQK2R w KQkq - 5 7",
+      "topic": "opening",
+      "game_id": "generated_008",
+      "ply": 12,
+      "split": "train"
+    },
+    {
+      "name": "generated_009_012",
+      "fen": "r2qkb1r/pp1npppp/2p2n2/4Nb2/P1pP4/2N5/1P2PPPP/R1BQKB1R w KQkq - 3 7",
+      "topic": "opening",
+      "game_id": "generated_009",
+      "ply": 12,
+      "split": "train"
+    },
+    {
+      "name": "generated_010_012",
+      "fen": "rn1qk2r/ppp1bppp/5n2/3p1b2/3P1B2/2N1P3/PP3PPP/R2QKBNR w KQkq - 1 7",
+      "topic": "opening",
+      "game_id": "generated_010",
+      "ply": 12,
+      "split": "train"
+    },
+    {
+      "name": "generated_011_012",
+      "fen": "rnbqk2r/ppp1ppbp/1n4p1/8/3PP3/2N2P2/PP4PP/R1BQKBNR w KQkq - 3 7",
+      "topic": "opening",
+      "game_id": "generated_011",
+      "ply": 12,
+      "split": "train"
+    },
+    {
+      "name": "generated_012_012",
+      "fen": "r1bqkb1r/pp3ppp/2np1n2/1N2p3/4P3/2N5/PPP2PPP/R1BQKB1R w KQkq - 0 7",
+      "topic": "opening",
+      "game_id": "generated_012",
+      "ply": 12,
+      "split": "train"
+    },
+    {
+      "name": "generated_013_012",
+      "fen": "r1bqk2r/2ppbppp/p1n2n2/1p2p3/B3P3/5N2/PPPP1PPP/RNBQR1K1 w kq - 0 7",
+      "topic": "opening",
+      "game_id": "generated_013",
+      "ply": 12,
+      "split": "train"
+    },
+    {
+      "name": "generated_014_012",
+      "fen": "rn1qkb1r/pp3ppp/2p1pn2/3p4/2PP4/4PQ1P/PP3PP1/RNB1KB1R w KQkq - 0 7",
+      "topic": "opening",
+      "game_id": "generated_014",
+      "ply": 12,
+      "split": "validation"
+    },
+    {
+      "name": "generated_015_012",
+      "fen": "rn1qkb1r/pp3ppp/2p1pn2/3p4/2PPb2N/2N1P3/PP3PPP/R1BQKB1R w KQkq - 2 7",
+      "topic": "opening",
+      "game_id": "generated_015",
+      "ply": 12,
+      "split": "validation"
+    },
+    {
+      "name": "generated_016_012",
+      "fen": "r2qk2r/ppp2ppp/2p1bn2/2b1p3/4P3/3P1N2/PPPN1PPP/R1BQK2R w KQkq - 2 7",
+      "topic": "opening",
+      "game_id": "generated_016",
+      "ply": 12,
+      "split": "validation"
+    },
+    {
+      "name": "generated_017_012",
+      "fen": "rnbqk2r/pp2b1pp/2pp1n2/4pp2/2P5/1QNP2P1/PP2PPBP/R1B1K1NR w KQkq - 0 7",
+      "topic": "opening",
+      "game_id": "generated_017",
+      "ply": 12,
+      "split": "test"
+    },
+    {
+      "name": "generated_018_012",
+      "fen": "rn1q1rk1/pbpp1ppp/1p2pn2/8/1bPP4/2NBPN2/PP3PPP/R1BQK2R w KQ - 4 7",
+      "topic": "opening",
+      "game_id": "generated_018",
+      "ply": 12,
+      "split": "test"
+    },
+    {
+      "name": "generated_019_012",
+      "fen": "rn1qkb1r/pp3ppp/2p1pn2/5b2/2QP4/5NP1/PP2PP1P/RNB1KB1R w KQkq - 0 7",
+      "topic": "opening",
+      "game_id": "generated_019",
+      "ply": 12,
+      "split": "test"
+    },
+    {
+      "name": "generated_020_012",
+      "fen": "rnbq1rk1/pp2ppbp/3p1np1/2p5/4P3/2P2N2/PP1PBPPP/RNBQR1K1 w - - 4 7",
+      "topic": "opening",
+      "game_id": "generated_020",
+      "ply": 12,
+      "split": "train"
+    },
+    {
+      "name": "generated_021_012",
+      "fen": "rnbqk2r/ppp2pp1/4pb1p/3p4/2PP4/2N2N2/PP2PPPP/R2QKB1R w KQkq - 0 7",
+      "topic": "opening",
+      "game_id": "generated_021",
+      "ply": 12,
+      "split": "train"
+    },
+    {
+      "name": "generated_022_012",
+      "fen": "r1bqk2r/pppn1ppp/5n2/3p2B1/1b1P4/2N2N2/PP2PPPP/R2QKB1R w KQkq - 2 7",
+      "topic": "opening",
+      "game_id": "generated_022",
+      "ply": 12,
+      "split": "train"
+    },
+    {
+      "name": "generated_023_012",
+      "fen": "r1b1kbnr/1pp2ppp/p1p1q3/4p3/4P3/N4N2/PPPP1PPP/R1BQ1RK1 w kq - 4 7",
+      "topic": "opening",
+      "game_id": "generated_023",
+      "ply": 12,
+      "split": "train"
+    },
+    {
+      "name": "generated_024_012",
+      "fen": "rn1qkbnr/pp1bppp1/7p/2ppP3/3P2PP/8/PPPN1P2/R1BQKBNR w KQkq - 0 7",
+      "topic": "opening",
+      "game_id": "generated_024",
+      "ply": 12,
+      "split": "train"
+    },
+    {
+      "name": "generated_025_012",
+      "fen": "r1bqkb1r/1p1n1ppp/2p1pn2/p2p4/2PP4/5NP1/PP2PPBP/RNBQ1RK1 w kq - 0 7",
+      "topic": "opening",
+      "game_id": "generated_025",
+      "ply": 12,
+      "split": "train"
+    },
+    {
+      "name": "generated_026_012",
+      "fen": "rnb1kb1r/pp3ppp/4pn2/3q4/3p4/2P1BN2/PP3PPP/RN1QKB1R w KQkq - 0 7",
+      "topic": "opening",
+      "game_id": "generated_026",
+      "ply": 12,
+      "split": "train"
+    },
+    {
+      "name": "generated_027_012",
+      "fen": "r1bqk2r/pp2ppbp/2np1np1/2p5/4P3/2N3P1/PPPPNPBP/R1BQ1RK1 w kq - 2 7",
+      "topic": "opening",
+      "game_id": "generated_027",
+      "ply": 12,
+      "split": "train"
+    },
+    {
+      "name": "generated_028_012",
+      "fen": "rnbqk2r/3pppbp/p4np1/1PpP4/8/2N1P3/PP3PPP/R1BQKBNR w KQkq - 2 7",
+      "topic": "opening",
+      "game_id": "generated_028",
+      "ply": 12,
+      "split": "train"
+    },
+    {
+      "name": "generated_029_012",
+      "fen": "rnbqk2r/pp4pp/2pbpn2/3p1p2/2PP4/6PN/PP2PPBP/RNBQ1RK1 w kq - 2 7",
+      "topic": "opening",
+      "game_id": "generated_029",
+      "ply": 12,
+      "split": "train"
+    },
+    {
+      "name": "generated_031_012",
+      "fen": "rnb1k2r/pp3ppp/4pn2/2pq4/1b1P4/2N1P3/PPQ2PPP/R1B1KBNR w KQkq - 0 7",
+      "topic": "opening",
+      "game_id": "generated_031",
+      "ply": 12,
+      "split": "train"
+    },
+    {
+      "name": "generated_032_012",
+      "fen": "rnbq1rk1/ppp1bppp/4pn2/3p4/2PP4/5NP1/PP1BPPBP/RN1QK2R w KQ - 6 7",
+      "topic": "opening",
+      "game_id": "generated_032",
+      "ply": 12,
+      "split": "train"
+    },
+    {
+      "name": "generated_034_012",
+      "fen": "r1bqkb1r/pp1p1ppp/2n2n2/2p5/4Pp2/2PP1N2/PP2Q1PP/RNB1KB1R w KQkq - 0 7",
+      "topic": "opening",
+      "game_id": "generated_034",
+      "ply": 12,
+      "split": "validation"
+    },
+    {
+      "name": "generated_035_012",
+      "fen": "r1bqkb1r/pp1n1ppp/2p1pn2/8/2pP4/2NBPN2/PP3PPP/R1BQK2R w KQkq - 0 7",
+      "topic": "opening",
+      "game_id": "generated_035",
+      "ply": 12,
+      "split": "validation"
+    },
+    {
+      "name": "generated_037_012",
+      "fen": "r1bqkb1r/pp2pp1p/2np1np1/8/2Pp4/2N2NP1/PP2PPBP/R1BQK2R w KQkq - 0 7",
+      "topic": "opening",
+      "game_id": "generated_037",
+      "ply": 12,
+      "split": "test"
+    },
+    {
+      "name": "generated_038_012",
+      "fen": "r1bqk1nr/ppp2ppp/2n5/8/1bBpP3/5N2/PP1N1PPP/R1BQK2R w KQkq - 3 7",
+      "topic": "opening",
+      "game_id": "generated_038",
+      "ply": 12,
+      "split": "test"
+    },
+    {
+      "name": "generated_039_012",
+      "fen": "rnbq1rk1/ppp2pbp/3p1np1/4p3/2PPP3/2N2N2/PP2BPPP/R1BQK2R w KQ - 0 7",
+      "topic": "opening",
+      "game_id": "generated_039",
+      "ply": 12,
+      "split": "test"
+    },
+    {
+      "name": "generated_000_016",
+      "fen": "rn1qkb1r/pp3ppp/2bp1n2/1N2p3/4PB2/2N5/PPP2PPP/R2QKB1R w KQkq - 0 9",
+      "topic": "opening",
+      "game_id": "generated_000",
+      "ply": 16,
+      "split": "train"
+    },
+    {
+      "name": "generated_001_016",
+      "fen": "rn1qkb1r/1p3ppp/p4n2/3ppP2/8/2N5/PPP1BPPP/R1BQK2R w KQkq - 0 9",
+      "topic": "opening",
+      "game_id": "generated_001",
+      "ply": 16,
+      "split": "train"
+    },
+    {
+      "name": "generated_002_016",
+      "fen": "r2q1rk1/ppp1b1pp/2nppn2/4p3/4P3/P2P1N2/1PP2PPP/RNBQR1K1 w - - 0 9",
+      "topic": "opening",
+      "game_id": "generated_002",
+      "ply": 16,
+      "split": "train"
+    },
+    {
+      "name": "generated_003_016",
+      "fen": "r2qkb1r/pp1b1ppp/2n1p3/2PpP3/6n1/3BBN2/PPP2PPP/RN1QK2R w KQkq - 8 9",
+      "topic": "opening",
+      "game_id": "generated_003",
+      "ply": 16,
+      "split": "train"
+    },
+    {
+      "name": "generated_004_016",
+      "fen": "2rqkb1r/pp1b1ppp/2nppn2/8/2BNP3/2N1B3/PPPQ1PPP/R3K2R w KQk - 4 9",
+      "topic": "opening",
+      "game_id": "generated_004",
+      "ply": 16,
+      "split": "train"
+    },
+    {
+      "name": "generated_005_016",
+      "fen": "r1bqkb1r/pp1n1ppp/4p3/3pP3/3n4/3B3N/PP1N1PPP/R1BQK2R w KQkq - 0 9",
+      "topic": "opening",
+      "game_id": "generated_005",
+      "ply": 16,
+      "split": "train"
+    },
+    {
+      "name": "generated_006_016",
+      "fen": "rnbqk2r/4bppp/p2ppn2/1p6/3NP3/2N1B1P1/PPP1QP1P/R3KB1R w KQkq - 0 9",
+      "topic": "opening",
+      "game_id": "generated_006",
+      "ply": 16,
+      "split": "train"
+    },
+    {
+      "name": "generated_007_016",
+      "fen": "rnb1k2r/pp1pppbp/6p1/q1n5/2PN4/2NQ2P1/PP2PPBP/R1B1K2R w KQkq - 1 9",
+      "topic": "opening",
+      "game_id": "generated_007",
+      "ply": 16,
+      "split": "train"
+    },
+    {
+      "name": "generated_008_016",
+      "fen": "r1bqk2r/pp1nbpp1/2pp3p/4p3/2PPP1n1/2N1BN2/PP2BPPP/R2Q1RK1 w kq - 2 9",
+      "topic": "opening",
+      "game_id": "generated_008",
+      "ply": 16,
+      "split": "train"
+    },
+    {
+      "name": "generated_009_016",
+      "fen": "3rkb1r/ppqnpppp/2p2n2/5b2/P1NP4/2N3P1/1P2PP1P/R1BQKB1R w KQk - 1 9",
+      "topic": "opening",
+      "game_id": "generated_009",
+      "ply": 16,
+      "split": "train"
+    },
+    {
+      "name": "generated_010_016",
+      "fen": "r1q1k2r/ppp1bppp/2n2n2/3p1b2/3P1B2/1QN1P3/PP2NPPP/R3KB1R w KQkq - 5 9",
+      "topic": "opening",
+      "game_id": "generated_010",
+      "ply": 16,
+      "split": "train"
+    },
+    {
+      "name": "generated_011_016",
+      "fen": "rnbq1rk1/pp2ppbp/1n4p1/2p5/3PPP2/2N1B3/PP4PP/R2QKBNR w KQ - 0 9",
+      "topic": "opening",
+      "game_id": "generated_011",
+      "ply": 16,
+      "split": "train"
+    },
+    {
+      "name": "generated_012_016",
+      "fen": "r1bqkb1r/5ppp/p1np1n2/1p2p3/4P3/N1N1B3/PPP2PPP/R2QKB1R w KQkq - 0 9",
+      "topic": "opening",
+      "game_id": "generated_012",
+      "ply": 16,
+      "split": "train"
+    },
+    {
+      "name": "generated_013_016",
+      "fen": "r2qk2r/2p1bppp/p1np1n2/1p2p3/4P1b1/1BP2N2/PP1P1PPP/RNBQR1K1 w kq - 1 9",
+      "topic": "opening",
+      "game_id": "generated_013",
+      "ply": 16,
+      "split": "train"
+    },
+    {
+      "name": "generated_014_016",
+      "fen": "rn1qkb1r/pp3ppp/5n2/2pp4/3P4/2N1PQ1P/PP3PP1/R1B1KB1R w KQkq - 0 9",
+      "topic": "opening",
+      "game_id": "generated_014",
+      "ply": 16,
+      "split": "validation"
+    },
+    {
+      "name": "generated_015_016",
+      "fen": "rn1qkb1r/pp3ppp/2p2n2/3p1p2/2PP4/2N1PP2/PP4PP/R1BQKB1R w KQkq - 0 9",
+      "topic": "opening",
+      "game_id": "generated_015",
+      "ply": 16,
+      "split": "validation"
+    },
+    {
+      "name": "generated_016_016",
+      "fen": "r3k2r/pppn1ppp/2p1bq2/2b1p3/4P3/2PP1N2/PP1N1PPP/R1BQ1RK1 w kq - 1 9",
+      "topic": "opening",
+      "game_id": "generated_016",
+      "ply": 16,
+      "split": "validation"
+    },
+    {
+      "name": "generated_017_016",
+      "fen": "rnbq1rk1/pp2b1pp/2pp1n2/5p2/2PPp3/1QN2NP1/PP2PPBP/R1B1K2R w KQ - 0 9",
+      "topic": "opening",
+      "game_id": "generated_017",
+      "ply": 16,
+      "split": "test"
+    },
+    {
+      "name": "generated_018_016",
+      "fen": "rn1q1rk1/pbp2ppp/1p2p3/3n4/1b1P4/2NBPN2/PP1B1PPP/R2QK2R w KQ - 0 9",
+      "topic": "opening",
+      "game_id": "generated_018",
+      "ply": 16,
+      "split": "test"
+    },
+    {
+      "name": "generated_019_016",
+      "fen": "rn1qk2r/p3bppp/2p1pn2/1p3b2/2QP4/P1N2NP1/1P2PP1P/R1B1KB1R w KQkq - 0 9",
+      "topic": "opening",
+      "game_id": "generated_019",
+      "ply": 16,
+      "split": "test"
+    },
+    {
+      "name": "generated_020_016",
+      "fen": "r1bq1rk1/pp2ppb1/2np1npp/2p5/4P3/2P2N1P/PP1P1PP1/RNBQRBK1 w - - 0 9",
+      "topic": "opening",
+      "game_id": "generated_020",
+      "ply": 16,
+      "split": "train"
+    },
+    {
+      "name": "generated_021_016",
+      "fen": "rnbq1rk1/1pp2pp1/p3pb1p/3p4/2PP4/2N1PN2/PP3PPP/2RQKB1R w K - 0 9",
+      "topic": "opening",
+      "game_id": "generated_021",
+      "ply": 16,
+      "split": "train"
+    },
+    {
+      "name": "generated_022_016",
+      "fen": "r1bqk2r/pp1n1pp1/2p2n1p/3p2B1/1b1P4/2NBPN2/PP3PPP/R2QK2R w KQkq - 0 9",
+      "topic": "opening",
+      "game_id": "generated_022",
+      "ply": 16,
+      "split": "train"
+    },
+    {
+      "name": "generated_023_016",
+      "fen": "r1b1kb1r/2p2ppp/p1p1q2n/1p2p3/4P3/NP3N2/PBPP1PPP/R2Q1RK1 w kq - 2 9",
+      "topic": "opening",
+      "game_id": "generated_023",
+      "ply": 16,
+      "split": "train"
+    },
+    {
+      "name": "generated_024_016",
+      "fen": "r1q1kbnr/pp1bppp1/2n4p/2PpP3/5PPP/8/PPPN4/R1BQKBNR w KQkq - 1 9",
+      "topic": "opening",
+      "game_id": "generated_024",
+      "ply": 16,
+      "split": "train"
+    },
+    {
+      "name": "generated_025_016",
+      "fen": "r1bqk2r/1p1nbppp/2p1pn2/p7/2pP4/2N3P1/PP1NPPBP/R1BQ1RK1 w kq - 0 9",
+      "topic": "opening",
+      "game_id": "generated_025",
+      "ply": 16,
+      "split": "train"
+    },
+    {
+      "name": "generated_026_016",
+      "fen": "rnb2rk1/pp3ppp/4pn2/3q4/1b1P4/2N1BN2/PP3PPP/R2QKB1R w KQ - 3 9",
+      "topic": "opening",
+      "game_id": "generated_026",
+      "ply": 16,
+      "split": "train"
+    },
+    {
+      "name": "generated_027_016",
+      "fen": "r1b2rk1/pp2ppbp/2np1np1/q1p5/4P3/2NP2PP/PPP1NPB1/R1BQ1RK1 w - - 1 9",
+      "topic": "opening",
+      "game_id": "generated_027",
+      "ply": 16,
+      "split": "train"
+    },
+    {
+      "name": "generated_028_016",
+      "fen": "rnbqk2r/3pppbp/6p1/1NpP4/P3n3/4P3/1P3PPP/R1BQKBNR w KQkq - 1 9",
+      "topic": "opening",
+      "game_id": "generated_028",
+      "ply": 16,
+      "split": "train"
+    },
+    {
+      "name": "generated_029_016",
+      "fen": "rnbq1rk1/1p4pp/2pbpn2/p2p1p2/2PP4/1QN3PN/PP2PPBP/R1B2RK1 w - - 0 9",
+      "topic": "opening",
+      "game_id": "generated_029",
+      "ply": 16,
+      "split": "train"
+    },
+    {
+      "name": "generated_030_016",
+      "fen": "r1bqk2r/2ppbppp/p4n2/n2Pp3/p3P3/5N2/PPP2PPP/RNBQR1K1 w kq - 1 9",
+      "topic": "opening",
+      "game_id": "generated_030",
+      "ply": 16,
+      "split": "train"
+    },
+    {
+      "name": "generated_031_016",
+      "fen": "rn2k2r/pp1b1ppp/4pn2/3q4/1b1N4/2N1P3/PPQ2PPP/R1B1KB1R w KQkq - 1 9",
+      "topic": "opening",
+      "game_id": "generated_031",
+      "ply": 16,
+      "split": "train"
+    },
+    {
+      "name": "generated_032_016",
+      "fen": "rnbq1rk1/p3bppp/1pp1pn2/3p4/2PP4/5NP1/PPQBPPBP/RN3RK1 w - - 0 9",
+      "topic": "opening",
+      "game_id": "generated_032",
+      "ply": 16,
+      "split": "train"
+    },
+    {
+      "name": "generated_033_016",
+      "fen": "r1bqk2r/2p1bppp/p2p1n2/np2p3/P3P3/1B3N2/1PPP1PPP/RNBQR1K1 w kq - 1 9",
+      "topic": "opening",
+      "game_id": "generated_033",
+      "ply": 16,
+      "split": "train"
+    },
+    {
+      "name": "generated_034_016",
+      "fen": "r1bq1rk1/pp1pbppp/2n2n2/2p5/2P1PB2/3P1N2/PP2Q1PP/RN2KB1R w KQ - 1 9",
+      "topic": "opening",
+      "game_id": "generated_034",
+      "ply": 16,
+      "split": "validation"
+    },
+    {
+      "name": "generated_035_016",
+      "fen": "r1bqk2r/p2nbppp/2p1pn2/1p6/2BPP3/2N2N2/PP3PPP/R1BQK2R w KQkq - 0 9",
+      "topic": "opening",
+      "game_id": "generated_035",
+      "ply": 16,
+      "split": "validation"
+    },
+    {
+      "name": "generated_036_016",
+      "fen": "rnq1k2r/ppp1bppp/8/3n1b2/3P1B2/1Q2P3/PP3PPP/R3KBNR w KQkq - 0 9",
+      "topic": "opening",
+      "game_id": "generated_036",
+      "ply": 16,
+      "split": "validation"
+    },
+    {
+      "name": "generated_037_016",
+      "fen": "r1bqk2r/pp3pbp/2np1np1/1N2p1B1/2Pp4/5NP1/PP2PPBP/R2QK2R w KQkq - 2 9",
+      "topic": "opening",
+      "game_id": "generated_037",
+      "ply": 16,
+      "split": "test"
+    },
+    {
+      "name": "generated_038_016",
+      "fen": "r2qk1nr/ppp2ppp/2n1b3/8/2BpP3/5N2/PP1B1PPP/R2Q1RK1 w kq - 1 9",
+      "topic": "opening",
+      "game_id": "generated_038",
+      "ply": 16,
+      "split": "test"
+    },
+    {
+      "name": "generated_039_016",
+      "fen": "r1bq1rk1/pp3pbp/n1pp1np1/3Pp3/2P1P3/2N5/PP1NBPPP/R1BQK2R w KQ - 0 9",
+      "topic": "opening",
+      "game_id": "generated_039",
+      "ply": 16,
+      "split": "test"
+    },
+    {
+      "name": "generated_000_020",
+      "fen": "rn1qkb1r/Np3ppp/p2p1n2/4p3/4b3/2N1B3/PPP2PPP/R2QKB1R w KQkq - 0 11",
+      "topic": "positional",
+      "game_id": "generated_000",
+      "ply": 20,
+      "split": "train"
+    },
+    {
+      "name": "generated_001_020",
+      "fen": "rn1qkb1r/1p3pp1/p4n2/3ppPp1/8/2N5/PPP1BP1P/R1BQK2R w KQkq - 0 11",
+      "topic": "positional",
+      "game_id": "generated_001",
+      "ply": 20,
+      "split": "train"
+    },
+    {
+      "name": "generated_002_020",
+      "fen": "r2q1rk1/pppnb1pp/3pp3/4p1N1/3nP3/P1PP4/1P3PPP/RNBQR1K1 w - - 1 11",
+      "topic": "positional",
+      "game_id": "generated_002",
+      "ply": 20,
+      "split": "train"
+    },
+    {
+      "name": "generated_003_020",
+      "fen": "r2qk2r/pp1b2pp/2n1pp2/2bpP3/5Bn1/3B1N2/PPP1QPPP/RN2K2R w KQkq - 0 11",
+      "topic": "positional",
+      "game_id": "generated_003",
+      "ply": 20,
+      "split": "train"
+    },
+    {
+      "name": "generated_004_020",
+      "fen": "2rqkb1r/pp1b1ppp/3pp3/1N2n3/2B1PBn1/2N5/PPPQ1PPP/R3K2R w KQk - 8 11",
+      "topic": "positional",
+      "game_id": "generated_004",
+      "ply": 20,
+      "split": "train"
+    },
+    {
+      "name": "generated_005_020",
+      "fen": "r1bqkb1r/pp1n1ppp/8/3pPp2/6Q1/7N/PP1N1PPP/R1B1K2R w KQkq - 0 11",
+      "topic": "positional",
+      "game_id": "generated_005",
+      "ply": 20,
+      "split": "train"
+    },
+    {
+      "name": "generated_006_020",
+      "fen": "rnbqk2r/4bppp/p2pp3/8/Pp1Nn3/4B1P1/NPP1QP1P/R3KB1R w KQkq - 0 11",
+      "topic": "positional",
+      "game_id": "generated_006",
+      "ply": 20,
+      "split": "train"
+    },
+    {
+      "name": "generated_007_020",
+      "fen": "r1b2rk1/pp1pppbp/2n3p1/q1n5/2PN4/2N1P1P1/PP3PBP/R1BQK2R w KQ - 1 11",
+      "topic": "positional",
+      "game_id": "generated_007",
+      "ply": 20,
+      "split": "train"
+    },
+    {
+      "name": "generated_008_020",
+      "fen": "r1bq1rk1/pp1nbpp1/2pp1n1p/4p3/2PPP3/2N2N2/PPQBBPPP/R4RK1 w - - 6 11",
+      "topic": "positional",
+      "game_id": "generated_008",
+      "ply": 20,
+      "split": "train"
+    },
+    {
+      "name": "generated_009_020",
+      "fen": "3rkb1r/ppqn1ppp/2p5/3nPb2/P1N2B2/2N3P1/1P2PP1P/R2QKB1R w KQk - 1 11",
+      "topic": "positional",
+      "game_id": "generated_009",
+      "ply": 20,
+      "split": "train"
+    },
+    {
+      "name": "generated_010_020",
+      "fen": "r1q1k2r/ppp1bppp/5nb1/3p4/1n1P1B1P/1QN1P1N1/PP3PP1/R3KB1R w KQkq - 1 11",
+      "topic": "positional",
+      "game_id": "generated_010",
+      "ply": 20,
+      "split": "train"
+    },
+    {
+      "name": "generated_011_020",
+      "fen": "rnbq1rk1/pp3p1p/1n2P1p1/2p5/4PP2/2b1B3/PP4PP/R2QKBNR w KQ - 0 11",
+      "topic": "tactics",
+      "game_id": "generated_011",
+      "ply": 20,
+      "split": "train"
+    },
+    {
+      "name": "generated_012_020",
+      "fen": "r2qkb1r/5ppp/p1npbn2/1N2p3/4P3/2N1BP2/PPP3PP/R2QKB1R w KQkq - 1 11",
+      "topic": "positional",
+      "game_id": "generated_012",
+      "ply": 20,
+      "split": "train"
+    },
+    {
+      "name": "generated_013_020",
+      "fen": "r2qk2r/4bppp/p2p1n2/npp1p3/4P1b1/2PP1N2/PPB2PPP/RNBQR1K1 w kq - 0 11",
+      "topic": "positional",
+      "game_id": "generated_013",
+      "ply": 20,
+      "split": "train"
+    },
+    {
+      "name": "generated_014_020",
+      "fen": "rn1qkb1r/pp3pp1/5n1p/3p4/3p2P1/2N1PQ1P/PP3PB1/R1B1K2R w KQkq - 0 11",
+      "topic": "positional",
+      "game_id": "generated_014",
+      "ply": 20,
+      "split": "validation"
+    },
+    {
+      "name": "generated_015_020",
+      "fen": "rn2kb1r/pp3ppp/2p2n2/3p1p2/2PP4/1qN1PP2/PP1B2PP/R3KB1R w KQkq - 0 11",
+      "topic": "tactics",
+      "game_id": "generated_015",
+      "ply": 20,
+      "split": "validation"
+    },
+    {
+      "name": "generated_016_020",
+      "fen": "r3k2r/pppn1p1p/2p2q2/2b1p1p1/4P3/1bPP1N2/PP3PPP/R1BQR1K1 w kq - 0 11",
+      "topic": "positional",
+      "game_id": "generated_016",
+      "ply": 20,
+      "split": "validation"
+    },
+    {
+      "name": "generated_017_020",
+      "fen": "rn1q1rk1/pp2b1pp/2p1bn2/3p1p2/2PPp3/1QN3P1/PP1NPPBP/R1B2RK1 w - - 2 11",
+      "topic": "positional",
+      "game_id": "generated_017",
+      "ply": 20,
+      "split": "test"
+    },
+    {
+      "name": "generated_018_020",
+      "fen": "rn1q1rk1/pbp2pp1/1p2p2p/3n4/3P4/P1bBPN2/1PQB1PPP/R3K2R w KQ - 0 11",
+      "topic": "positional",
+      "game_id": "generated_018",
+      "ply": 20,
+      "split": "test"
+    },
+    {
+      "name": "generated_019_020",
+      "fen": "rn1q1rk1/p3bpp1/2p1pn1p/1p3b2/3P4/PQN2NP1/1P2PPBP/R1B1K2R w KQ - 2 11",
+      "topic": "positional",
+      "game_id": "generated_019",
+      "ply": 20,
+      "split": "test"
+    },
+    {
+      "name": "generated_020_020",
+      "fen": "r1bq1rk1/pp2ppb1/2n2npp/3p4/3PP3/5N1P/PP3PP1/RNBQRBK1 w - - 0 11",
+      "topic": "positional",
+      "game_id": "generated_020",
+      "ply": 20,
+      "split": "train"
+    },
+    {
+      "name": "generated_021_020",
+      "fen": "rnbq1rk1/2p2pp1/p3pb1p/1p6/2pP3P/2N1PNP1/PP3P2/2RQKB1R w K - 0 11",
+      "topic": "positional",
+      "game_id": "generated_021",
+      "ply": 20,
+      "split": "train"
+    },
+    {
+      "name": "generated_022_020",
+      "fen": "r1bq1rk1/pp3pp1/2p2n1p/3p4/1b1P4/2NBPN2/PP3PPP/R2Q1RK1 w - - 2 11",
+      "topic": "positional",
+      "game_id": "generated_022",
+      "ply": 20,
+      "split": "train"
+    },
+    {
+      "name": "generated_023_020",
+      "fen": "r1b1k2r/2p2ppp/p1pb2qn/1p2p3/2PPP3/NP3N2/PB3PPP/R2Q1RK1 w kq - 1 11",
+      "topic": "positional",
+      "game_id": "generated_023",
+      "ply": 20,
+      "split": "train"
+    },
+    {
+      "name": "generated_024_020",
+      "fen": "r1q1kbnr/pp3pp1/2n1p2p/2PpP3/5PbP/1N6/PPP1N3/R1BQKB1R w KQkq - 0 11",
+      "topic": "positional",
+      "game_id": "generated_024",
+      "ply": 20,
+      "split": "train"
+    },
+    {
+      "name": "generated_025_020",
+      "fen": "r1bqk2r/1p1nbppp/1np1p3/p7/2NP4/1QN3P1/PP2PPBP/R1B2RK1 w kq - 3 11",
+      "topic": "positional",
+      "game_id": "generated_025",
+      "ply": 20,
+      "split": "train"
+    },
+    {
+      "name": "generated_026_020",
+      "fen": "r1b2rk1/pp3ppp/2n1pn2/q7/1b1P4/2N2N2/PP1BBPPP/R2QK2R w KQ - 7 11",
+      "topic": "positional",
+      "game_id": "generated_026",
+      "ply": 20,
+      "split": "train"
+    },
+    {
+      "name": "generated_027_020",
+      "fen": "1rbq1rk1/pp2ppbp/2np1np1/2p5/4PPP1/2NP3P/PPP1N1B1/R1BQ1RK1 w - - 1 11",
+      "topic": "positional",
+      "game_id": "generated_027",
+      "ply": 20,
+      "split": "train"
+    },
+    {
+      "name": "generated_028_020",
+      "fen": "rn2k2r/3pppbp/b5p1/qNpP4/P3n3/3BP3/1P3PPP/R1BQ1KNR w kq - 5 11",
+      "topic": "positional",
+      "game_id": "generated_028",
+      "ply": 20,
+      "split": "train"
+    },
+    {
+      "name": "generated_029_020",
+      "fen": "rnb1qrk1/1pb3pp/2p1pn2/p1Pp1p2/3P4/PQN3PN/1P2PPBP/R1B2RK1 w - - 1 11",
+      "topic": "positional",
+      "game_id": "generated_029",
+      "ply": 20,
+      "split": "train"
+    },
+    {
+      "name": "generated_030_020",
+      "fen": "r1bq1rk1/2p1bppp/p2p1n2/n2PN3/p1P1P3/8/PP3PPP/RNBQR1K1 w - - 0 11",
+      "topic": "positional",
+      "game_id": "generated_030",
+      "ply": 20,
+      "split": "train"
+    },
+    {
+      "name": "generated_031_020",
+      "fen": "rn1qk2r/pp1b1ppp/4pn2/8/1b6/1NN1P3/PPQB1PPP/R3KB1R w KQkq - 5 11",
+      "topic": "positional",
+      "game_id": "generated_031",
+      "ply": 20,
+      "split": "train"
+    },
+    {
+      "name": "generated_032_020",
+      "fen": "rn1q1rk1/1b2bppp/1pp1pn2/p2p4/P1PP4/5NP1/1PQBPPBP/RN1R2K1 w - - 0 11",
+      "topic": "positional",
+      "game_id": "generated_032",
+      "ply": 20,
+      "split": "train"
+    },
+    {
+      "name": "generated_033_020",
+      "fen": "r1bqk2r/2p1bppp/p2p1n2/1Pn1p3/R3P3/5N2/1PPP1PPP/1NBQR1K1 w kq - 2 11",
+      "topic": "positional",
+      "game_id": "generated_033",
+      "ply": 20,
+      "split": "train"
+    },
+    {
+      "name": "generated_034_020",
+      "fen": "r2q1rk1/pp2bppp/2npbn2/2p5/2P1PB2/2NP1N2/PP1Q2PP/R3KB1R w KQ - 2 11",
+      "topic": "positional",
+      "game_id": "generated_034",
+      "ply": 20,
+      "split": "validation"
+    },
+    {
+      "name": "generated_035_020",
+      "fen": "r1b1k2r/p2nbppp/2p1p3/qp1nP3/3P4/2NB1N2/PP3PPP/R1BQK2R w KQkq - 1 11",
+      "topic": "positional",
+      "game_id": "generated_035",
+      "ply": 20,
+      "split": "validation"
+    },
+    {
+      "name": "generated_036_020",
+      "fen": "rnq2rk1/ppp1bppp/5n2/4Bb2/3P4/1Q2P3/PP2NPPP/R3KB1R w KQ - 4 11",
+      "topic": "positional",
+      "game_id": "generated_036",
+      "ply": 20,
+      "split": "validation"
+    },
+    {
+      "name": "generated_037_020",
+      "fen": "r2qk2r/1p3pbp/p1np1np1/1N2p1B1/Q1Pp2b1/6P1/PP1NPPBP/R3K2R w KQkq - 2 11",
+      "topic": "positional",
+      "game_id": "generated_037",
+      "ply": 20,
+      "split": "test"
+    },
+    {
+      "name": "generated_038_020",
+      "fen": "r3k2r/ppp1qppp/2n2n2/8/2BpP3/5N2/PP1B1PPP/R2Q1RK1 w kq - 3 11",
+      "topic": "positional",
+      "game_id": "generated_038",
+      "ply": 20,
+      "split": "test"
+    },
+    {
+      "name": "generated_039_020",
+      "fen": "r1bq1rk1/pp3p2/n1pp1npb/3Pp2p/1PP1P3/2N5/P2NBPPP/1RBQK2R w K - 1 11",
+      "topic": "positional",
+      "game_id": "generated_039",
+      "ply": 20,
+      "split": "test"
+    },
+    {
+      "name": "generated_000_024",
+      "fen": "rn2kb1r/Npq2ppp/p2p1n2/4p3/2B5/2N1B3/PPP2PbP/R2QK1R1 w Qkq - 2 13",
+      "topic": "positional",
+      "game_id": "generated_000",
+      "ply": 24,
+      "split": "train"
+    },
+    {
+      "name": "generated_001_024",
+      "fen": "rn2k2r/1pq2pp1/p4n2/3ppPB1/1b6/2NQ4/PPP1BP1P/R3K2R w KQkq - 3 13",
+      "topic": "positional",
+      "game_id": "generated_001",
+      "ply": 24,
+      "split": "train"
+    },
+    {
+      "name": "generated_002_024",
+      "fen": "r2q1rk1/pppnb1p1/3pp2p/1n2p1N1/P3P2P/2PP4/1P3PP1/RNBQR1K1 w - - 0 13",
+      "topic": "positional",
+      "game_id": "generated_002",
+      "ply": 24,
+      "split": "train"
+    },
+    {
+      "name": "generated_003_024",
+      "fen": "r2q1rk1/pp1b2pp/2n1pp2/2bpP3/5B2/2NB1N1P/PPP1QnP1/R3K2R w KQ - 2 13",
+      "topic": "positional",
+      "game_id": "generated_003",
+      "ply": 24,
+      "split": "train"
+    },
+    {
+      "name": "generated_004_024",
+      "fen": "2r1kb1r/pp1b1ppp/3pp3/1N2n3/4PBn1/2N5/PPPQBqPP/2KR3R w k - 0 13",
+      "topic": "positional",
+      "game_id": "generated_004",
+      "ply": 24,
+      "split": "train"
+    },
+    {
+      "name": "generated_005_024",
+      "fen": "r1bqk2r/pp1n1pbp/6p1/3pPp2/8/6QN/PP1N1PPP/R1B2RK1 w kq - 2 13",
+      "topic": "positional",
+      "game_id": "generated_005",
+      "ply": 24,
+      "split": "train"
+    },
+    {
+      "name": "generated_006_024",
+      "fen": "rn1qk2r/1b2bppp/p3p3/3p4/PN1Nn3/4B1P1/1PP1QPBP/R3K2R w KQkq - 0 13",
+      "topic": "positional",
+      "game_id": "generated_006",
+      "ply": 24,
+      "split": "train"
+    },
+    {
+      "name": "generated_007_024",
+      "fen": "r1b2rk1/1p1pppbp/p1n1n1p1/qN6/2P5/2N1P1P1/PP3PBP/R1BQ1RK1 w - - 0 13",
+      "topic": "positional",
+      "game_id": "generated_007",
+      "ply": 24,
+      "split": "train"
+    },
+    {
+      "name": "generated_008_024",
+      "fen": "r1bq1rk1/pp1nbpp1/2pp3p/4p1n1/2PPP3/1PN2N2/P1QBBPPP/3R1RK1 w - - 1 13",
+      "topic": "positional",
+      "game_id": "generated_008",
+      "ply": 24,
+      "split": "train"
+    },
+    {
+      "name": "generated_009_024",
+      "fen": "3rk2r/ppqn1ppp/3b4/3pPb2/P4B2/6P1/1P2PP1P/R2QKB1R w KQk - 0 13",
+      "topic": "positional",
+      "game_id": "generated_009",
+      "ply": 24,
+      "split": "train"
+    },
+    {
+      "name": "generated_010_024",
+      "fen": "r1q1k2r/pp2bppp/2p2n2/3p4/Qn1P1B1P/2NbP1N1/PP3PP1/2R1KB1R w Kkq - 2 13",
+      "topic": "positional",
+      "game_id": "generated_010",
+      "ply": 24,
+      "split": "train"
+    },
+    {
+      "name": "generated_011_024",
+      "fen": "rn3rk1/pp3p1p/1n2b1p1/2B5/4PP2/2P5/P5PP/R2qKBNR w KQ - 0 13",
+      "topic": "tactics",
+      "game_id": "generated_011",
+      "ply": 24,
+      "split": "train"
+    },
+    {
+      "name": "generated_012_024",
+      "fen": "rq2kb1r/5ppp/1Bnpbn2/1p1Np3/4P3/5P2/PPP3PP/R2QKB1R w KQkq - 2 13",
+      "topic": "positional",
+      "game_id": "generated_012",
+      "ply": 24,
+      "split": "train"
+    },
+    {
+      "name": "generated_013_024",
+      "fen": "r2qk2r/4bppp/p2p1nb1/npp1p3/4P3/2PP1N1P/PPBN1PP1/R1BQR1K1 w kq - 3 13",
+      "topic": "positional",
+      "game_id": "generated_013",
+      "ply": 24,
+      "split": "train"
+    },
+    {
+      "name": "generated_014_024",
+      "fen": "rn2kb1r/pp3pp1/7p/3n4/3p2P1/4P2P/PP3PB1/R1B1K2R w KQkq - 0 13",
+      "topic": "positional",
+      "game_id": "generated_014",
+      "ply": 24,
+      "split": "validation"
+    },
+    {
+      "name": "generated_015_024",
+      "fen": "rn2k2r/p3bppp/1pp2n2/R2p1p2/2PP4/1PN1PP2/1P1B2PP/4KB1R w Kkq - 0 13",
+      "topic": "positional",
+      "game_id": "generated_015",
+      "ply": 24,
+      "split": "validation"
+    },
+    {
+      "name": "generated_016_024",
+      "fen": "r3k2r/pppn1p1p/2p3q1/2b1p1B1/4P1p1/1QPP1N2/PP3PPP/R3R1K1 w kq - 2 13",
+      "topic": "positional",
+      "game_id": "generated_016",
+      "ply": 24,
+      "split": "validation"
+    },
+    {
+      "name": "generated_017_024",
+      "fen": "rn3rk1/pp2b1pp/2p1b3/3q1p2/3Pp3/1Q4P1/PP1NPPBP/R1B2RK1 w - - 0 13",
+      "topic": "tactics",
+      "game_id": "generated_017",
+      "ply": 24,
+      "split": "test"
+    },
+    {
+      "name": "generated_018_024",
+      "fen": "rn1q1rk1/pb3pp1/1p2p2p/2p5/3P4/P1PBPN2/2Q2PPP/R3K2R w KQ - 0 13",
+      "topic": "positional",
+      "game_id": "generated_018",
+      "ply": 24,
+      "split": "test"
+    },
+    {
+      "name": "generated_019_024",
+      "fen": "rn1q1rk1/4bpp1/2p1p2p/pp1n1b2/3P1B2/PQN2NP1/1P2PPBP/R4RK1 w - - 2 13",
+      "topic": "positional",
+      "game_id": "generated_019",
+      "ply": 24,
+      "split": "test"
+    },
+    {
+      "name": "generated_020_024",
+      "fen": "r1bqnrk1/pp2ppb1/6pp/n2pP3/3P4/2N2N1P/PP3PP1/R1BQRBK1 w - - 3 13",
+      "topic": "positional",
+      "game_id": "generated_020",
+      "ply": 24,
+      "split": "train"
+    },
+    {
+      "name": "generated_021_024",
+      "fen": "rn1q1rk1/1bp1bpp1/p3p2p/1p4P1/2pP3P/2N1PN2/PP3P2/2RQKB1R w K - 1 13",
+      "topic": "positional",
+      "game_id": "generated_021",
+      "ply": 24,
+      "split": "train"
+    },
+    {
+      "name": "generated_022_024",
+      "fen": "r1b2rk1/pp2qpp1/2p2n1p/b2pN3/3P4/P1NBP3/1P3PPP/R2Q1RK1 w - - 1 13",
+      "topic": "positional",
+      "game_id": "generated_022",
+      "ply": 24,
+      "split": "train"
+    },
+    {
+      "name": "generated_023_024",
+      "fen": "r1b1k2r/2p2ppp/p1p2bqn/1p6/2PPPP2/NP6/PB4PP/R2Q1RK1 w kq - 1 13",
+      "topic": "positional",
+      "game_id": "generated_023",
+      "ply": 24,
+      "split": "train"
+    },
+    {
+      "name": "generated_024_024",
+      "fen": "r1q1kb1r/pp2npp1/2n1p2p/2PpP2P/5P1R/1N3b2/PPP1N3/R1BQKB2 w Qkq - 3 13",
+      "topic": "positional",
+      "game_id": "generated_024",
+      "ply": 24,
+      "split": "train"
+    },
+    {
+      "name": "generated_025_024",
+      "fen": "r1b1k2r/1p1nbppp/2p1p3/p7/Qq1P4/2N3P1/PP2PPBP/R1B2RK1 w kq - 2 13",
+      "topic": "tactics",
+      "game_id": "generated_025",
+      "ply": 24,
+      "split": "train"
+    },
+    {
+      "name": "generated_026_024",
+      "fen": "r1br1bk1/pp3ppp/2n1pn2/q7/3P4/P1N2N2/1P1BBPPP/R2Q1RK1 w - - 1 13",
+      "topic": "positional",
+      "game_id": "generated_026",
+      "ply": 24,
+      "split": "train"
+    },
+    {
+      "name": "generated_027_024",
+      "fen": "1rbq1rk1/p3ppbp/1pnp2p1/2p1P3/5Pn1/2NP3P/PPP1N1B1/R1B1QRK1 w - - 0 13",
+      "topic": "positional",
+      "game_id": "generated_027",
+      "ply": 24,
+      "split": "train"
+    },
+    {
+      "name": "generated_028_024",
+      "fen": "rn2k2r/3pppbp/1q4p1/1BpP4/P3n3/4P3/1P2NPPP/R1BQ1K1R w kq - 1 13",
+      "topic": "positional",
+      "game_id": "generated_028",
+      "ply": 24,
+      "split": "train"
+    },
+    {
+      "name": "generated_029_024",
+      "fen": "rnb1qrk1/1pb3pp/2p5/p1Pppp2/3P2n1/PQN1B1PN/1P2PPBP/R4RK1 w - - 2 13",
+      "topic": "positional",
+      "game_id": "generated_029",
+      "ply": 24,
+      "split": "train"
+    },
+    {
+      "name": "generated_030_024",
+      "fen": "r1bq1rk1/1np1bppp/p4n2/3Pp3/Q1P1P3/8/PP1B1PPP/RN2R1K1 w - - 2 13",
+      "topic": "positional",
+      "game_id": "generated_030",
+      "ply": 24,
+      "split": "train"
+    },
+    {
+      "name": "generated_031_024",
+      "fen": "r2q1rk1/pp1b1ppp/2n1pn2/8/1b6/1NN1P3/PPQBBPPP/R4RK1 w - - 9 13",
+      "topic": "positional",
+      "game_id": "generated_031",
+      "ply": 24,
+      "split": "train"
+    },
+    {
+      "name": "generated_032_024",
+      "fen": "2rq1rk1/1b2bppp/npp1pn2/p2p4/P1PP1B2/1P3NP1/2Q1PPBP/RN1R2K1 w - - 1 13",
+      "topic": "positional",
+      "game_id": "generated_032",
+      "ply": 24,
+      "split": "train"
+    },
+    {
+      "name": "generated_033_024",
+      "fen": "r2q1rk1/2p1bppp/p2p1n2/1Pn1p3/4P1b1/R1N2N2/1PPP1PPP/2BQR1K1 w - - 6 13",
+      "topic": "positional",
+      "game_id": "generated_033",
+      "ply": 24,
+      "split": "train"
+    },
+    {
+      "name": "generated_034_024",
+      "fen": "r2q1rk1/pp2bppp/2npb3/2p1n3/2P1PB2/2NP1N2/PP1QB1PP/1R2K2R w K - 6 13",
+      "topic": "positional",
+      "game_id": "generated_034",
+      "ply": 24,
+      "split": "validation"
+    },
+    {
+      "name": "generated_035_024",
+      "fen": "r1b1k2r/p2n1ppp/2p1p3/qp2P3/1b1P4/2nB1N2/PP3PPP/R1B1QRK1 w kq - 2 13",
+      "topic": "positional",
+      "game_id": "generated_035",
+      "ply": 24,
+      "split": "validation"
+    },
+    {
+      "name": "generated_036_024",
+      "fen": "rnq2rk1/pp2bppp/2p1bn2/4B3/3P4/PQ2P3/1P2NPPP/2R1KB1R w K - 1 13",
+      "topic": "positional",
+      "game_id": "generated_036",
+      "ply": 24,
+      "split": "validation"
+    },
+    {
+      "name": "generated_037_024",
+      "fen": "2bqk2r/rp3pbp/p1np1np1/4p1B1/Q1PpN3/6P1/PP2PPBP/R3K2R w KQk - 2 13",
+      "topic": "positional",
+      "game_id": "generated_037",
+      "ply": 24,
+      "split": "test"
+    },
+    {
+      "name": "generated_038_024",
+      "fen": "2kr3r/pppnqppp/2n5/4P3/2Bp4/5N2/PP1B1PPP/R2QR1K1 w - - 1 13",
+      "topic": "positional",
+      "game_id": "generated_038",
+      "ply": 24,
+      "split": "test"
+    },
+    {
+      "name": "generated_039_024",
+      "fen": "r1bq1r2/pp3p2/n1pp1npk/3Pp2p/1PP1P3/2N2N2/P3BPPP/1R1QK2R w K - 0 13",
+      "topic": "positional",
+      "game_id": "generated_039",
+      "ply": 24,
+      "split": "test"
+    },
+    {
+      "name": "generated_000_028",
+      "fen": "r3kb1r/Npqn1ppp/p2p1n2/4p1B1/2B5/2NQ1b2/PPP2P1P/R3K1R1 w Qkq - 6 15",
+      "topic": "positional",
+      "game_id": "generated_000",
+      "ply": 28,
+      "split": "train"
+    },
+    {
+      "name": "generated_001_028",
+      "fen": "rn2k2r/1pq2p2/p4p2/3ppP2/8/2bQ4/PPP1BP1P/2KR3R w kq - 0 15",
+      "topic": "positional",
+      "game_id": "generated_001",
+      "ply": 28,
+      "split": "train"
+    },
+    {
+      "name": "generated_002_028",
+      "fen": "r4rk1/pppnq1p1/3pN2p/1n2p3/P3P2b/2PPB3/1P3PP1/RN1QR1K1 w - - 2 15",
+      "topic": "tactics",
+      "game_id": "generated_002",
+      "ply": 28,
+      "split": "train"
+    },
+    {
+      "name": "generated_003_028",
+      "fen": "r2q1r2/pp1b2pk/4pp2/2bpP3/1n3B2/2N2N1P/P1P1QnP1/R3K2R w KQ - 0 15",
+      "topic": "positional",
+      "game_id": "generated_003",
+      "ply": 28,
+      "split": "train"
+    },
+    {
+      "name": "generated_004_028",
+      "fen": "4kb1r/pp1b1p1p/3pp3/4n1p1/4PBn1/2N4P/PPPQBqP1/2KR3R w k - 0 15",
+      "topic": "positional",
+      "game_id": "generated_004",
+      "ply": 28,
+      "split": "train"
+    },
+    {
+      "name": "generated_005_028",
+      "fen": "r1bq1rk1/pp1n1pb1/6pp/3pPp2/8/1N4QN/PP3PPP/R1B1R1K1 w - - 0 15",
+      "topic": "positional",
+      "game_id": "generated_005",
+      "ply": 28,
+      "split": "train"
+    },
+    {
+      "name": "generated_006_028",
+      "fen": "rn1qk2r/1b2bppp/4p3/p7/PN1Np3/2P1B1P1/1P2QP1P/R3K2R w KQkq - 0 15",
+      "topic": "positional",
+      "game_id": "generated_006",
+      "ply": 28,
+      "split": "train"
+    },
+    {
+      "name": "generated_007_028",
+      "fen": "1rbq1rk1/1p1pppbp/p1n1n1p1/8/2P5/2N1P1P1/PP2NPBP/R1BQ1RK1 w - - 4 15",
+      "topic": "positional",
+      "game_id": "generated_007",
+      "ply": 28,
+      "split": "train"
+    },
+    {
+      "name": "generated_008_028",
+      "fen": "r1bq1rk1/pp1nbpp1/3p3p/2pPp3/2P1P3/1PN2B2/P1QB1PPP/3R1RK1 w - - 0 15",
+      "topic": "positional",
+      "game_id": "generated_008",
+      "ply": 28,
+      "split": "train"
+    },
+    {
+      "name": "generated_009_028",
+      "fen": "3rk2r/pp1n1ppp/3P4/3Q1b2/P4B2/6P1/1q2PP1P/R3KB1R w KQk - 0 15",
+      "topic": "positional",
+      "game_id": "generated_009",
+      "ply": 28,
+      "split": "train"
+    },
+    {
+      "name": "generated_010_028",
+      "fen": "r3k2r/pp2bppp/2p1qn2/3p4/1n1P1B1P/2N1P1N1/PP3PP1/2RQ1K1R w kq - 1 15",
+      "topic": "positional",
+      "game_id": "generated_010",
+      "ply": 28,
+      "split": "train"
+    },
+    {
+      "name": "generated_011_028",
+      "fen": "rn2r1k1/pp1b1p1p/1n4p1/1BB5/4PP2/2P5/P5PP/3RK1NR w K - 3 15",
+      "topic": "positional",
+      "game_id": "generated_011",
+      "ply": 28,
+      "split": "train"
+    },
+    {
+      "name": "generated_012_028",
+      "fen": "rq2kb1r/5ppp/1Bbp1n2/3Np3/4P3/5P2/PPP3PP/R2QK2R w KQkq - 0 15",
+      "topic": "positional",
+      "game_id": "generated_012",
+      "ply": 28,
+      "split": "train"
+    },
+    {
+      "name": "generated_013_028",
+      "fen": "r4rk1/2q1bppp/p2p1nb1/npp1p3/4P2N/2PP3P/PPB2PP1/R1BQRNK1 w - - 7 15",
+      "topic": "positional",
+      "game_id": "generated_013",
+      "ply": 28,
+      "split": "train"
+    },
+    {
+      "name": "generated_014_028",
+      "fen": "r3kb1r/pp3pp1/2n5/3B3p/3P2P1/7P/PP3P2/R1B1K2R w KQkq - 0 15",
+      "topic": "endgame",
+      "game_id": "generated_014",
+      "ply": 28,
+      "split": "validation"
+    },
+    {
+      "name": "generated_015_028",
+      "fen": "rn3rk1/p3bppp/1pp5/3n1p2/3P4/1PN1PP2/RP1B2PP/4KB1R w K - 0 15",
+      "topic": "positional",
+      "game_id": "generated_015",
+      "ply": 28,
+      "split": "validation"
+    },
+    {
+      "name": "generated_016_028",
+      "fen": "4k2r/prpn1p1p/2p3q1/2b1N1B1/4P1p1/2PP4/PP3PPP/R3R1K1 w k - 0 15",
+      "topic": "tactics",
+      "game_id": "generated_016",
+      "ply": 28,
+      "split": "validation"
+    },
+    {
+      "name": "generated_017_028",
+      "fen": "r4rk1/1Q1nb1pp/2p1b3/p2q1p2/3Pp3/1N4P1/PP2PPBP/R1B2RK1 w - - 0 15",
+      "topic": "tactics",
+      "game_id": "generated_017",
+      "ply": 28,
+      "split": "test"
+    },
+    {
+      "name": "generated_018_028",
+      "fen": "rn1q1r1k/pb4pB/1p2p2p/2p1Np2/3P4/P1P1P3/2Q2PPP/R3K2R w KQ - 0 15",
+      "topic": "positional",
+      "game_id": "generated_018",
+      "ply": 28,
+      "split": "test"
+    },
+    {
+      "name": "generated_019_028",
+      "fen": "rn1q1rk1/4bpp1/2p1p2p/1p3b2/p2P1n2/P1N2NP1/1P2PPBP/R1RQ2K1 w - - 0 15",
+      "topic": "positional",
+      "game_id": "generated_019",
+      "ply": 28,
+      "split": "test"
+    },
+    {
+      "name": "generated_020_028",
+      "fen": "r1bq1rk1/ppn1ppb1/7p/n2pP1p1/3P3N/2N4P/PP1B1PP1/R2QRBK1 w - - 0 15",
+      "topic": "positional",
+      "game_id": "generated_020",
+      "ply": 28,
+      "split": "train"
+    },
+    {
+      "name": "generated_021_028",
+      "fen": "rn1q1rk1/1bp1bp2/p3p1p1/1p2N1Pp/2pP3P/2N1P3/PP3P2/2RQKBR1 w - - 0 15",
+      "topic": "positional",
+      "game_id": "generated_021",
+      "ply": 28,
+      "split": "train"
+    },
+    {
+      "name": "generated_022_028",
+      "fen": "r1br2k1/pp2qpp1/5n1p/b1ppN3/3P1P2/P1N1P3/1PB3PP/R2Q1RK1 w - - 0 15",
+      "topic": "positional",
+      "game_id": "generated_022",
+      "ply": 28,
+      "split": "train"
+    },
+    {
+      "name": "generated_023_028",
+      "fen": "r1b2rk1/2p2ppp/p1p2bq1/1p3n2/2PPP3/1P6/PBN3PP/R2Q1RK1 w - - 0 15",
+      "topic": "positional",
+      "game_id": "generated_023",
+      "ply": 28,
+      "split": "train"
+    },
+    {
+      "name": "generated_024_028",
+      "fen": "r1q1kb1r/pp3pp1/2n1p2p/2PpPn1P/5Pb1/1N6/PPP1N2R/R1BQKB2 w Qkq - 7 15",
+      "topic": "positional",
+      "game_id": "generated_024",
+      "ply": 28,
+      "split": "train"
+    },
+    {
+      "name": "generated_025_028",
+      "fen": "r1b2rk1/1p1nbppp/2p1p3/8/pq1P4/2N3P1/PPQ1PPBP/R1BR2K1 w - - 0 15",
+      "topic": "positional",
+      "game_id": "generated_025",
+      "ply": 28,
+      "split": "train"
+    },
+    {
+      "name": "generated_026_028",
+      "fen": "r1br1b1k/pp3ppp/2n1pN2/5q2/3P4/P4N2/1P1BBPPP/R2Q1RK1 w - - 1 15",
+      "topic": "positional",
+      "game_id": "generated_026",
+      "ply": 28,
+      "split": "train"
+    },
+    {
+      "name": "generated_027_028",
+      "fen": "1r1q1rk1/pb3pbp/1pnp2p1/2p5/5PP1/2NP4/PPP1N1B1/R1B1QRK1 w - - 0 15",
+      "topic": "positional",
+      "game_id": "generated_027",
+      "ply": 28,
+      "split": "train"
+    },
+    {
+      "name": "generated_028_028",
+      "fen": "rn2k2r/3p1pbp/1q2pnp1/2pP4/P7/2NBP3/1P3PPP/R1BQ1K1R w kq - 0 15",
+      "topic": "positional",
+      "game_id": "generated_028",
+      "ply": 28,
+      "split": "train"
+    },
+    {
+      "name": "generated_029_028",
+      "fen": "rnb1qrk1/1pb3pp/2p2n2/p1Pp1p2/3Pp3/PQN2PPN/1P1BP1BP/R4RK1 w - - 1 15",
+      "topic": "positional",
+      "game_id": "generated_029",
+      "ply": 28,
+      "split": "train"
+    },
+    {
+      "name": "generated_030_028",
+      "fen": "1rbq1rk1/1np1bppp/p7/3Pp3/Q1P1P1n1/2N1B3/PP3PPP/R3R1K1 w - - 6 15",
+      "topic": "positional",
+      "game_id": "generated_030",
+      "ply": 28,
+      "split": "train"
+    },
+    {
+      "name": "generated_031_028",
+      "fen": "r2q1rk1/pp1bbppp/2n1pn2/1N6/8/PN2P3/1PQBBPPP/R4RK1 w - - 3 15",
+      "topic": "positional",
+      "game_id": "generated_031",
+      "ply": 28,
+      "split": "train"
+    },
+    {
+      "name": "generated_032_028",
+      "fen": "2rq1rk1/1b2bppp/nppnp3/p2p4/P1PP1B2/1P3NP1/1Q1NPPBP/R2R2K1 w - - 5 15",
+      "topic": "positional",
+      "game_id": "generated_032",
+      "ply": 28,
+      "split": "train"
+    },
+    {
+      "name": "generated_033_028",
+      "fen": "3q1rk1/2p1bppp/r2pnn2/1P2p3/1P2P1b1/2N2N2/2PP1PPP/2BQR1K1 w - - 0 15",
+      "topic": "tactics",
+      "game_id": "generated_033",
+      "ply": 28,
+      "split": "train"
+    },
+    {
+      "name": "generated_034_028",
+      "fen": "r2q1rk1/p3bppp/1pnpb3/2p5/2P1PB2/2NP1B2/PP1Q2PP/1R3RK1 w - - 0 15",
+      "topic": "positional",
+      "game_id": "generated_034",
+      "ply": 28,
+      "split": "validation"
+    },
+    {
+      "name": "generated_035_028",
+      "fen": "r1b1k2r/p2n1ppp/2p1p3/q3P3/1p1P4/2bB1N2/P2B1PPP/R3QRK1 w kq - 0 15",
+      "topic": "positional",
+      "game_id": "generated_035",
+      "ply": 28,
+      "split": "validation"
+    },
+    {
+      "name": "generated_036_028",
+      "fen": "r1q2rk1/pp2bppp/2p1bn2/4n3/3P1N2/P3P3/1P3PPP/2RQKB1R w K - 0 15",
+      "topic": "positional",
+      "game_id": "generated_036",
+      "ply": 28,
+      "split": "validation"
+    },
+    {
+      "name": "generated_037_028",
+      "fen": "2bq1rk1/rp3pbp/p1n2np1/2Ppp1B1/QP1pN3/6P1/P3PPBP/R3K2R w KQ - 0 15",
+      "topic": "positional",
+      "game_id": "generated_037",
+      "ply": 28,
+      "split": "test"
+    },
+    {
+      "name": "generated_038_028",
+      "fen": "2kr3r/pppn2pp/2n1p3/2q3B1/2Bp4/5N2/PP3PPP/R2QR1K1 w - - 2 15",
+      "topic": "tactics",
+      "game_id": "generated_038",
+      "ply": 28,
+      "split": "test"
+    },
+    {
+      "name": "generated_039_028",
+      "fen": "r2q1r2/p2b1p2/n1pp1npk/4p1Np/1PP1P3/2N5/P3BPPP/1R1QK2R w K - 0 15",
+      "topic": "positional",
+      "game_id": "generated_039",
+      "ply": 28,
+      "split": "test"
+    },
+    {
+      "name": "generated_000_032",
+      "fen": "r4b1r/Npqn1k1p/p2p1p2/4p3/8/2NQ1b2/PPP2P1P/R3K1R1 w Q - 0 17",
+      "topic": "positional",
+      "game_id": "generated_000",
+      "ply": 32,
+      "split": "train"
+    },
+    {
+      "name": "generated_001_032",
+      "fen": "r3k2r/1p3p2/p1n2p2/3ppP2/8/2P5/P1P1BP1P/2KR3R w kq - 1 17",
+      "topic": "endgame",
+      "game_id": "generated_001",
+      "ply": 32,
+      "split": "train"
+    },
+    {
+      "name": "generated_002_032",
+      "fen": "5rk1/pppnq1p1/3p3p/1n2p3/P3P3/2PP4/1P3BP1/RN1QR1K1 w - - 0 17",
+      "topic": "positional",
+      "game_id": "generated_002",
+      "ply": 32,
+      "split": "train"
+    },
+    {
+      "name": "generated_003_032",
+      "fen": "r2qbr2/pp4pk/4pp2/2bpP3/1n3B1N/2N4P/P1P1Q1P1/2KR3n w - - 2 17",
+      "topic": "positional",
+      "game_id": "generated_003",
+      "ply": 32,
+      "split": "train"
+    },
+    {
+      "name": "generated_004_032",
+      "fen": "4kb1r/pp1b1p1p/3pp2n/2q1n1B1/4P3/2N4P/PPPQB1P1/2KR1R2 w k - 3 17",
+      "topic": "positional",
+      "game_id": "generated_004",
+      "ply": 32,
+      "split": "train"
+    },
+    {
+      "name": "generated_005_032",
+      "fen": "r1bq1rk1/1p1n1pb1/6pp/3pPp2/p4P2/1N2B1QN/PP4PP/R3R1K1 w - - 0 17",
+      "topic": "positional",
+      "game_id": "generated_005",
+      "ply": 32,
+      "split": "train"
+    },
+    {
+      "name": "generated_006_032",
+      "fen": "rn3rk1/1b1qbppp/4p3/pQ6/P2Np3/2P1B1P1/1PN2P1P/R3K2R w KQ - 4 17",
+      "topic": "tactics",
+      "game_id": "generated_006",
+      "ply": 32,
+      "split": "train"
+    },
+    {
+      "name": "generated_007_032",
+      "fen": "1rbq1rk1/1p2ppbp/p2pn1p1/8/PnP5/2N1P1P1/RP2NPBP/2BQ1RK1 w - - 2 17",
+      "topic": "positional",
+      "game_id": "generated_007",
+      "ply": 32,
+      "split": "train"
+    },
+    {
+      "name": "generated_008_032",
+      "fen": "r1bq1rk1/1p2bpp1/p2p1n1p/2pPp3/2P1P3/1PN3P1/P1QBBP1P/3R1RK1 w - - 2 17",
+      "topic": "positional",
+      "game_id": "generated_008",
+      "ply": 32,
+      "split": "train"
+    },
+    {
+      "name": "generated_009_032",
+      "fen": "3rk2r/pp1n1ppp/3Pb3/1Q6/P4B2/q5P1/4PP1P/3RKB1R w Kk - 4 17",
+      "topic": "positional",
+      "game_id": "generated_009",
+      "ply": 32,
+      "split": "train"
+    },
+    {
+      "name": "generated_010_032",
+      "fen": "r3k2r/pp2bp1p/n1p1qnp1/3p4/3P1B1P/P1NQP1N1/1P3PP1/2R2K1R w kq - 0 17",
+      "topic": "positional",
+      "game_id": "generated_010",
+      "ply": 32,
+      "split": "train"
+    },
+    {
+      "name": "generated_011_032",
+      "fen": "rn2r1k1/pp1b1p1p/6p1/8/4PP2/B1nB4/P5PP/3RK1NR w K - 0 17",
+      "topic": "positional",
+      "game_id": "generated_011",
+      "ply": 32,
+      "split": "train"
+    },
+    {
+      "name": "generated_012_032",
+      "fen": "r4b1r/2Nk1ppp/1qbp1n2/4p3/2P1P3/5P2/PP4PP/R2QK2R w KQ - 0 17",
+      "topic": "tactics",
+      "game_id": "generated_012",
+      "ply": 32,
+      "split": "train"
+    },
+    {
+      "name": "generated_013_032",
+      "fen": "1r2r1k1/2q1bppp/p2p1nb1/npp1pN2/4P3/2PPN2P/PPB2PP1/R1BQR1K1 w - - 11 17",
+      "topic": "positional",
+      "game_id": "generated_013",
+      "ply": 32,
+      "split": "train"
+    },
+    {
+      "name": "generated_014_032",
+      "fen": "3rkb1r/p4pp1/2p5/7p/3P2P1/4B2P/PP3P2/R3K2R w KQk - 0 17",
+      "topic": "endgame",
+      "game_id": "generated_014",
+      "ply": 32,
+      "split": "validation"
+    },
+    {
+      "name": "generated_015_032",
+      "fen": "rn3rk1/p4ppp/1p6/3p1p2/3P3b/1P2PPP1/RP1B3P/4KB1R w K - 0 17",
+      "topic": "endgame",
+      "game_id": "generated_015",
+      "ply": 32,
+      "split": "validation"
+    },
+    {
+      "name": "generated_016_032",
+      "fen": "4k3/prpn1p2/2p3p1/2b3Br/3PP1p1/2P5/PP3PPP/R3R1K1 w - - 1 17",
+      "topic": "endgame",
+      "game_id": "generated_016",
+      "ply": 32,
+      "split": "validation"
+    },
+    {
+      "name": "generated_017_032",
+      "fen": "r4rk1/1QBnb3/2p1b2p/p2q1pp1/3Pp3/1N4P1/PP2PPBP/R4RK1 w - - 0 17",
+      "topic": "tactics",
+      "game_id": "generated_017",
+      "ply": 32,
+      "split": "test"
+    },
+    {
+      "name": "generated_018_032",
+      "fen": "rn3r1k/pb4p1/1p2p2p/4NpqB/3p4/P1P1P3/2Q2PPP/R3K2R w KQ - 2 17",
+      "topic": "positional",
+      "game_id": "generated_018",
+      "ply": 32,
+      "split": "test"
+    },
+    {
+      "name": "generated_019_032",
+      "fen": "rn3rk1/4b1p1/1qp1pp1p/1p2Nb2/p2P1P2/P1N5/1P2PPBP/R1RQ2K1 w - - 0 17",
+      "topic": "positional",
+      "game_id": "generated_019",
+      "ply": 32,
+      "split": "test"
+    },
+    {
+      "name": "generated_020_032",
+      "fen": "r1bq1rk1/ppn1ppb1/2n4p/3pP3/3P3p/7P/PP1BNPP1/R1Q1RBK1 w - - 0 17",
+      "topic": "positional",
+      "game_id": "generated_020",
+      "ply": 32,
+      "split": "train"
+    },
+    {
+      "name": "generated_021_032",
+      "fen": "rn1q1rk1/1bp1bp2/p3p1p1/1p2N1Pp/P1pP3P/2N1P3/1P3P2/2RQK1R1 w - - 1 17",
+      "topic": "positional",
+      "game_id": "generated_021",
+      "ply": 32,
+      "split": "train"
+    },
+    {
+      "name": "generated_022_032",
+      "fen": "r2r2k1/pp1bqpp1/5n1p/2ppN3/3P1PP1/P1b1P3/1PB4P/R2Q1R1K w - - 0 17",
+      "topic": "positional",
+      "game_id": "generated_022",
+      "ply": 32,
+      "split": "train"
+    },
+    {
+      "name": "generated_023_032",
+      "fen": "r4rk1/2p2ppp/p1p2bq1/1p6/2PP4/1P6/PBbQ2PP/R4RK1 w - - 0 17",
+      "topic": "positional",
+      "game_id": "generated_023",
+      "ply": 32,
+      "split": "train"
+    },
+    {
+      "name": "generated_024_032",
+      "fen": "r1q1k2r/p3bpp1/1pn1p2p/2PpPn1P/5Pb1/1N1QB3/PPP1N2R/R3KB2 w Qkq - 0 17",
+      "topic": "positional",
+      "game_id": "generated_024",
+      "ply": 32,
+      "split": "train"
+    },
+    {
+      "name": "generated_025_032",
+      "fen": "r1b2rk1/1p2bppp/2p1pn2/q7/p2P4/P1N3P1/1PQBPPBP/R2R2K1 w - - 3 17",
+      "topic": "positional",
+      "game_id": "generated_025",
+      "ply": 32,
+      "split": "train"
+    },
+    {
+      "name": "generated_026_032",
+      "fen": "r1br1b1k/pp3ppp/2n1p3/6N1/3P3q/P7/1P1BBPPP/R2Q1RK1 w - - 2 17",
+      "topic": "positional",
+      "game_id": "generated_026",
+      "ply": 32,
+      "split": "train"
+    },
+    {
+      "name": "generated_027_032",
+      "fen": "1r1q2k1/pb4bp/1pnp2p1/2p2r2/5P2/2NP2Q1/PPP1N1B1/R1B2RK1 w - - 0 17",
+      "topic": "positional",
+      "game_id": "generated_027",
+      "ply": 32,
+      "split": "train"
+    },
+    {
+      "name": "generated_028_032",
+      "fen": "rn2nrk1/3p1pbp/1q2p1p1/2pP4/P1B5/2N1P1P1/1P3P1P/R1BQ1K1R w - - 1 17",
+      "topic": "positional",
+      "game_id": "generated_028",
+      "ply": 32,
+      "split": "train"
+    },
+    {
+      "name": "generated_029_032",
+      "fen": "rnbq1rk1/1p4pp/2p2n2/p1Pp1p2/3PPb2/PQN3PN/1P2P1BP/R4RK1 w - - 0 17",
+      "topic": "positional",
+      "game_id": "generated_029",
+      "ply": 32,
+      "split": "train"
+    },
+    {
+      "name": "generated_030_032",
+      "fen": "1rbq1rk1/1np1b1pp/Q4p2/3Pp3/2P1P3/2N1P3/PP4PP/R3R1K1 w - - 0 17",
+      "topic": "positional",
+      "game_id": "generated_030",
+      "ply": 32,
+      "split": "train"
+    },
+    {
+      "name": "generated_031_032",
+      "fen": "r4rk1/1p1qbppp/p1n1pn2/1N6/8/P3P3/1PQBBPPP/R4RK1 w - - 0 17",
+      "topic": "positional",
+      "game_id": "generated_031",
+      "ply": 32,
+      "split": "train"
+    },
+    {
+      "name": "generated_032_032",
+      "fen": "2rq1rk1/1b2bppp/np1np3/p2P4/P2p1B2/1P4P1/1Q1NPPBP/R2RN1K1 w - - 0 17",
+      "topic": "positional",
+      "game_id": "generated_032",
+      "ply": 32,
+      "split": "train"
+    },
+    {
+      "name": "generated_033_032",
+      "fen": "3q1rk1/4bppp/P1ppnn2/4p3/1P1PP3/2N2b2/2P2PPP/2BQR1K1 w - - 0 17",
+      "topic": "positional",
+      "game_id": "generated_033",
+      "ply": 32,
+      "split": "train"
+    },
+    {
+      "name": "generated_034_032",
+      "fen": "r4rk1/p2qnppp/1p1pb3/2p5/2P1PB2/3P1B2/PP1Q2PP/1R3RK1 w - - 0 17",
+      "topic": "positional",
+      "game_id": "generated_034",
+      "ply": 32,
+      "split": "validation"
+    },
+    {
+      "name": "generated_035_032",
+      "fen": "r1b1k2r/p2n1ppp/2p1p3/q3P3/1p1PB3/P1b2N2/3B1PPP/4QRK1 w kq - 2 17",
+      "topic": "positional",
+      "game_id": "generated_035",
+      "ply": 32,
+      "split": "validation"
+    },
+    {
+      "name": "generated_036_032",
+      "fen": "r1q2rk1/pp3ppp/2p1b3/3NP3/8/b3P3/1P3PPP/2RQKB1R w K - 0 17",
+      "topic": "positional",
+      "game_id": "generated_036",
+      "ply": 32,
+      "split": "validation"
+    },
+    {
+      "name": "generated_037_032",
+      "fen": "2bq1rk1/rp3p1p/p1nN1bp1/2Pp4/QP1pp3/6P1/P3PPBP/R3K2R w KQ - 0 17",
+      "topic": "positional",
+      "game_id": "generated_037",
+      "ply": 32,
+      "split": "test"
+    },
+    {
+      "name": "generated_038_032",
+      "fen": "1k1r3r/pppn2pp/1qn1B3/6B1/3p4/5N2/PP3PPP/2RQR1K1 w - - 1 17",
+      "topic": "tactics",
+      "game_id": "generated_038",
+      "ply": 32,
+      "split": "test"
+    },
+    {
+      "name": "generated_039_032",
+      "fen": "r2qnr2/p2b1pk1/n1pp2p1/4p1Np/1PP1P2P/2N5/P2QBPP1/1R2K2R w K - 3 17",
+      "topic": "positional",
+      "game_id": "generated_039",
+      "ply": 32,
+      "split": "test"
+    },
+    {
+      "name": "generated_000_036",
+      "fen": "r4b2/Npqn1k1p/p2p1pr1/4p2Q/8/2N5/PPP2P1P/R3K1R1 w Q - 3 19",
+      "topic": "tactics",
+      "game_id": "generated_000",
+      "ply": 36,
+      "split": "train"
+    },
+    {
+      "name": "generated_001_036",
+      "fen": "3rk3/1p3p2/p1n2p2/3RpP2/7r/2P5/P1P1BP1P/2K3R1 w - - 3 19",
+      "topic": "endgame",
+      "game_id": "generated_001",
+      "ply": 36,
+      "split": "train"
+    },
+    {
+      "name": "generated_002_036",
+      "fen": "5rk1/ppp3p1/3p1n1p/1n2p1q1/P3P3/N1PP4/1P3BP1/R2Q1RK1 w - - 4 19",
+      "topic": "positional",
+      "game_id": "generated_002",
+      "ply": 36,
+      "split": "train"
+    },
+    {
+      "name": "generated_003_036",
+      "fen": "r2qbr2/pp4pk/4p3/2bpp3/5B1N/P1N4P/nKP1Q1P1/3R3n w - - 0 19",
+      "topic": "positional",
+      "game_id": "generated_003",
+      "ply": 36,
+      "split": "train"
+    },
+    {
+      "name": "generated_004_036",
+      "fen": "4k2r/pp1b1p1p/3pp3/2q1n2B/4P3/2N1b2P/PPPQ2P1/2KR1R2 w k - 2 19",
+      "topic": "positional",
+      "game_id": "generated_004",
+      "ply": 36,
+      "split": "train"
+    },
+    {
+      "name": "generated_005_036",
+      "fen": "r1b2rk1/1p2qpb1/6pp/2npPp2/p2N1P2/4B1Q1/PP3NPP/R3R1K1 w - - 4 19",
+      "topic": "positional",
+      "game_id": "generated_005",
+      "ply": 36,
+      "split": "train"
+    },
+    {
+      "name": "generated_006_036",
+      "fen": "rnq2rk1/1b3ppp/4p3/p7/P2Np3/b1P1B1P1/1P2QP1P/R3K2R w KQ - 0 19",
+      "topic": "positional",
+      "game_id": "generated_006",
+      "ply": 36,
+      "split": "train"
+    },
+    {
+      "name": "generated_007_036",
+      "fen": "1rbqr1k1/1p2ppbp/p2p2p1/P1n5/1nP5/R1N1P1P1/1P2NPBP/2BQ1RK1 w - - 1 19",
+      "topic": "positional",
+      "game_id": "generated_007",
+      "ply": 36,
+      "split": "train"
+    },
+    {
+      "name": "generated_008_036",
+      "fen": "1r1q1rk1/1p1bbpp1/p2p1n1p/2pPp3/2P1PP2/1PN3P1/P1QBB1KP/3R1R2 w - - 1 19",
+      "topic": "positional",
+      "game_id": "generated_008",
+      "ply": 36,
+      "split": "train"
+    },
+    {
+      "name": "generated_009_036",
+      "fen": "3rk2r/1Q1n1ppp/p2Pb3/8/q4B2/6P1/4PPBP/3RK2R w Kk - 0 19",
+      "topic": "positional",
+      "game_id": "generated_009",
+      "ply": 36,
+      "split": "train"
+    },
+    {
+      "name": "generated_010_036",
+      "fen": "2kr2r1/pp2bp1p/n1p1qnp1/1N1p3P/3P1B2/P2QP1N1/1P3PP1/2R2K1R w - - 3 19",
+      "topic": "positional",
+      "game_id": "generated_010",
+      "ply": 36,
+      "split": "train"
+    },
+    {
+      "name": "generated_011_036",
+      "fen": "rn2r1k1/pp3p1p/6p1/8/4nPb1/B2B4/P3N1PP/2R1K2R w K - 2 19",
+      "topic": "positional",
+      "game_id": "generated_011",
+      "ply": 36,
+      "split": "train"
+    },
+    {
+      "name": "generated_012_036",
+      "fen": "N4b1r/3k1ppp/2bp1n2/q1P1p3/4P3/5P2/PP4PP/R2QK2R w KQ - 1 19",
+      "topic": "tactics",
+      "game_id": "generated_012",
+      "ply": 36,
+      "split": "train"
+    },
+    {
+      "name": "generated_013_036",
+      "fen": "3r2k1/2q1rppp/p2p1nb1/npp1p3/4P2P/2PPN3/PPB2PP1/R1BQR1K1 w - - 0 19",
+      "topic": "positional",
+      "game_id": "generated_013",
+      "ply": 36,
+      "split": "train"
+    },
+    {
+      "name": "generated_014_036",
+      "fen": "4kb1r/p4pp1/2p5/3r4/3P2p1/4B2P/PP2KP2/R2R4 w k - 0 19",
+      "topic": "endgame",
+      "game_id": "generated_014",
+      "ply": 36,
+      "split": "validation"
+    },
+    {
+      "name": "generated_015_036",
+      "fen": "rn3rk1/p4ppp/1p6/3p4/3P3P/1P2pP2/RP1B1K1P/5B1R w - - 0 19",
+      "topic": "endgame",
+      "game_id": "generated_015",
+      "ply": 36,
+      "split": "validation"
+    },
+    {
+      "name": "generated_016_036",
+      "fen": "4k3/prpnbp2/6p1/2p4r/3PP1p1/1PP5/P2B1PPP/R3R1K1 w - - 0 19",
+      "topic": "endgame",
+      "game_id": "generated_016",
+      "ply": 36,
+      "split": "validation"
+    },
+    {
+      "name": "generated_017_036",
+      "fen": "5rk1/1Q1nb3/2p1b2p/q4pp1/3Pp3/6P1/PP2PPBP/R4RK1 w - - 0 19",
+      "topic": "positional",
+      "game_id": "generated_017",
+      "ply": 36,
+      "split": "test"
+    },
+    {
+      "name": "generated_018_036",
+      "fen": "rn3r1k/p4Bp1/1p2p2p/4N1q1/3pp3/P1P1P3/5PPP/R3K2R w KQ - 0 19",
+      "topic": "positional",
+      "game_id": "generated_018",
+      "ply": 36,
+      "split": "test"
+    },
+    {
+      "name": "generated_019_036",
+      "fen": "r4r1k/3nb1p1/1qp1pp1p/1p3b2/pP1P1P2/P1N2N2/4PPBP/R1RQ2K1 w - - 1 19",
+      "topic": "positional",
+      "game_id": "generated_019",
+      "ply": 36,
+      "split": "test"
+    },
+    {
+      "name": "generated_020_036",
+      "fen": "r2q1rk1/pp2ppb1/2n4p/1n1pPb2/3P3p/7P/P2BNPP1/R1Q1RBK1 w - - 0 19",
+      "topic": "positional",
+      "game_id": "generated_020",
+      "ply": 36,
+      "split": "train"
+    },
+    {
+      "name": "generated_021_036",
+      "fen": "r2q1rk1/1bp1bp2/p3p1p1/1p2N1Pp/PnpP3P/2N1P3/1PQ2P2/2R1K1R1 w - - 5 19",
+      "topic": "positional",
+      "game_id": "generated_021",
+      "ply": 36,
+      "split": "train"
+    },
+    {
+      "name": "generated_022_036",
+      "fen": "r2r2k1/pp2qpp1/4bn1p/3pN3/3P1PP1/P3P3/2B4P/R2Q1R1K w - - 1 19",
+      "topic": "positional",
+      "game_id": "generated_022",
+      "ply": 36,
+      "split": "train"
+    },
+    {
+      "name": "generated_023_036",
+      "fen": "r4rk1/2p2ppp/p1p3q1/3P4/2p4b/1P3R2/PBbQ2PP/R5K1 w - - 0 19",
+      "topic": "positional",
+      "game_id": "generated_023",
+      "ply": 36,
+      "split": "train"
+    },
+    {
+      "name": "generated_024_036",
+      "fen": "r1q2rk1/p4pp1/1Pn1p2p/3pPn1P/5Pbb/PN1QB3/1PP1N2R/R3KB2 w Q - 1 19",
+      "topic": "tactics",
+      "game_id": "generated_024",
+      "ply": 36,
+      "split": "train"
+    },
+    {
+      "name": "generated_025_036",
+      "fen": "2b2rk1/1p2bppp/2p2n2/r2p4/p2P4/P5P1/1PQ1PPBP/R2R2K1 w - - 0 19",
+      "topic": "positional",
+      "game_id": "generated_025",
+      "ply": 36,
+      "split": "train"
+    },
+    {
+      "name": "generated_026_036",
+      "fen": "r1bN1bk1/pp4pp/4p3/8/3n3q/P7/1P1BBPPP/R2Q1RK1 w - - 0 19",
+      "topic": "positional",
+      "game_id": "generated_026",
+      "ply": 36,
+      "split": "train"
+    },
+    {
+      "name": "generated_027_036",
+      "fen": "1r1q2k1/pb4bp/1p1p2p1/2p2r2/5P2/2NP2QB/PPn1NR2/R1B3K1 w - - 0 19",
+      "topic": "tactics",
+      "game_id": "generated_027",
+      "ply": 36,
+      "split": "train"
+    },
+    {
+      "name": "generated_028_036",
+      "fen": "1n2nrk1/r2p1pbp/4p1p1/2pP4/Pq6/2N1P1P1/1P2BPKP/R1BQ3R w - - 5 19",
+      "topic": "positional",
+      "game_id": "generated_028",
+      "ply": 36,
+      "split": "train"
+    },
+    {
+      "name": "generated_029_036",
+      "fen": "rn1q1rk1/1p4pp/2P1bn1b/p1P2p2/3P4/PQN3PN/1P2P1BP/R4RK1 w - - 1 19",
+      "topic": "positional",
+      "game_id": "generated_029",
+      "ply": 36,
+      "split": "train"
+    },
+    {
+      "name": "generated_030_036",
+      "fen": "1r1q1rk1/Qnp3pp/5p2/2bPp3/2P1P1b1/P1N1P3/1P4PP/R3R1K1 w - - 1 19",
+      "topic": "tactics",
+      "game_id": "generated_030",
+      "ply": 36,
+      "split": "train"
+    },
+    {
+      "name": "generated_031_036",
+      "fen": "r4rk1/3qbppp/p3pn2/1p2n3/8/P1N1P3/1PQBBPPP/R2R2K1 w - - 2 19",
+      "topic": "positional",
+      "game_id": "generated_031",
+      "ply": 36,
+      "split": "train"
+    },
+    {
+      "name": "generated_032_036",
+      "fen": "2rq1rk1/5ppp/np1nPb2/p7/P2p1B2/1P4P1/1Q1NPPNP/R2R2K1 w - - 1 19",
+      "topic": "positional",
+      "game_id": "generated_032",
+      "ply": 36,
+      "split": "train"
+    },
+    {
+      "name": "generated_033_036",
+      "fen": "3q1rk1/4bppp/P1ppnn2/8/1P2P3/2pQ1P2/2P2P1P/2B1R1K1 w - - 0 19",
+      "topic": "positional",
+      "game_id": "generated_033",
+      "ply": 36,
+      "split": "train"
+    },
+    {
+      "name": "generated_034_036",
+      "fen": "2r2rk1/p2q1ppp/1pnpb3/2p5/1PP1PB2/3P4/P2QB1PP/1R3RK1 w - - 1 19",
+      "topic": "positional",
+      "game_id": "generated_034",
+      "ply": 36,
+      "split": "validation"
+    },
+    {
+      "name": "generated_035_036",
+      "fen": "r1b1k2r/p2n1ppp/1qp1p3/4P3/1P1PB3/5N2/3Q1PPP/5RK1 w kq - 1 19",
+      "topic": "positional",
+      "game_id": "generated_035",
+      "ply": 36,
+      "split": "validation"
+    },
+    {
+      "name": "generated_036_036",
+      "fen": "r1q2rk1/pp3ppp/2p5/4P3/4bP2/P3P3/6PP/2RQKB1R w K - 1 19",
+      "topic": "positional",
+      "game_id": "generated_036",
+      "ply": 36,
+      "split": "validation"
+    },
+    {
+      "name": "generated_037_036",
+      "fen": "3q1rk1/rp3p1p/p1nNbbp1/2Pp4/QP2p3/P2p2P1/4PPBP/R4RK1 w - - 2 19",
+      "topic": "positional",
+      "game_id": "generated_037",
+      "ply": 36,
+      "split": "test"
+    },
+    {
+      "name": "generated_038_036",
+      "fen": "1k6/pppr2pp/1qn5/8/3p4/5N2/PP3PPP/2RQR1K1 w - - 0 19",
+      "topic": "positional",
+      "game_id": "generated_038",
+      "ply": 36,
+      "split": "test"
+    },
+    {
+      "name": "generated_039_036",
+      "fen": "r2qnr2/2nb1pk1/2pp2p1/p1P1p1Np/1P2P2P/2N5/P2QBPP1/1R3RK1 w - - 0 19",
+      "topic": "positional",
+      "game_id": "generated_039",
+      "ply": 36,
+      "split": "test"
+    },
+    {
+      "name": "generated_000_040",
+      "fen": "r4b2/1pqn1krQ/3p1p2/1p2p3/8/2N5/PPP2P1P/R3K1R1 w Q - 1 21",
+      "topic": "tactics",
+      "game_id": "generated_000",
+      "ply": 40,
+      "split": "train"
+    },
+    {
+      "name": "generated_001_040",
+      "fen": "3n2R1/1p2kp2/p4p2/4pP2/7r/2P5/P1P1BP1P/2K5 w - - 0 21",
+      "topic": "endgame",
+      "game_id": "generated_001",
+      "ply": 40,
+      "split": "train"
+    },
+    {
+      "name": "generated_002_040",
+      "fen": "5rk1/ppp3p1/3p1nqp/4pR2/P3P3/n1PP4/1P4P1/R2QB1K1 w - - 2 21",
+      "topic": "positional",
+      "game_id": "generated_002",
+      "ply": 40,
+      "split": "train"
+    },
+    {
+      "name": "generated_003_040",
+      "fen": "r2qb3/pp4pk/4p3/2bpp3/4r2N/P6P/K1P1Q1P1/3R3n w - - 0 21",
+      "topic": "tactics",
+      "game_id": "generated_003",
+      "ply": 40,
+      "split": "train"
+    },
+    {
+      "name": "generated_004_040",
+      "fen": "4k1r1/pp1b1p1p/3pp3/4n2B/P3P3/2N1q2P/1PP3P1/2KR1R2 w - - 0 21",
+      "topic": "tactics",
+      "game_id": "generated_004",
+      "ply": 40,
+      "split": "train"
+    },
+    {
+      "name": "generated_005_040",
+      "fen": "r4rk1/4qpb1/1p2b1pp/1NnpPp2/p4P2/4B1Q1/PP3NPP/2R1R1K1 w - - 2 21",
+      "topic": "positional",
+      "game_id": "generated_005",
+      "ply": 40,
+      "split": "train"
+    },
+    {
+      "name": "generated_006_040",
+      "fen": "r1q2rk1/3n1ppp/b3p3/p6Q/P2Np3/R1P1B1P1/1P3P1P/4K2R w K - 3 21",
+      "topic": "positional",
+      "game_id": "generated_006",
+      "ply": 40,
+      "split": "train"
+    },
+    {
+      "name": "generated_007_040",
+      "fen": "1rbqr1k1/1p1nppbp/p1np2p1/P2N4/2P5/RP2P1P1/4NPBP/2BQ1RK1 w - - 1 21",
+      "topic": "positional",
+      "game_id": "generated_007",
+      "ply": 40,
+      "split": "train"
+    },
+    {
+      "name": "generated_008_040",
+      "fen": "1r1qnrk1/1p1b1pp1/p2p1b1p/2pPp3/P1P1PP2/1PNB2P1/2QB2KP/3R1R2 w - - 3 21",
+      "topic": "positional",
+      "game_id": "generated_008",
+      "ply": 40,
+      "split": "train"
+    },
+    {
+      "name": "generated_009_040",
+      "fen": "3r1rk1/1Q1n1ppp/p2Pb3/1q6/5B2/6P1/4PPBP/R4RK1 w - - 4 21",
+      "topic": "tactics",
+      "game_id": "generated_009",
+      "ply": 40,
+      "split": "train"
+    },
+    {
+      "name": "generated_010_040",
+      "fen": "1r4r1/Np1kbp1p/n1p1qnp1/3p3P/3P1B2/PQ2P1N1/1P3PP1/2R2K1R w - - 3 21",
+      "topic": "tactics",
+      "game_id": "generated_010",
+      "ply": 40,
+      "split": "train"
+    },
+    {
+      "name": "generated_011_040",
+      "fen": "r3r1k1/1pRn1p1p/6p1/p7/2B1nPb1/B7/P3N1PP/4K2R w K - 2 21",
+      "topic": "positional",
+      "game_id": "generated_011",
+      "ply": 40,
+      "split": "train"
+    },
+    {
+      "name": "generated_012_040",
+      "fen": "b6r/3kbppp/3p1n2/q1P1p3/4P3/P4P2/1P2K1PP/R2Q3R w - - 1 21",
+      "topic": "positional",
+      "game_id": "generated_012",
+      "ply": 40,
+      "split": "train"
+    },
+    {
+      "name": "generated_013_040",
+      "fen": "3r2k1/2q1rppp/p4nb1/npp1p2P/4p1P1/2PPN3/PPB2P2/R1BQR1K1 w - - 0 21",
+      "topic": "positional",
+      "game_id": "generated_013",
+      "ply": 40,
+      "split": "train"
+    },
+    {
+      "name": "generated_014_040",
+      "fen": "5b2/p2k1pp1/2p5/3r4/3P2Pr/4B3/PP2KP2/2RR4 w - - 3 21",
+      "topic": "endgame",
+      "game_id": "generated_014",
+      "ply": 40,
+      "split": "validation"
+    },
+    {
+      "name": "generated_015_040",
+      "fen": "rn2r1k1/5ppp/1p6/p2p4/3P3P/1P3P2/RP1B1K1P/5B1R w - - 0 21",
+      "topic": "endgame",
+      "game_id": "generated_015",
+      "ply": 40,
+      "split": "validation"
+    },
+    {
+      "name": "generated_016_040",
+      "fen": "4k3/pr1nb3/2p2pp1/2p4r/3PPBp1/1PP5/P3RPPP/R5K1 w - - 0 21",
+      "topic": "endgame",
+      "game_id": "generated_016",
+      "ply": 40,
+      "split": "validation"
+    },
+    {
+      "name": "generated_017_040",
+      "fen": "5r2/3n1k2/4b2p/q4pp1/1b1Pp3/2Q3P1/PP2PPBP/R4RK1 w - - 3 21",
+      "topic": "positional",
+      "game_id": "generated_017",
+      "ply": 40,
+      "split": "test"
+    },
+    {
+      "name": "generated_018_040",
+      "fen": "rn3N1k/p4Bp1/1p2p2p/6q1/3pp3/P1P1P3/5PPP/R3K2R w KQ - 1 21",
+      "topic": "positional",
+      "game_id": "generated_018",
+      "ply": 40,
+      "split": "test"
+    },
+    {
+      "name": "generated_019_040",
+      "fen": "2r2r1k/3nb1pb/1qp1pp1p/1p6/pP1P1P2/P3PN2/4NPBP/R1RQ2K1 w - - 3 21",
+      "topic": "positional",
+      "game_id": "generated_019",
+      "ply": 40,
+      "split": "test"
+    },
+    {
+      "name": "generated_020_040",
+      "fen": "r2q1rk1/pp3pb1/2n1p2B/3pPb2/3P1Q1p/n6P/P3NPP1/R3RBK1 w - - 2 21",
+      "topic": "positional",
+      "game_id": "generated_020",
+      "ply": 40,
+      "split": "train"
+    },
+    {
+      "name": "generated_021_040",
+      "fen": "r3qrk1/1bp1bp2/p3p1p1/1p2N1Pp/P1pP3P/2NQP3/1P3P2/2R1K1R1 w - - 1 21",
+      "topic": "positional",
+      "game_id": "generated_021",
+      "ply": 40,
+      "split": "train"
+    },
+    {
+      "name": "generated_022_040",
+      "fen": "r2r2k1/pp1bqpp1/5n2/3pNPp1/3P4/P3P3/2B4P/R2Q1R1K w - - 1 21",
+      "topic": "positional",
+      "game_id": "generated_022",
+      "ply": 40,
+      "split": "train"
+    },
+    {
+      "name": "generated_023_040",
+      "fen": "r4rk1/2p2ppp/p1p3q1/3P2b1/2p1b3/1P5R/PB1Q2PP/2R3K1 w - - 4 21",
+      "topic": "positional",
+      "game_id": "generated_023",
+      "ply": 40,
+      "split": "train"
+    },
+    {
+      "name": "generated_024_040",
+      "fen": "r1q2rk1/6p1/1pn1pp1p/3pPn1P/3N1Pbb/PN1QB3/1PPK3R/R4B2 w - - 0 21",
+      "topic": "positional",
+      "game_id": "generated_024",
+      "ply": 40,
+      "split": "train"
+    },
+    {
+      "name": "generated_025_040",
+      "fen": "r1bb1rk1/1p3ppp/2p2n2/3p4/pP1P4/P3P1P1/2Q2PBP/R2R2K1 w - - 1 21",
+      "topic": "positional",
+      "game_id": "generated_025",
+      "ply": 40,
+      "split": "train"
+    },
+    {
+      "name": "generated_026_040",
+      "fen": "r1bq1bk1/pp4pp/4p3/8/8/P3B3/1P2QPPP/R4RK1 w - - 0 21",
+      "topic": "positional",
+      "game_id": "generated_026",
+      "ply": 40,
+      "split": "train"
+    },
+    {
+      "name": "generated_027_040",
+      "fen": "1r4k1/pb2q1bp/1p1p4/2p2p2/5P2/2NP2Q1/PPn1NR2/1RB3K1 w - - 2 21",
+      "topic": "positional",
+      "game_id": "generated_027",
+      "ply": 40,
+      "split": "train"
+    },
+    {
+      "name": "generated_028_040",
+      "fen": "1n3rk1/r2p1p1p/3np1p1/2pP4/Pq6/2b1P1P1/1PQBBPKP/R6R w - - 0 21",
+      "topic": "positional",
+      "game_id": "generated_028",
+      "ply": 40,
+      "split": "train"
+    },
+    {
+      "name": "generated_029_040",
+      "fen": "r2q1rk1/1Q4pp/n1P2n1b/p1P2p2/2bP4/P1N3PN/1P2P1BP/3R1RK1 w - - 3 21",
+      "topic": "tactics",
+      "game_id": "generated_029",
+      "ply": 40,
+      "split": "train"
+    },
+    {
+      "name": "generated_030_040",
+      "fen": "1r3rk1/1n4pp/3p1p2/2bPp3/2P1P1b1/P1N1P3/1P4PP/R3R1K1 w - - 0 21",
+      "topic": "endgame",
+      "game_id": "generated_030",
+      "ply": 40,
+      "split": "train"
+    },
+    {
+      "name": "generated_031_040",
+      "fen": "r1r3k1/3qbppp/p3p3/1p1nn3/4N3/PQ2P3/1P1BBPPP/R2R2K1 w - - 6 21",
+      "topic": "positional",
+      "game_id": "generated_031",
+      "ply": 40,
+      "split": "train"
+    },
+    {
+      "name": "generated_032_040",
+      "fen": "2rq1Bk1/5ppp/n3Pb2/pp6/P7/1P1p2P1/1Q1NPPNP/R2R2K1 w - - 0 21",
+      "topic": "positional",
+      "game_id": "generated_032",
+      "ply": 40,
+      "split": "train"
+    },
+    {
+      "name": "generated_033_040",
+      "fen": "3q1rk1/4bppp/P3nn2/2Pp4/4P3/2pQBP2/2P2P1P/4R1K1 w - - 0 21",
+      "topic": "positional",
+      "game_id": "generated_033",
+      "ply": 40,
+      "split": "train"
+    },
+    {
+      "name": "generated_034_040",
+      "fen": "2r2rk1/p2q2pp/1p1pb3/2p2p2/1PPnPB2/3P1B1P/P2Q2P1/1R3RK1 w - - 2 21",
+      "topic": "positional",
+      "game_id": "generated_034",
+      "ply": 40,
+      "split": "validation"
+    },
+    {
+      "name": "generated_035_040",
+      "fen": "r1b1k2r/p2n1ppB/1qp1p3/4P1Q1/1P1P4/5N2/5PPP/5RK1 w q - 1 21",
+      "topic": "positional",
+      "game_id": "generated_035",
+      "ply": 40,
+      "split": "validation"
+    },
+    {
+      "name": "generated_036_040",
+      "fen": "r4rk1/pp3ppp/8/2p1Pq2/3QbP2/P3P3/6PP/3RKB1R w K - 0 21",
+      "topic": "positional",
+      "game_id": "generated_036",
+      "ply": 40,
+      "split": "validation"
+    },
+    {
+      "name": "generated_037_040",
+      "fen": "3q1rk1/rp3p1p/p1nNb1p1/2Ppb3/QP6/P2p2P1/5PBP/3R1RK1 w - - 2 21",
+      "topic": "positional",
+      "game_id": "generated_037",
+      "ply": 40,
+      "split": "test"
+    },
+    {
+      "name": "generated_038_040",
+      "fen": "1k1nR3/pppr2pp/1q6/8/8/3p1N2/PP2QPPP/2R3K1 w - - 0 21",
+      "topic": "positional",
+      "game_id": "generated_038",
+      "ply": 40,
+      "split": "test"
+    },
+    {
+      "name": "generated_039_040",
+      "fen": "3qnr2/3b1pk1/2pP2p1/rn2p1Np/4P2P/2N5/P2QBPP1/1R3RK1 w - - 1 21",
+      "topic": "positional",
+      "game_id": "generated_039",
+      "ply": 40,
+      "split": "test"
+    },
+    {
+      "name": "generated_000_044",
+      "fen": "r4n2/1pq2kbQ/3p1p2/1p2p3/8/2N5/PPP2P1P/3RK3 w - - 2 23",
+      "topic": "positional",
+      "game_id": "generated_000",
+      "ply": 44,
+      "split": "train"
+    },
+    {
+      "name": "generated_001_044",
+      "fen": "3n2R1/1p2kp2/p4p2/4pP2/8/2P1K3/P1P1BP2/7r w - - 2 23",
+      "topic": "endgame",
+      "game_id": "generated_001",
+      "ply": 44,
+      "split": "train"
+    },
+    {
+      "name": "generated_002_044",
+      "fen": "6k1/ppp2rp1/3p1nqp/4pR2/P3P3/2PP4/1PQ3P1/R3B1K1 w - - 1 23",
+      "topic": "positional",
+      "game_id": "generated_002",
+      "ply": 44,
+      "split": "train"
+    },
+    {
+      "name": "generated_003_044",
+      "fen": "r3b3/pp4pk/4pq2/2bpp3/7r/P4Q1P/2P3P1/1K1R3n w - - 2 23",
+      "topic": "tactics",
+      "game_id": "generated_003",
+      "ply": 44,
+      "split": "train"
+    },
+    {
+      "name": "generated_004_044",
+      "fen": "4k1r1/pp1b1p1p/3pp2q/8/P1n1P1B1/2N4P/1PP3P1/1K1R1R2 w - - 4 23",
+      "topic": "positional",
+      "game_id": "generated_004",
+      "ply": 44,
+      "split": "train"
+    },
+    {
+      "name": "generated_005_044",
+      "fen": "r2r4/4qpbk/1p1Nb1pp/2npPp2/p4P1P/4B1Q1/PP3NP1/2R1R1K1 w - - 3 23",
+      "topic": "positional",
+      "game_id": "generated_005",
+      "ply": 44,
+      "split": "train"
+    },
+    {
+      "name": "generated_006_044",
+      "fen": "r4rk1/3n1ppp/b3p3/7Q/PPqNp3/R3B1P1/5P1P/4K2R w K - 1 23",
+      "topic": "positional",
+      "game_id": "generated_006",
+      "ply": 44,
+      "split": "train"
+    },
+    {
+      "name": "generated_007_044",
+      "fen": "1rbqr1k1/1p2ppbp/p2p2p1/n3n3/2PN4/RPN1P1P1/5PBP/2BQ1RK1 w - - 2 23",
+      "topic": "positional",
+      "game_id": "generated_007",
+      "ply": 44,
+      "split": "train"
+    },
+    {
+      "name": "generated_008_044",
+      "fen": "1r1qnrk1/1p1b4/p2p1bpp/2pPp3/P1P1P3/1PNB2P1/2QB2KP/3R1R2 w - - 0 23",
+      "topic": "positional",
+      "game_id": "generated_008",
+      "ply": 44,
+      "split": "train"
+    },
+    {
+      "name": "generated_009_044",
+      "fen": "3r1rk1/3n1ppp/Q2Pb3/8/5B2/6P1/2q1PPBP/RR4K1 w - - 3 23",
+      "topic": "positional",
+      "game_id": "generated_009",
+      "ply": 44,
+      "split": "train"
+    },
+    {
+      "name": "generated_010_044",
+      "fen": "r5r1/3kbp1p/n1p1qnp1/1p1p3P/3P1B2/PQN1P1N1/1P3PP1/2R2K1R w - - 0 23",
+      "topic": "positional",
+      "game_id": "generated_010",
+      "ply": 44,
+      "split": "train"
+    },
+    {
+      "name": "generated_011_044",
+      "fen": "2r1r1k1/2Rn1p1p/1p4p1/pB6/4nPb1/B7/P3N1PP/4K2R w K - 2 23",
+      "topic": "tactics",
+      "game_id": "generated_011",
+      "ply": 44,
+      "split": "train"
+    },
+    {
+      "name": "generated_012_044",
+      "fen": "b2r4/3kbppp/q2p1n2/2P1p3/1P2P3/P3KP2/6PP/R2Q3R w - - 3 23",
+      "topic": "positional",
+      "game_id": "generated_012",
+      "ply": 44,
+      "split": "train"
+    },
+    {
+      "name": "generated_013_044",
+      "fen": "3r2k1/2q1rppp/p4nP1/npp1p1P1/8/2P1N3/PPp2P2/R1BQR1K1 w - - 0 23",
+      "topic": "tactics",
+      "game_id": "generated_013",
+      "ply": 44,
+      "split": "train"
+    },
+    {
+      "name": "generated_014_044",
+      "fen": "5b2/p2k2p1/2p5/3r2P1/3P1p1r/4BK2/PP3P2/2RR4 w - - 0 23",
+      "topic": "endgame",
+      "game_id": "generated_014",
+      "ply": 44,
+      "split": "validation"
+    },
+    {
+      "name": "generated_015_044",
+      "fen": "rn4k1/5pp1/1p2r3/p2p3p/1P1P3P/2B2P2/RP3K1P/5B1R w - - 1 23",
+      "topic": "endgame",
+      "game_id": "generated_015",
+      "ply": 44,
+      "split": "validation"
+    },
+    {
+      "name": "generated_016_044",
+      "fen": "4k3/pr1nb3/5pp1/2p4r/3PP1p1/1P4B1/P3RPPP/R5K1 w - - 0 23",
+      "topic": "endgame",
+      "game_id": "generated_016",
+      "ply": 44,
+      "split": "validation"
+    },
+    {
+      "name": "generated_017_044",
+      "fen": "3r4/5k2/4bn1p/q4pp1/1b1Pp3/4P1P1/PP3PBP/R1Q2RK1 w - - 1 23",
+      "topic": "positional",
+      "game_id": "generated_017",
+      "ply": 44,
+      "split": "test"
+    },
+    {
+      "name": "generated_018_044",
+      "fen": "rn6/p4Bpk/1p2p1Np/2q5/3pp2P/P1P1P3/5PP1/R3K2R w KQ - 3 23",
+      "topic": "positional",
+      "game_id": "generated_018",
+      "ply": 44,
+      "split": "test"
+    },
+    {
+      "name": "generated_019_044",
+      "fen": "2r2r1k/1q1nb1pb/2p1p2p/1p3p2/pP1P1P2/P3PN2/4NPBP/R1RQ2K1 w - - 2 23",
+      "topic": "positional",
+      "game_id": "generated_019",
+      "ply": 44,
+      "split": "test"
+    },
+    {
+      "name": "generated_020_044",
+      "fen": "r2q1rk1/pp3pb1/2n1p2B/3pP3/3P1Q1p/7P/P1b1NPP1/4RBK1 w - - 0 23",
+      "topic": "positional",
+      "game_id": "generated_020",
+      "ply": 44,
+      "split": "train"
+    },
+    {
+      "name": "generated_021_044",
+      "fen": "2r1qrk1/1b2bp2/p3p1p1/1pp1N1Pp/P1pP3P/2N1P3/1P1Q1P2/2R1KR2 w - - 0 23",
+      "topic": "positional",
+      "game_id": "generated_021",
+      "ply": 44,
+      "split": "train"
+    },
+    {
+      "name": "generated_022_044",
+      "fen": "2rr2k1/pp1bqppn/8/3pNPp1/3P4/P3P3/2BQ3P/R5RK w - - 5 23",
+      "topic": "positional",
+      "game_id": "generated_022",
+      "ply": 44,
+      "split": "train"
+    },
+    {
+      "name": "generated_023_044",
+      "fen": "r4rk1/2p2ppp/p1p3q1/3P4/2p1b2R/1P2b3/PB2Q1PP/6K1 w - - 2 23",
+      "topic": "tactics",
+      "game_id": "generated_023",
+      "ply": 44,
+      "split": "train"
+    },
+    {
+      "name": "generated_024_044",
+      "fen": "r1q2rk1/6p1/1pn1pp1p/3pP2P/5P1b/PN2B3/1PbKQ2R/R4B2 w - - 0 23",
+      "topic": "positional",
+      "game_id": "generated_024",
+      "ply": 44,
+      "split": "train"
+    },
+    {
+      "name": "generated_025_044",
+      "fen": "r1bb1rk1/1p3ppp/2p5/3p2n1/pP1P4/P3PPP1/2Q4P/R2R1BK1 w - - 1 23",
+      "topic": "positional",
+      "game_id": "generated_025",
+      "ply": 44,
+      "split": "train"
+    },
+    {
+      "name": "generated_026_044",
+      "fen": "r1b1qbk1/p5pp/1p2p3/8/8/P3B3/1P2QPPP/2R1R1K1 w - - 0 23",
+      "topic": "positional",
+      "game_id": "generated_026",
+      "ply": 44,
+      "split": "train"
+    },
+    {
+      "name": "generated_027_044",
+      "fen": "1r5k/pb2q2p/1p1p1b2/2p2pQ1/5P2/2NP4/PPn1NR2/1RB2K2 w - - 6 23",
+      "topic": "positional",
+      "game_id": "generated_027",
+      "ply": 44,
+      "split": "train"
+    },
+    {
+      "name": "generated_028_044",
+      "fen": "1n3rk1/r2p1p1p/1q2p1p1/2pP4/P1n5/2B1PBP1/1PQ2PKP/R6R w - - 3 23",
+      "topic": "positional",
+      "game_id": "generated_028",
+      "ply": 44,
+      "split": "train"
+    },
+    {
+      "name": "generated_029_044",
+      "fen": "3q1rk1/1r4pp/n1P2n1b/p1P2p2/2PP4/P1N3PN/4P1BP/3R1RK1 w - - 0 23",
+      "topic": "tactics",
+      "game_id": "generated_029",
+      "ply": 44,
+      "split": "train"
+    },
+    {
+      "name": "generated_030_044",
+      "fen": "1r3rk1/6pp/1b1p1p2/n2Pp3/PPP1P1b1/2N1P3/6PP/R3R1K1 w - - 1 23",
+      "topic": "endgame",
+      "game_id": "generated_030",
+      "ply": 44,
+      "split": "train"
+    },
+    {
+      "name": "generated_031_044",
+      "fen": "1rr3k1/3qbppp/p3p3/3nn3/p7/1QN1P3/1P1BBPPP/R2R2K1 w - - 0 23",
+      "topic": "tactics",
+      "game_id": "generated_031",
+      "ply": 44,
+      "split": "train"
+    },
+    {
+      "name": "generated_032_044",
+      "fen": "1r3Bk1/4Pppp/nq3b2/pp6/P7/1P1p2P1/1Q1NPPNP/R1R3K1 w - - 3 23",
+      "topic": "tactics",
+      "game_id": "generated_032",
+      "ply": 44,
+      "split": "train"
+    },
+    {
+      "name": "generated_033_044",
+      "fen": "q4rk1/P3bppp/4nn2/2P5/3pP3/2pQBP2/2P2P1P/1R4K1 w - - 2 23",
+      "topic": "positional",
+      "game_id": "generated_033",
+      "ply": 44,
+      "split": "train"
+    },
+    {
+      "name": "generated_034_044",
+      "fen": "2r2rk1/p4qpp/1p1p4/2p2p2/1PPnPB2/3P3P/P2Q2P1/1R3RK1 w - - 0 23",
+      "topic": "positional",
+      "game_id": "generated_034",
+      "ply": 44,
+      "split": "validation"
+    },
+    {
+      "name": "generated_035_044",
+      "fen": "r1b1krB1/p2n1pQ1/2p1p3/4P3/1q1P4/5N2/5PPP/5RK1 w q - 0 23",
+      "topic": "tactics",
+      "game_id": "generated_035",
+      "ply": 44,
+      "split": "validation"
+    },
+    {
+      "name": "generated_036_044",
+      "fen": "r2r2k1/p4ppp/1p6/2Q1Pq2/3RbP2/P3P3/6PP/4KB1R w K - 0 23",
+      "topic": "tactics",
+      "game_id": "generated_036",
+      "ply": 44,
+      "split": "validation"
+    },
+    {
+      "name": "generated_037_044",
+      "fen": "4qrk1/r3np1p/p3b1p1/N1Ppb3/QP6/P2p2P1/5PBP/3R1RK1 w - - 3 23",
+      "topic": "tactics",
+      "game_id": "generated_037",
+      "ply": 44,
+      "split": "test"
+    },
+    {
+      "name": "generated_038_044",
+      "fen": "1k1n3R/p1pr2pp/6q1/1p6/8/3p1N2/PP1Q1PPP/2R3K1 w - - 0 23",
+      "topic": "positional",
+      "game_id": "generated_038",
+      "ply": 44,
+      "split": "test"
+    },
+    {
+      "name": "generated_039_044",
+      "fen": "3qnr2/3b2k1/3P1pp1/rp1Qp1Np/4P2P/8/P3BPP1/1R3RK1 w - - 0 23",
+      "topic": "positional",
+      "game_id": "generated_039",
+      "ply": 44,
+      "split": "test"
+    },
+    {
+      "name": "generated_000_048",
+      "fen": "3r4/1pq2kb1/3p1pn1/1p2p2Q/4N3/8/PPP2P1P/3RK3 w - - 6 25",
+      "topic": "positional",
+      "game_id": "generated_000",
+      "ply": 48,
+      "split": "train"
+    },
+    {
+      "name": "generated_001_048",
+      "fen": "3n4/1p2kp2/p4p2/4pP2/8/2P1KBr1/P1P2P2/8 w - - 0 25",
+      "topic": "endgame",
+      "game_id": "generated_001",
+      "ply": 48,
+      "split": "train"
+    },
+    {
+      "name": "generated_002_048",
+      "fen": "6k1/pp2r1p1/3p1nqp/2p1pR2/P3P3/2PP1Q2/1P4P1/R3B1K1 w - - 2 25",
+      "topic": "positional",
+      "game_id": "generated_002",
+      "ply": 48,
+      "split": "train"
+    },
+    {
+      "name": "generated_003_048",
+      "fen": "r3b3/pp4k1/4pp2/2bpp3/7r/P6P/2P3P1/1K5R w - - 1 25",
+      "topic": "endgame",
+      "game_id": "generated_003",
+      "ply": 48,
+      "split": "train"
+    },
+    {
+      "name": "generated_004_048",
+      "fen": "5kr1/pp1b1p1p/3pp2q/8/P3P3/2N4P/1PPnB1P1/K2R1R2 w - - 8 25",
+      "topic": "positional",
+      "game_id": "generated_004",
+      "ply": 48,
+      "split": "train"
+    },
+    {
+      "name": "generated_005_048",
+      "fen": "r2q4/3r1pbk/1p1Nb1pp/2npPp2/p2B1P1P/6Q1/PP3NP1/2RR2K1 w - - 7 25",
+      "topic": "positional",
+      "game_id": "generated_005",
+      "ply": 48,
+      "split": "train"
+    },
+    {
+      "name": "generated_006_048",
+      "fen": "r4rk1/3n1ppp/b3p3/1P5Q/P2Np3/q3B1P1/5P1P/5K1R w - - 0 25",
+      "topic": "positional",
+      "game_id": "generated_006",
+      "ply": 48,
+      "split": "train"
+    },
+    {
+      "name": "generated_007_048",
+      "fen": "1r1qr1k1/1p2ppbp/p1np2p1/4n3/2PN2b1/RP2P1P1/1B2NPBP/3Q1RK1 w - - 6 25",
+      "topic": "positional",
+      "game_id": "generated_007",
+      "ply": 48,
+      "split": "train"
+    },
+    {
+      "name": "generated_008_048",
+      "fen": "1r1q1rk1/1p1b2n1/p2p2pB/2pPp1b1/P1P1P3/1PNB2P1/2Q3KP/1R3R2 w - - 3 25",
+      "topic": "tactics",
+      "game_id": "generated_008",
+      "ply": 48,
+      "split": "train"
+    },
+    {
+      "name": "generated_009_048",
+      "fen": "3r1rk1/3n1ppp/Q2P4/8/5B2/1q3BPb/4PP1P/R1R3K1 w - - 7 25",
+      "topic": "positional",
+      "game_id": "generated_009",
+      "ply": 48,
+      "split": "train"
+    },
+    {
+      "name": "generated_010_048",
+      "fen": "r5r1/3kbp1p/n1p1q3/1p1p3p/3P1B2/PQN1PP2/1P4P1/2R2K1R w - - 0 25",
+      "topic": "positional",
+      "game_id": "generated_010",
+      "ply": 48,
+      "split": "train"
+    },
+    {
+      "name": "generated_011_048",
+      "fen": "2r3k1/3n1p1p/1p4p1/pB6/5Pb1/B5n1/P5PP/4K2R w K - 0 25",
+      "topic": "endgame",
+      "game_id": "generated_011",
+      "ply": 48,
+      "split": "train"
+    },
+    {
+      "name": "generated_012_048",
+      "fen": "b2r4/3kbppp/3p4/2P1p3/PPq1P1n1/4KP2/3Q2PP/R6R w - - 3 25",
+      "topic": "tactics",
+      "game_id": "generated_012",
+      "ply": 48,
+      "split": "train"
+    },
+    {
+      "name": "generated_013_048",
+      "fen": "3r3k/2q1rppP/p7/npp1p1Pn/8/2P1N3/PPQ2P2/R1B1R1K1 w - - 1 25",
+      "topic": "positional",
+      "game_id": "generated_013",
+      "ply": 48,
+      "split": "train"
+    },
+    {
+      "name": "generated_014_048",
+      "fen": "8/p2k2p1/2p2bP1/3r4/3P1p1r/5K2/PP1B1P2/2RR4 w - - 1 25",
+      "topic": "endgame",
+      "game_id": "generated_014",
+      "ply": 48,
+      "split": "validation"
+    },
+    {
+      "name": "generated_015_048",
+      "fen": "rn4k1/r4pp1/1p6/p2p3p/1P1P3P/2B2P1B/RP3K1P/2R5 w - - 5 25",
+      "topic": "endgame",
+      "game_id": "generated_015",
+      "ply": 48,
+      "split": "validation"
+    },
+    {
+      "name": "generated_016_048",
+      "fen": "4k3/p2n4/1r1b1pp1/2pP3r/4P1p1/1P4B1/P3RPPP/2R3K1 w - - 3 25",
+      "topic": "endgame",
+      "game_id": "generated_016",
+      "ply": 48,
+      "split": "validation"
+    },
+    {
+      "name": "generated_017_048",
+      "fen": "2r5/5k2/4bn1p/q4pp1/3Pp3/4P1P1/PP1bQPBP/R4RK1 w - - 5 25",
+      "topic": "positional",
+      "game_id": "generated_017",
+      "ply": 48,
+      "split": "test"
+    },
+    {
+      "name": "generated_018_048",
+      "fen": "r7/p4Bpk/1pn1p1Np/5q2/3pp2P/P1P1P3/5PP1/2R2RK1 w - - 7 25",
+      "topic": "positional",
+      "game_id": "generated_018",
+      "ply": 48,
+      "split": "test"
+    },
+    {
+      "name": "generated_019_048",
+      "fen": "2r2r1k/1q2b2b/2p1p2p/1p2Ppp1/pP3P2/P3P3/4NPBP/R1RQ2K1 w - - 0 25",
+      "topic": "positional",
+      "game_id": "generated_019",
+      "ply": 48,
+      "split": "test"
+    },
+    {
+      "name": "generated_020_048",
+      "fen": "r4rk1/pp3pb1/2n1pPbB/3p4/3P2Qp/7P/P3NPP1/4RBK1 w - - 1 25",
+      "topic": "positional",
+      "game_id": "generated_020",
+      "ply": 48,
+      "split": "train"
+    },
+    {
+      "name": "generated_021_048",
+      "fen": "3rqrk1/1b2b3/p3ppp1/1pp1N1Pp/P1pP3P/2N1PP2/1P1Q1R2/2R1K3 w - - 0 25",
+      "topic": "positional",
+      "game_id": "generated_021",
+      "ply": 48,
+      "split": "train"
+    },
+    {
+      "name": "generated_022_048",
+      "fen": "2rr1qk1/pp1b1ppn/8/3pNP2/3P2RP/P3P3/2BQ4/R6K w - - 1 25",
+      "topic": "positional",
+      "game_id": "generated_022",
+      "ply": 48,
+      "split": "train"
+    },
+    {
+      "name": "generated_023_048",
+      "fen": "r4rk1/2p2ppp/p1P3q1/8/2p4R/1P2b3/PB2b1PP/5K2 w - - 0 25",
+      "topic": "tactics",
+      "game_id": "generated_023",
+      "ply": 48,
+      "split": "train"
+    },
+    {
+      "name": "generated_024_048",
+      "fen": "r1q2rk1/6p1/1pn1pp1p/3pP2P/2b2P1R/P3B3/1P1KQ3/2R2B2 w - - 1 25",
+      "topic": "positional",
+      "game_id": "generated_024",
+      "ply": 48,
+      "split": "train"
+    },
+    {
+      "name": "generated_025_048",
+      "fen": "r1bb1rk1/1p3p1p/2p1n1p1/3p4/pP1P3P/P3PPP1/2Q2K2/R2R1B2 w - - 1 25",
+      "topic": "positional",
+      "game_id": "generated_025",
+      "ply": 48,
+      "split": "train"
+    },
+    {
+      "name": "generated_026_048",
+      "fen": "r1b1qbk1/2R3pp/4p3/pp6/5B2/P7/1P2QPPP/4R1K1 w - - 0 25",
+      "topic": "positional",
+      "game_id": "generated_026",
+      "ply": 48,
+      "split": "train"
+    },
+    {
+      "name": "generated_027_048",
+      "fen": "4r2k/pb2q2p/1p1p4/2p2Q2/3b1P2/2NP4/PPn1N2R/1RB2K2 w - - 3 25",
+      "topic": "positional",
+      "game_id": "generated_027",
+      "ply": 48,
+      "split": "train"
+    },
+    {
+      "name": "generated_028_048",
+      "fen": "5rk1/r2p1p1p/nq2p1p1/n1pP4/P7/1PB1PBP1/2Q2PKP/RR6 w - - 3 25",
+      "topic": "positional",
+      "game_id": "generated_028",
+      "ply": 48,
+      "split": "train"
+    },
+    {
+      "name": "generated_029_048",
+      "fen": "5rk1/1P2q1pp/n6b/p1Pn1p2/2PP4/P5PN/4P1BP/3R1RK1 w - - 0 25",
+      "topic": "tactics",
+      "game_id": "generated_029",
+      "ply": 48,
+      "split": "train"
+    },
+    {
+      "name": "generated_030_048",
+      "fen": "1rr3k1/6pp/3p1p2/b2Pp3/P1P1P1b1/2N1P3/6PP/R1R3K1 w - - 2 25",
+      "topic": "endgame",
+      "game_id": "generated_030",
+      "ply": 48,
+      "split": "train"
+    },
+    {
+      "name": "generated_031_048",
+      "fen": "2r3k1/3nbppp/p3p3/3n4/8/2N1P3/1r1BBPPP/R2R2K1 w - - 0 25",
+      "topic": "positional",
+      "game_id": "generated_031",
+      "ply": 48,
+      "split": "train"
+    },
+    {
+      "name": "generated_032_048",
+      "fen": "1r3Bk1/4Pppp/5q2/pp6/Pn6/1P1P2P1/3N1PNP/R1R3K1 w - - 1 25",
+      "topic": "tactics",
+      "game_id": "generated_032",
+      "ply": 48,
+      "split": "train"
+    },
+    {
+      "name": "generated_033_048",
+      "fen": "q4rk1/P3bppp/5n2/2P5/1R2P3/2p1Bn2/2P2P1P/6K1 w - - 0 25",
+      "topic": "endgame",
+      "game_id": "generated_033",
+      "ply": 48,
+      "split": "train"
+    },
+    {
+      "name": "generated_034_048",
+      "fen": "2r1r1k1/p4qp1/1p1B3p/2p1Pp2/1PPn4/3P3P/P2Q2P1/1R3RK1 w - - 0 25",
+      "topic": "positional",
+      "game_id": "generated_034",
+      "ply": 48,
+      "split": "validation"
+    },
+    {
+      "name": "generated_035_048",
+      "fen": "r3krB1/p2nqpQ1/b1p1p3/4P1N1/3P3P/8/5PP1/5RK1 w q - 1 25",
+      "topic": "tactics",
+      "game_id": "generated_035",
+      "ply": 48,
+      "split": "validation"
+    },
+    {
+      "name": "generated_036_048",
+      "fen": "2rr2k1/p4pp1/Bp6/4Pq1p/3RbP2/P1Q1P3/6PP/4K2R w K - 0 25",
+      "topic": "tactics",
+      "game_id": "generated_036",
+      "ply": 48,
+      "split": "validation"
+    },
+    {
+      "name": "generated_037_048",
+      "fen": "4r1k1/r3np1p/p3bbp1/N1Pp4/1P6/P2p2P1/5PBP/3RR1K1 w - - 2 25",
+      "topic": "positional",
+      "game_id": "generated_037",
+      "ply": 48,
+      "split": "test"
+    },
+    {
+      "name": "generated_038_048",
+      "fen": "1k1n3R/p1pr3p/7p/1p6/8/P2p1N2/1P3PPP/2R3K1 w - - 0 25",
+      "topic": "endgame",
+      "game_id": "generated_038",
+      "ply": 48,
+      "split": "test"
+    },
+    {
+      "name": "generated_039_048",
+      "fen": "r3nr2/3b2k1/3P1pp1/1p2p2p/4P2P/5N2/P3BPP1/1R3RK1 w - - 0 25",
+      "topic": "endgame",
+      "game_id": "generated_039",
+      "ply": 48,
+      "split": "test"
+    },
+    {
+      "name": "generated_000_052",
+      "fen": "3r4/1p3kb1/2qp1pn1/1p2pN1Q/8/8/PP3P1P/3RK3 w - - 2 27",
+      "topic": "positional",
+      "game_id": "generated_000",
+      "ply": 52,
+      "split": "train"
+    },
+    {
+      "name": "generated_001_052",
+      "fen": "3n4/1p3p2/p4p2/2k1pP2/2P5/4KBP1/P1P5/8 w - - 1 27",
+      "topic": "endgame",
+      "game_id": "generated_001",
+      "ply": 52,
+      "split": "train"
+    },
+    {
+      "name": "generated_002_052",
+      "fen": "6k1/pp3rp1/3p1nqp/4pR2/P1p1P2B/2PP1Q2/1P4P1/5RK1 w - - 0 27",
+      "topic": "positional",
+      "game_id": "generated_002",
+      "ply": 52,
+      "split": "train"
+    },
+    {
+      "name": "generated_003_052",
+      "fen": "r3b3/pp4k1/4pp2/2bpp3/8/P4rPP/2P5/1KR5 w - - 1 27",
+      "topic": "endgame",
+      "game_id": "generated_003",
+      "ply": 52,
+      "split": "train"
+    },
+    {
+      "name": "generated_004_052",
+      "fen": "5k2/pp1b1p1p/3pp2q/P7/4P3/2N4P/KPP1B1r1/3R1n2 w - - 0 27",
+      "topic": "endgame",
+      "game_id": "generated_004",
+      "ply": 52,
+      "split": "train"
+    },
+    {
+      "name": "generated_005_052",
+      "fen": "r2q4/5pbk/1p1rb2p/2npPp1p/p2B1P2/7Q/PP3NP1/2RR2K1 w - - 0 27",
+      "topic": "tactics",
+      "game_id": "generated_005",
+      "ply": 52,
+      "split": "train"
+    },
+    {
+      "name": "generated_006_052",
+      "fen": "r4rk1/5ppp/b3pn2/1P4Q1/P2Np3/3qB1P1/5PKP/7R w - - 4 27",
+      "topic": "positional",
+      "game_id": "generated_006",
+      "ply": 52,
+      "split": "train"
+    },
+    {
+      "name": "generated_007_052",
+      "fen": "1r1qr1k1/1p2ppbp/p1np2p1/8/2P5/RP2PnPP/1B2NPB1/3Q1RK1 w - - 0 27",
+      "topic": "tactics",
+      "game_id": "generated_007",
+      "ply": 52,
+      "split": "train"
+    },
+    {
+      "name": "generated_008_052",
+      "fen": "1r1q1k2/1p4n1/p2p2p1/2pPp1B1/P1P1P3/1PNB2Pb/2Q3KP/1R6 w - - 1 27",
+      "topic": "tactics",
+      "game_id": "generated_008",
+      "ply": 52,
+      "split": "train"
+    },
+    {
+      "name": "generated_009_052",
+      "fen": "3rr1k1/3n1ppp/3Pq3/R7/5B2/3Q1BPb/4PP1P/2R3K1 w - - 11 27",
+      "topic": "positional",
+      "game_id": "generated_009",
+      "ply": 52,
+      "split": "train"
+    },
+    {
+      "name": "generated_010_052",
+      "fen": "r3k3/4bp1p/n1p1q3/1p1R4/3P1B2/PQN1PP2/1P4r1/2R2K2 w - - 1 27",
+      "topic": "tactics",
+      "game_id": "generated_010",
+      "ply": 52,
+      "split": "train"
+    },
+    {
+      "name": "generated_011_052",
+      "fen": "6k1/3n1p1p/1p4p1/pB6/5Pb1/r5P1/P5P1/5RK1 w - - 0 27",
+      "topic": "endgame",
+      "game_id": "generated_011",
+      "ply": 52,
+      "split": "train"
+    },
+    {
+      "name": "generated_012_052",
+      "fen": "b2r4/3k1ppp/3p4/2P1p3/PPq1P1P1/8/3b1KPP/R6R w - - 0 27",
+      "topic": "endgame",
+      "game_id": "generated_012",
+      "ply": 52,
+      "split": "train"
+    },
+    {
+      "name": "generated_013_052",
+      "fen": "3rr2k/2q2ppP/p7/1pp1pNPn/2n1Q3/2P5/PP3P2/R1B1R1K1 w - - 5 27",
+      "topic": "positional",
+      "game_id": "generated_013",
+      "ply": 52,
+      "split": "train"
+    },
+    {
+      "name": "generated_014_052",
+      "fen": "8/p2k2p1/2p2bP1/7r/3P1p2/2B4r/PP3PK1/2RR4 w - - 5 27",
+      "topic": "endgame",
+      "game_id": "generated_014",
+      "ply": 52,
+      "split": "validation"
+    },
+    {
+      "name": "generated_015_052",
+      "fen": "r4nk1/r4pp1/1p6/P2p3p/3P3P/5P1B/RP1B1K1P/2R5 w - - 1 27",
+      "topic": "endgame",
+      "game_id": "generated_015",
+      "ply": 52,
+      "split": "validation"
+    },
+    {
+      "name": "generated_016_052",
+      "fen": "4k3/p7/1r3pp1/2pPb2r/2R1P1p1/1P6/P3RPPP/6K1 w - - 0 27",
+      "topic": "endgame",
+      "game_id": "generated_016",
+      "ply": 52,
+      "split": "validation"
+    },
+    {
+      "name": "generated_017_052",
+      "fen": "2r5/5k2/Q3bn1p/6p1/1q1Ppp2/4P1P1/P2b1PBP/R4RK1 w - - 0 27",
+      "topic": "tactics",
+      "game_id": "generated_017",
+      "ply": 52,
+      "split": "test"
+    },
+    {
+      "name": "generated_018_052",
+      "fen": "r3q3/p5pk/1pn1p1Np/7P/3Pp3/P3P3/5PP1/2R2RK1 w - - 1 27",
+      "topic": "endgame",
+      "game_id": "generated_018",
+      "ply": 52,
+      "split": "test"
+    },
+    {
+      "name": "generated_019_052",
+      "fen": "2rr3k/4b2b/1qp1p2p/1p2Ppp1/pP3P2/P3P3/2R1NPBP/R4QK1 w - - 4 27",
+      "topic": "positional",
+      "game_id": "generated_019",
+      "ply": 52,
+      "split": "test"
+    },
+    {
+      "name": "generated_020_052",
+      "fen": "rr4k1/pp3pP1/2n3bB/3pp3/3P3Q/7P/P3NPP1/4RBK1 w - - 0 27",
+      "topic": "positional",
+      "game_id": "generated_020",
+      "ply": 52,
+      "split": "train"
+    },
+    {
+      "name": "generated_021_052",
+      "fen": "3rqrk1/1b2b3/p3p1p1/1pp1p1Pp/P2PP2P/2p2P2/1P1QNR2/2R1K3 w - - 0 27",
+      "topic": "positional",
+      "game_id": "generated_021",
+      "ply": 52,
+      "split": "train"
+    },
+    {
+      "name": "generated_022_052",
+      "fen": "2rr2k1/pp1b1pq1/5n2/3pNP2/3P3P/P3P3/2BQ4/6RK w - - 0 27",
+      "topic": "tactics",
+      "game_id": "generated_022",
+      "ply": 52,
+      "split": "train"
+    },
+    {
+      "name": "generated_023_052",
+      "fen": "r3r1k1/2p2ppp/p1P3q1/8/2p4R/1P6/P3b1PP/2b1K3 w - - 0 27",
+      "topic": "endgame",
+      "game_id": "generated_023",
+      "ply": 52,
+      "split": "train"
+    },
+    {
+      "name": "generated_024_052",
+      "fen": "r1q2rk1/6p1/1pn1p2p/3pp2P/5P1R/P3B3/1P1K4/2R2Q2 w - - 0 27",
+      "topic": "positional",
+      "game_id": "generated_024",
+      "ply": 52,
+      "split": "train"
+    },
+    {
+      "name": "generated_025_052",
+      "fen": "r1bb1rk1/1p3p1p/2p3p1/3p1n2/pP1P3P/P3PPP1/2Q2K2/1R2RB2 w - - 5 27",
+      "topic": "positional",
+      "game_id": "generated_025",
+      "ply": 52,
+      "split": "train"
+    },
+    {
+      "name": "generated_026_052",
+      "fen": "2b1qbk1/2R3pp/1r2p3/pp6/5B1P/P4Q2/1P3PP1/4R1K1 w - - 1 27",
+      "topic": "positional",
+      "game_id": "generated_026",
+      "ply": 52,
+      "split": "train"
+    },
+    {
+      "name": "generated_027_052",
+      "fen": "4r2k/pb2q3/1p6/2pp1QNp/3b1P2/3P4/PPn1N2R/1RB2K2 w - - 0 27",
+      "topic": "positional",
+      "game_id": "generated_027",
+      "ply": 52,
+      "split": "train"
+    },
+    {
+      "name": "generated_028_052",
+      "fen": "5rk1/r2p3p/nq2p1p1/n1pP4/P3p3/1PB2BP1/3Q1PKP/RR6 w - - 0 27",
+      "topic": "positional",
+      "game_id": "generated_028",
+      "ply": 52,
+      "split": "train"
+    },
+    {
+      "name": "generated_029_052",
+      "fen": "5r1k/1P2q1pp/n7/p1PB1p2/2PPP3/P3b1PN/7P/3R1RK1 w - - 1 27",
+      "topic": "tactics",
+      "game_id": "generated_029",
+      "ply": 52,
+      "split": "train"
+    },
+    {
+      "name": "generated_030_052",
+      "fen": "2r3k1/6pp/1r1p1p2/bN1Pp2b/P1P1P3/4P2P/6P1/R1R3K1 w - - 1 27",
+      "topic": "endgame",
+      "game_id": "generated_030",
+      "ply": 52,
+      "split": "train"
+    },
+    {
+      "name": "generated_031_052",
+      "fen": "6k1/2rnbppp/B7/3p4/8/4P3/1r1B1PPP/R2R2K1 w - - 0 27",
+      "topic": "endgame",
+      "game_id": "generated_031",
+      "ply": 52,
+      "split": "train"
+    },
+    {
+      "name": "generated_032_052",
+      "fen": "5k2/5ppp/5q2/pp6/Pn3N2/1P1P2P1/3N1P1P/R1R3K1 w - - 0 27",
+      "topic": "endgame",
+      "game_id": "generated_032",
+      "ply": 52,
+      "split": "train"
+    },
+    {
+      "name": "generated_033_052",
+      "fen": "q4rk1/P3bppp/2n2n1B/2P5/1R2P3/2p5/2P2P1P/7K w - - 4 27",
+      "topic": "endgame",
+      "game_id": "generated_033",
+      "ply": 52,
+      "split": "train"
+    },
+    {
+      "name": "generated_034_052",
+      "fen": "2r3k1/p2q2p1/1p1Br2p/2p1Pp2/1PPn4/3P3P/P4QP1/1R3RK1 w - - 4 27",
+      "topic": "positional",
+      "game_id": "generated_034",
+      "ply": 52,
+      "split": "validation"
+    },
+    {
+      "name": "generated_035_052",
+      "fen": "r3krB1/3nqpQ1/2p1p3/p3P1N1/3P3P/3b4/1R3PP1/6K1 w q - 0 27",
+      "topic": "tactics",
+      "game_id": "generated_035",
+      "ply": 52,
+      "split": "validation"
+    },
+    {
+      "name": "generated_036_052",
+      "fen": "3r2k1/p4pp1/Bp4q1/4P2p/4bP2/P3P3/1Q4PP/4K2R w K - 0 27",
+      "topic": "positional",
+      "game_id": "generated_036",
+      "ply": 52,
+      "split": "validation"
+    },
+    {
+      "name": "generated_037_052",
+      "fen": "r5k1/r3np1p/p4bp1/N1Pp1b2/1P6/P4RP1/5PBP/4R1K1 w - - 3 27",
+      "topic": "positional",
+      "game_id": "generated_037",
+      "ply": 52,
+      "split": "test"
+    },
+    {
+      "name": "generated_038_052",
+      "fen": "2knR3/p1p4p/3r3p/1p6/8/PP1p1N2/5PPP/2R3K1 w - - 1 27",
+      "topic": "endgame",
+      "game_id": "generated_038",
+      "ply": 52,
+      "split": "test"
+    },
+    {
+      "name": "generated_039_052",
+      "fen": "4nr2/6k1/3P1pp1/1b2p2p/4P2P/5N2/r4PP1/1R1R2K1 w - - 0 27",
+      "topic": "endgame",
+      "game_id": "generated_039",
+      "ply": 52,
+      "split": "test"
+    },
+    {
+      "name": "generated_000_056",
+      "fen": "7r/1p3kb1/3p1pn1/1p2pN1Q/7P/3R4/PP3Pq1/4K3 w - - 3 29",
+      "topic": "tactics",
+      "game_id": "generated_000",
+      "ply": 56,
+      "split": "train"
+    },
+    {
+      "name": "generated_001_056",
+      "fen": "3n4/5p2/p4p2/2kBpP2/2p1K3/6P1/P1P5/8 w - - 0 29",
+      "topic": "endgame",
+      "game_id": "generated_001",
+      "ply": 56,
+      "split": "train"
+    },
+    {
+      "name": "generated_002_056",
+      "fen": "6k1/pp3rp1/3p1nqp/4pR2/P1P1P2B/2P4Q/1P4P1/5RK1 w - - 3 29",
+      "topic": "positional",
+      "game_id": "generated_002",
+      "ply": 56,
+      "split": "train"
+    },
+    {
+      "name": "generated_003_056",
+      "fen": "r3b3/pp4k1/3bpp2/3pp3/6P1/5r1P/2P5/1K1R4 w - - 2 29",
+      "topic": "endgame",
+      "game_id": "generated_003",
+      "ply": 56,
+      "split": "train"
+    },
+    {
+      "name": "generated_004_056",
+      "fen": "5k2/pp1b1p1p/3Rp3/P7/4P3/2NB3P/KPr5/2q2n2 w - - 0 29",
+      "topic": "endgame",
+      "game_id": "generated_004",
+      "ply": 56,
+      "split": "train"
+    },
+    {
+      "name": "generated_005_056",
+      "fen": "r7/5p1k/1p1qb2p/2np1p1p/p2R1P2/7Q/PP3NP1/2R3K1 w - - 0 29",
+      "topic": "positional",
+      "game_id": "generated_005",
+      "ply": 56,
+      "split": "train"
+    },
+    {
+      "name": "generated_006_056",
+      "fen": "r4r2/5ppk/b1N1pn1p/1P2Q3/P3p3/3qB1P1/5PKP/7R w - - 2 29",
+      "topic": "positional",
+      "game_id": "generated_006",
+      "ply": 56,
+      "split": "train"
+    },
+    {
+      "name": "generated_007_056",
+      "fen": "1r1qr1k1/1p2pp1p/p1np2p1/8/2P4n/1P2P1PP/Rb2NPB1/3Q1R1K w - - 2 29",
+      "topic": "positional",
+      "game_id": "generated_007",
+      "ply": 56,
+      "split": "train"
+    },
+    {
+      "name": "generated_008_056",
+      "fen": "1r3k2/1p2q1n1/p2p2p1/2pPp3/P1P1P3/1PNB2PK/7P/1RQ5 w - - 2 29",
+      "topic": "positional",
+      "game_id": "generated_008",
+      "ply": 56,
+      "split": "train"
+    },
+    {
+      "name": "generated_009_056",
+      "fen": "3rrnk1/5ppp/3q4/4R3/5B2/4QBPb/4PP1P/2R3K1 w - - 0 29",
+      "topic": "tactics",
+      "game_id": "generated_009",
+      "ply": 56,
+      "split": "train"
+    },
+    {
+      "name": "generated_010_056",
+      "fen": "r3k3/4bp1p/n1p5/3q4/1p1P1B2/PQ2PP2/1P2N1K1/2R5 w - - 0 29",
+      "topic": "tactics",
+      "game_id": "generated_010",
+      "ply": 56,
+      "split": "train"
+    },
+    {
+      "name": "generated_011_056",
+      "fen": "8/2Rnkp1p/1p4p1/pB6/5Pb1/r5P1/P5P1/6K1 w - - 4 29",
+      "topic": "endgame",
+      "game_id": "generated_011",
+      "ply": 56,
+      "split": "train"
+    },
+    {
+      "name": "generated_012_056",
+      "fen": "b2r4/3k1ppp/3p4/2P1p3/PP2P1P1/3q4/3b2PP/R1R2K2 w - - 4 29",
+      "topic": "endgame",
+      "game_id": "generated_012",
+      "ply": 56,
+      "split": "train"
+    },
+    {
+      "name": "generated_013_056",
+      "fen": "3rr2k/3q1ppP/p6N/1pp3Pn/2n1p1Q1/2P5/PP3P2/R1B1R1K1 w - - 0 29",
+      "topic": "tactics",
+      "game_id": "generated_013",
+      "ply": 56,
+      "split": "train"
+    },
+    {
+      "name": "generated_014_056",
+      "fen": "8/p2k2p1/2p3P1/6br/3P4/2B2p1r/PP3P2/2R2KR1 w - - 0 29",
+      "topic": "endgame",
+      "game_id": "generated_014",
+      "ply": 56,
+      "split": "validation"
+    },
+    {
+      "name": "generated_015_056",
+      "fen": "r5k1/r4pp1/4n3/p2p3p/1P1P3P/5P1B/2RB1K1P/2R5 w - - 0 29",
+      "topic": "endgame",
+      "game_id": "generated_015",
+      "ply": 56,
+      "split": "validation"
+    },
+    {
+      "name": "generated_016_056",
+      "fen": "8/p3k3/1r3pp1/2RPb2r/4P3/1P5p/P3RPP1/6K1 w - - 1 29",
+      "topic": "endgame",
+      "game_id": "generated_016",
+      "ply": 56,
+      "split": "validation"
+    },
+    {
+      "name": "generated_017_056",
+      "fen": "2r5/1R6/Q3bnkp/6p1/2qPpp2/4P1P1/P2b1PBP/5RK1 w - - 4 29",
+      "topic": "tactics",
+      "game_id": "generated_017",
+      "ply": 56,
+      "split": "test"
+    },
+    {
+      "name": "generated_018_056",
+      "fen": "r3q3/p3n1pk/1p5p/4p2P/3PpN2/P3PP2/6P1/2R2RK1 w - - 0 29",
+      "topic": "endgame",
+      "game_id": "generated_018",
+      "ply": 56,
+      "split": "test"
+    },
+    {
+      "name": "generated_019_056",
+      "fen": "2rr3k/4b2b/4p2p/1qp1Ppp1/pP1N1P2/P3P3/2R2PBP/R5K1 w - - 0 29",
+      "topic": "tactics",
+      "game_id": "generated_019",
+      "ply": 56,
+      "split": "test"
+    },
+    {
+      "name": "generated_020_056",
+      "fen": "rr4k1/pp3pPb/2n5/3p4/3p1P1Q/4B2P/P3N1P1/4RBK1 w - - 0 29",
+      "topic": "positional",
+      "game_id": "generated_020",
+      "ply": 56,
+      "split": "train"
+    },
+    {
+      "name": "generated_021_056",
+      "fen": "3rq1k1/1b3r2/p2bp1p1/1pp1p1Pp/P2PP2P/2P2P2/2Q1NR2/2R1K3 w - - 3 29",
+      "topic": "positional",
+      "game_id": "generated_021",
+      "ply": 56,
+      "split": "train"
+    },
+    {
+      "name": "generated_022_056",
+      "fen": "2r3r1/pp1b1pk1/5n2/3pNP2/3PP2P/P7/2BQ4/7K w - - 1 29",
+      "topic": "endgame",
+      "game_id": "generated_022",
+      "ply": 56,
+      "split": "train"
+    },
+    {
+      "name": "generated_024_056",
+      "fen": "r4rk1/1q4p1/1Bn1p2p/3pp2P/5P1R/P7/1P1K4/2R2Q2 w - - 1 29",
+      "topic": "positional",
+      "game_id": "generated_024",
+      "ply": 56,
+      "split": "train"
+    },
+    {
+      "name": "generated_025_056",
+      "fen": "r1b2rk1/1pb2p1p/2p3p1/1P1p4/p2P2Pn/P3PP2/2Q2K2/1R2RB2 w - - 0 29",
+      "topic": "positional",
+      "game_id": "generated_025",
+      "ply": 56,
+      "split": "train"
+    },
+    {
+      "name": "generated_026_056",
+      "fen": "2b1qbk1/2R3pp/1r2p3/4B3/pp5P/P4Q2/1P3PP1/3R2K1 w - - 0 29",
+      "topic": "positional",
+      "game_id": "generated_026",
+      "ply": 56,
+      "split": "train"
+    },
+    {
+      "name": "generated_027_056",
+      "fen": "5r1k/pb2q3/1p3bQ1/2pp2Np/5P2/3P4/PPn1N1R1/1RB2K2 w - - 4 29",
+      "topic": "positional",
+      "game_id": "generated_027",
+      "ply": 56,
+      "split": "train"
+    },
+    {
+      "name": "generated_028_056",
+      "fen": "5rk1/r1np3p/1q4pQ/n1pPp3/P3B3/1PB3P1/5PKP/RR6 w - - 0 29",
+      "topic": "tactics",
+      "game_id": "generated_028",
+      "ply": 56,
+      "split": "train"
+    },
+    {
+      "name": "generated_029_056",
+      "fen": "7k/1P2q1pp/n7/p1PB4/2PPp3/P3brPN/6KP/3R1R2 w - - 2 29",
+      "topic": "tactics",
+      "game_id": "generated_029",
+      "ply": 56,
+      "split": "train"
+    },
+    {
+      "name": "generated_030_056",
+      "fen": "2r3k1/3r2pp/5p2/b1PPp2b/P3P3/4P2P/6P1/R1R3K1 w - - 1 29",
+      "topic": "endgame",
+      "game_id": "generated_030",
+      "ply": 56,
+      "split": "train"
+    },
+    {
+      "name": "generated_031_056",
+      "fen": "6k1/3nbp1p/6p1/B2p4/8/4P3/1rr2PPP/R2R1BK1 w - - 2 29",
+      "topic": "endgame",
+      "game_id": "generated_031",
+      "ply": 56,
+      "split": "train"
+    },
+    {
+      "name": "generated_032_056",
+      "fen": "5k2/5p2/5q1p/pP4p1/1n3N1P/1P1P2P1/3N1P2/R1R3K1 w - - 0 29",
+      "topic": "endgame",
+      "game_id": "generated_032",
+      "ply": 56,
+      "split": "train"
+    },
+    {
+      "name": "generated_033_056",
+      "fen": "5r2/q3bpkp/2n2n2/2P5/4P3/2p5/2P2P1P/1R5K w - - 0 29",
+      "topic": "endgame",
+      "game_id": "generated_033",
+      "ply": 56,
+      "split": "train"
+    },
+    {
+      "name": "generated_034_056",
+      "fen": "2r3k1/p5p1/1pqB2rp/2p1Pp2/1PPn4/P2P3P/1R3QP1/5RK1 w - - 1 29",
+      "topic": "positional",
+      "game_id": "generated_034",
+      "ply": 56,
+      "split": "validation"
+    },
+    {
+      "name": "generated_035_056",
+      "fen": "r3k1B1/3nqrQ1/2p1pp2/p3P3/3P3P/3b4/R4PP1/6K1 w q - 0 29",
+      "topic": "tactics",
+      "game_id": "generated_035",
+      "ply": 56,
+      "split": "validation"
+    },
+    {
+      "name": "generated_036_056",
+      "fen": "6k1/p4pp1/B5q1/1p1rP2p/4bP2/P3P3/1Q4PP/2R3K1 w - - 0 29",
+      "topic": "positional",
+      "game_id": "generated_036",
+      "ply": 56,
+      "split": "validation"
+    },
+    {
+      "name": "generated_037_056",
+      "fen": "r5k1/4rp1p/p4bp1/N1Pp4/1P4b1/P4R2/5PBP/6K1 w - - 0 29",
+      "topic": "endgame",
+      "game_id": "generated_037",
+      "ply": 56,
+      "split": "test"
+    },
+    {
+      "name": "generated_038_056",
+      "fen": "2k5/p1p4p/3r3p/1pn5/8/PP1pRN2/5PPP/3R2K1 w - - 5 29",
+      "topic": "endgame",
+      "game_id": "generated_038",
+      "ply": 56,
+      "split": "test"
+    },
+    {
+      "name": "generated_039_056",
+      "fen": "4n3/3R1rk1/5pp1/4p2p/4P2P/5N2/r4PP1/1R4K1 w - - 1 29",
+      "topic": "endgame",
+      "game_id": "generated_039",
+      "ply": 56,
+      "split": "test"
+    },
+    {
+      "name": "generated_000_060",
+      "fen": "5b1r/1p3k2/3p1pn1/1p2pN2/7P/5R2/PP3P2/4K3 w - - 1 31",
+      "topic": "endgame",
+      "game_id": "generated_000",
+      "ply": 60,
+      "split": "train"
+    },
+    {
+      "name": "generated_001_060",
+      "fen": "8/n4B2/p4p2/2k1pP2/2p1K3/2P3P1/P7/8 w - - 1 31",
+      "topic": "endgame",
+      "game_id": "generated_001",
+      "ply": 60,
+      "split": "train"
+    },
+    {
+      "name": "generated_002_060",
+      "fen": "6k1/5rp1/1p1p1nqp/p3pR2/P1P1P2B/1PP2Q2/6P1/5RK1 w - - 0 31",
+      "topic": "positional",
+      "game_id": "generated_002",
+      "ply": 60,
+      "split": "train"
+    },
+    {
+      "name": "generated_003_060",
+      "fen": "r3b3/pp4k1/3bp3/3p2p1/4p2P/5r2/2P5/1K1R4 w - - 0 31",
+      "topic": "endgame",
+      "game_id": "generated_003",
+      "ply": 60,
+      "split": "train"
+    },
+    {
+      "name": "generated_004_060",
+      "fen": "3R4/pp2kp1p/2b1p3/P7/4P3/2N4P/KPB5/2q2n2 w - - 3 31",
+      "topic": "endgame",
+      "game_id": "generated_004",
+      "ply": 60,
+      "split": "train"
+    },
+    {
+      "name": "generated_005_060",
+      "fen": "r7/4qp1k/1p2b2p/3pNp1p/p2RnP2/7Q/PP4P1/2R3K1 w - - 4 31",
+      "topic": "positional",
+      "game_id": "generated_005",
+      "ply": 60,
+      "split": "train"
+    },
+    {
+      "name": "generated_006_060",
+      "fen": "r4r2/5ppk/q1N1p2p/8/P3p1n1/4B1P1/1Q3PKP/7R w - - 0 31",
+      "topic": "positional",
+      "game_id": "generated_006",
+      "ply": 60,
+      "split": "train"
+    },
+    {
+      "name": "generated_007_060",
+      "fen": "1r1qr1k1/1p2pp1p/p2p1bp1/7P/1nP5/1P2P2P/R3NPB1/3Q1R1K w - - 1 31",
+      "topic": "positional",
+      "game_id": "generated_007",
+      "ply": 60,
+      "split": "train"
+    },
+    {
+      "name": "generated_008_060",
+      "fen": "1r3k2/1p2q1n1/p2p2p1/2pPp3/P1P1P3/1PNB2P1/3Q2KP/1R6 w - - 6 31",
+      "topic": "positional",
+      "game_id": "generated_008",
+      "ply": 60,
+      "split": "train"
+    },
+    {
+      "name": "generated_009_060",
+      "fen": "3r1nk1/5ppp/8/4r3/5B2/4Q1Pb/4PP1P/2Rq1BK1 w - - 0 31",
+      "topic": "tactics",
+      "game_id": "generated_009",
+      "ply": 60,
+      "split": "train"
+    },
+    {
+      "name": "generated_010_060",
+      "fen": "r3k3/4bp1p/2p5/2nq4/3P1B2/P2QPP2/4N1K1/2R5 w - - 1 31",
+      "topic": "positional",
+      "game_id": "generated_010",
+      "ply": 60,
+      "split": "train"
+    },
+    {
+      "name": "generated_011_060",
+      "fen": "8/4kp1p/1p2b1p1/p7/5P2/r5P1/P1R3P1/6K1 w - - 2 31",
+      "topic": "endgame",
+      "game_id": "generated_011",
+      "ply": 60,
+      "split": "train"
+    },
+    {
+      "name": "generated_012_060",
+      "fen": "b2r4/3k1ppp/3p4/2P1p3/PP2q1P1/8/6PP/2R3K1 w - - 0 31",
+      "topic": "endgame",
+      "game_id": "generated_012",
+      "ply": 60,
+      "split": "train"
+    },
+    {
+      "name": "generated_013_060",
+      "fen": "3rr2k/3q3P/p4ppN/1pp3P1/2n1p3/2P5/PP3P2/R1B1R1KQ w - - 0 31",
+      "topic": "positional",
+      "game_id": "generated_013",
+      "ply": 60,
+      "split": "train"
+    },
+    {
+      "name": "generated_014_060",
+      "fen": "8/p5p1/2p1k1Pb/7r/3P4/2BR1p1r/PP3P2/5KR1 w - - 4 31",
+      "topic": "endgame",
+      "game_id": "generated_014",
+      "ply": 60,
+      "split": "validation"
+    },
+    {
+      "name": "generated_015_060",
+      "fen": "2r3k1/r5p1/4p3/p2p3p/1P1P3P/5P2/3B1K1P/2R5 w - - 0 31",
+      "topic": "endgame",
+      "game_id": "generated_015",
+      "ply": 60,
+      "split": "validation"
+    },
+    {
+      "name": "generated_016_060",
+      "fen": "8/p3k3/1r3p2/2RPb1pr/4P3/1P4P1/P3RP1p/7K w - - 0 31",
+      "topic": "endgame",
+      "game_id": "generated_016",
+      "ply": 60,
+      "split": "validation"
+    },
+    {
+      "name": "generated_017_060",
+      "fen": "2r5/8/R4nkp/3b2p1/3Ppp2/4P1P1/P2b1PBP/5RK1 w - - 1 31",
+      "topic": "endgame",
+      "game_id": "generated_017",
+      "ply": 60,
+      "split": "test"
+    },
+    {
+      "name": "generated_018_060",
+      "fen": "2q5/p3n1pk/1p5p/4P2P/4pN2/P3PP2/6P1/5RK1 w - - 0 31",
+      "topic": "endgame",
+      "game_id": "generated_018",
+      "ply": 60,
+      "split": "test"
+    },
+    {
+      "name": "generated_019_060",
+      "fen": "2r4k/4b2b/4p2p/1N2Ppp1/pp3P2/P3P3/5PBP/R5K1 w - - 0 31",
+      "topic": "endgame",
+      "game_id": "generated_019",
+      "ply": 60,
+      "split": "test"
+    },
+    {
+      "name": "generated_020_060",
+      "fen": "r3r1k1/pp3pPb/2n5/8/3p1P1Q/4BN1P/P5P1/4RBK1 w - - 0 31",
+      "topic": "positional",
+      "game_id": "generated_020",
+      "ply": 60,
+      "split": "train"
+    },
+    {
+      "name": "generated_021_060",
+      "fen": "3r1bk1/1b3r2/p3p1p1/1qp1P1Pp/4P2P/2P2P2/2Q1NR2/2R1K3 w - - 0 31",
+      "topic": "positional",
+      "game_id": "generated_021",
+      "ply": 60,
+      "split": "train"
+    },
+    {
+      "name": "generated_022_060",
+      "fen": "6r1/pp1b1p1k/5Q2/3pNP2/3PP2P/P1r5/2B5/7K w - - 1 31",
+      "topic": "endgame",
+      "game_id": "generated_022",
+      "ply": 60,
+      "split": "train"
+    },
+    {
+      "name": "generated_024_060",
+      "fen": "r4rk1/1qR3p1/1B2p2p/1n1pp2P/5P1R/P7/1P1K4/8 w - - 0 31",
+      "topic": "tactics",
+      "game_id": "generated_024",
+      "ply": 60,
+      "split": "train"
+    }
+  ],
+  "topic_counts": {
+    "opening": 77,
+    "positional": 287,
+    "tactics": 61,
+    "endgame": 75
+  },
+  "split_counts": {
+    "train": 351,
+    "validation": 74,
+    "test": 75
+  }
+}

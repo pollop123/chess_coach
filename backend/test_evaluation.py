@@ -8,10 +8,25 @@ from evaluation import (
     CALIBRATED_FEATURE_WEIGHTS,
     EvaluationResult,
     PositionEvaluator,
+    endgame_weight_percent,
+    get_piece_square_value,
+    is_endgame,
     strategic_weight_percent,
 )
+from evaluation.endgame import mop_up_score
 from evaluation.king_activity import king_activity_score
-from evaluation.pawn_structure import pawn_structure_for_color, pawn_structure_score
+from evaluation.king_safety import (
+    contextual_pawn_shelter_for_color,
+    contextual_pawn_shelter_score,
+    graded_king_safety_for_color,
+    graded_king_safety_score,
+    king_safety_score,
+)
+from evaluation.pawn_structure import (
+    is_candidate_passed_pawn,
+    pawn_structure_for_color,
+    pawn_structure_score,
+)
 from evaluation.piece_activity import piece_activity_for_color, piece_activity_score
 from evaluation.rook_activity import rook_activity_for_color, rook_activity_score
 
@@ -26,7 +41,7 @@ class PositionEvaluatorTests(unittest.TestCase):
             "r1bqk2r/pppp1ppp/2n2n2/2b1p3/2B1P3/5N2/PPPP1PPP/RNBQ1RK1 w kq - 4 5": -55,
             "rnbqkbnr/pppppppp/8/8/4K3/8/PPPPPPPP/RNBQ1BNR b kq - 0 1": -320,
             "8/8/4k3/8/4P3/4K3/8/8 w - - 0 1": 123,
-            "7k/8/5KQ1/8/8/8/8/8 w - - 0 1": 1310,
+            "7k/8/5KQ1/8/8/8/8/8 w - - 0 1": 1242,
         }
 
         for fen, expected in positions.items():
@@ -47,13 +62,13 @@ class PositionEvaluatorTests(unittest.TestCase):
             dict(result.components),
             {
                 "material": 900,
-                "piece_square": 70,
+                "piece_square": 60,
                 "king_safety": 0,
                 "pawn_structure": 0,
                 "piece_activity": 0,
                 "rook_activity": 0,
                 "king_activity": 0,
-                "endgame_mop_up": 340,
+                "endgame_mop_up": 282,
             },
         )
         self.assertEqual(sum(result.components.values()), result.score)
@@ -101,6 +116,31 @@ class PositionEvaluatorTests(unittest.TestCase):
         self.assertLess(
             pawn_structure_for_color(damaged, chess.WHITE),
             pawn_structure_for_color(healthy, chess.WHITE),
+        )
+
+    def test_candidate_passer_requires_enough_neighbor_support(self):
+        candidate = chess.Board("7k/8/4p3/2PP4/8/8/8/7K w - - 0 1")
+        unsupported = chess.Board("7k/8/2p1p3/3P4/8/8/8/7K w - - 0 1")
+
+        self.assertTrue(is_candidate_passed_pawn(candidate, chess.D5, chess.WHITE))
+        self.assertFalse(is_candidate_passed_pawn(unsupported, chess.D5, chess.WHITE))
+
+    def test_blocked_passer_scores_below_free_passer(self):
+        free = chess.Board("7k/8/8/4P3/8/8/8/7K w - - 0 1")
+        blocked = chess.Board("7k/8/4n3/4P3/8/8/8/7K w - - 0 1")
+
+        self.assertGreater(
+            pawn_structure_for_color(free, chess.WHITE),
+            pawn_structure_for_color(blocked, chess.WHITE),
+        )
+
+    def test_connected_passers_score_above_separated_passers(self):
+        connected = chess.Board("7k/8/8/3PP3/8/8/8/7K w - - 0 1")
+        separated = chess.Board("7k/8/8/2P2P2/8/8/8/7K w - - 0 1")
+
+        self.assertGreater(
+            pawn_structure_for_color(connected, chess.WHITE),
+            pawn_structure_for_color(separated, chess.WHITE),
         )
 
     def test_supported_knight_outpost_receives_activity_bonus(self):
@@ -158,7 +198,60 @@ class PositionEvaluatorTests(unittest.TestCase):
         self.assertEqual(strategic_weight_percent(opening), 0)
         self.assertEqual(strategic_weight_percent(endgame), 100)
 
-    def test_only_benchmarked_feature_is_enabled_by_default(self):
+    def test_phase_progresses_monotonically_with_material_trades(self):
+        board = chess.Board()
+        weights = [endgame_weight_percent(board)]
+
+        for square in (chess.D1, chess.D8):
+            board.remove_piece_at(square)
+        weights.append(endgame_weight_percent(board))
+        for square in (chess.A1, chess.H1, chess.A8, chess.H8):
+            board.remove_piece_at(square)
+        weights.append(endgame_weight_percent(board))
+        for square in (
+            chess.B1,
+            chess.C1,
+            chess.F1,
+            chess.G1,
+            chess.B8,
+            chess.C8,
+            chess.F8,
+            chess.G8,
+        ):
+            board.remove_piece_at(square)
+        weights.append(endgame_weight_percent(board))
+
+        self.assertEqual(weights, [0, 33, 67, 100])
+
+    def test_queenless_full_armies_do_not_cross_an_endgame_cliff(self):
+        board = chess.Board()
+        board.remove_piece_at(chess.D1)
+        board.remove_piece_at(chess.D8)
+
+        self.assertEqual(endgame_weight_percent(board), 33)
+        self.assertFalse(is_endgame(board))
+
+    def test_king_piece_square_value_interpolates_at_midphase(self):
+        opening = get_piece_square_value(chess.KING, chess.E4, chess.WHITE, 0)
+        midpoint = get_piece_square_value(chess.KING, chess.E4, chess.WHITE, 50)
+        endgame = get_piece_square_value(chess.KING, chess.E4, chess.WHITE, 100)
+
+        self.assertEqual(midpoint, round((opening + endgame) / 2))
+
+    def test_king_safety_and_mop_up_taper_in_opposite_directions(self):
+        exposed_king = chess.Board(
+            "rnbqkbnr/pppppppp/8/8/4K3/8/PPPPPPPP/RNBQ1BNR b kq - 0 1"
+        )
+        raw_safety = king_safety_score(exposed_king, 0)
+        self.assertEqual(king_safety_score(exposed_king, 50), round(raw_safety / 2))
+        self.assertEqual(king_safety_score(exposed_king, 100), 0)
+
+        winning_endgame = chess.Board("7k/8/5KQ1/8/8/8/8/8 w - - 0 1")
+        raw_mop_up = mop_up_score(winning_endgame, 900, 100)
+        self.assertEqual(mop_up_score(winning_endgame, 900, 50), round(raw_mop_up / 2))
+        self.assertEqual(mop_up_score(winning_endgame, 900, 0), 0)
+
+    def test_only_benchmarked_features_are_enabled_by_default(self):
         self.assertEqual(
             dict(CALIBRATED_FEATURE_WEIGHTS),
             {
@@ -166,6 +259,8 @@ class PositionEvaluatorTests(unittest.TestCase):
                 "piece_activity": 0,
                 "rook_activity": 0,
                 "king_activity": 100,
+                "king_safety_blend": 0,
+                "quiet_pawn_shelter": 0,
             },
         )
 
@@ -178,17 +273,63 @@ class PositionEvaluatorTests(unittest.TestCase):
         self.assertGreater(result.components["piece_activity"], 0)
         self.assertEqual(sum(result.components.values()), result.score)
 
+    def test_middlegame_activity_is_not_zeroed_by_endgame_phase(self):
+        board = chess.Board()
+        board.remove_piece_at(chess.B1)
+        board.remove_piece_at(chess.C1)
+        board.set_piece_at(chess.D5, chess.Piece(chess.KNIGHT, chess.WHITE))
+        board.set_piece_at(chess.G5, chess.Piece(chess.BISHOP, chess.WHITE))
+        self.assertEqual(endgame_weight_percent(board), 0)
+
+        result = PositionEvaluator({"piece_activity": 100}).evaluate(board)
+
+        self.assertNotEqual(result.components["piece_activity"], 0)
+
+    def test_strategic_features_have_distinct_continuous_phase_profiles(self):
+        opening_board = chess.Board()
+        developed_board = chess.Board()
+        for square in (
+            chess.B1, chess.G1, chess.C1, chess.F1,
+            chess.B8, chess.G8, chess.C8, chess.F8,
+        ):
+            developed_board.remove_piece_at(square)
+        opening = PositionEvaluator._feature_phase_weights(opening_board, 0)
+        developed = PositionEvaluator._feature_phase_weights(developed_board, 0)
+        endgame = PositionEvaluator._feature_phase_weights(developed_board, 100)
+
+        self.assertEqual(opening, {
+            "pawn_structure": 100,
+            "piece_activity": 0,
+            "rook_activity": 50,
+            "king_activity": 0,
+            "king_safety_blend": 0,
+        })
+        self.assertEqual(developed, {
+            "pawn_structure": 100,
+            "piece_activity": 100,
+            "rook_activity": 50,
+            "king_activity": 0,
+            "king_safety_blend": 100,
+        })
+        self.assertEqual(endgame, {
+            "pawn_structure": 100,
+            "piece_activity": 50,
+            "rook_activity": 100,
+            "king_activity": 100,
+            "king_safety_blend": 0,
+        })
+
     def test_zero_weight_features_are_not_computed_in_search(self):
         board = chess.Board("8/8/4k3/8/4P3/4K3/8/8 w - - 0 1")
 
         with (
             patch(
-                "evaluation.evaluator.pawn_structure_score",
-                side_effect=AssertionError("disabled pawn feature was evaluated"),
-            ),
-            patch(
                 "evaluation.evaluator.piece_activity_score",
                 side_effect=AssertionError("disabled piece feature was evaluated"),
+            ),
+            patch(
+                "evaluation.evaluator.pawn_structure_score",
+                side_effect=AssertionError("disabled pawn feature was evaluated"),
             ),
             patch(
                 "evaluation.evaluator.rook_activity_score",
@@ -198,6 +339,79 @@ class PositionEvaluatorTests(unittest.TestCase):
             result = self.evaluator.evaluate(board)
 
         self.assertNotEqual(result.components["king_activity"], 0)
+
+    def test_graded_king_safety_values_pawn_shield_and_closed_files(self):
+        shielded = chess.Board()
+        exposed = shielded.copy(stack=False)
+        exposed.remove_piece_at(chess.F2)
+        exposed.remove_piece_at(chess.G2)
+        exposed.remove_piece_at(chess.H2)
+
+        self.assertGreater(
+            graded_king_safety_for_color(shielded, chess.WHITE),
+            graded_king_safety_for_color(exposed, chess.WHITE),
+        )
+
+    def test_graded_king_exposure_changes_gradually(self):
+        home = chess.Board()
+        second_rank = home.copy(stack=False)
+        second_rank.remove_piece_at(chess.E1)
+        second_rank.remove_piece_at(chess.E2)
+        second_rank.set_piece_at(chess.E2, chess.Piece(chess.KING, chess.WHITE))
+        third_rank = second_rank.copy(stack=False)
+        third_rank.remove_piece_at(chess.E2)
+        third_rank.set_piece_at(chess.E3, chess.Piece(chess.KING, chess.WHITE))
+
+        scores = [
+            graded_king_safety_for_color(board, chess.WHITE)
+            for board in (home, second_rank, third_rank)
+        ]
+        self.assertGreater(scores[0], scores[1])
+        self.assertGreater(scores[1], scores[2])
+        self.assertLess(scores[0] - scores[1], 180)
+
+    def test_graded_king_safety_is_color_symmetric_and_tapered(self):
+        board = chess.Board(
+            "r3k2r/ppp2ppp/2n5/3qp3/8/2N2N2/PPP2PPP/R3K2R w KQkq - 0 1"
+        )
+        mirrored = board.mirror()
+
+        self.assertEqual(
+            graded_king_safety_score(board, 25),
+            -graded_king_safety_score(mirrored, 25),
+        )
+        self.assertEqual(graded_king_safety_score(board, 100), 0)
+
+    def test_contextual_shelter_scales_with_enemy_heavy_pieces(self):
+        exposed = chess.Board(
+            "3q1rk1/ppp2ppp/8/8/8/8/PPP5/3Q1RK1 w - - 0 1"
+        )
+        no_heavy_pieces = chess.Board(
+            "6k1/ppp2ppp/8/8/8/8/PPP5/6K1 w - - 0 1"
+        )
+
+        self.assertLess(
+            contextual_pawn_shelter_for_color(exposed, chess.WHITE),
+            contextual_pawn_shelter_for_color(exposed, chess.BLACK),
+        )
+        self.assertEqual(
+            contextual_pawn_shelter_score(no_heavy_pieces, 0),
+            0,
+        )
+        self.assertEqual(contextual_pawn_shelter_score(exposed, 100), 0)
+
+    def test_contextual_shelter_is_only_added_to_quiet_leaf_score(self):
+        board = chess.Board(
+            "3q1rk1/ppp2ppp/8/8/8/8/PPP5/3Q1RK1 w - - 0 1"
+        )
+        evaluator = PositionEvaluator({"quiet_pawn_shelter": 100})
+
+        ordinary = evaluator.score_nonterminal(board)
+        quiet = evaluator.score_quiet_nonterminal(board)
+
+        self.assertLess(quiet, ordinary)
+        self.assertEqual(evaluator.evaluate(board).score, ordinary)
+
 
 
 if __name__ == "__main__":

@@ -3,8 +3,11 @@
 import chess
 
 
-def mop_up_score(board: chess.Board, base_score: int, endgame: bool) -> int:
-    if not endgame:
+def mop_up_score(
+    board: chess.Board, base_score: int, endgame_weight: int | bool
+) -> int:
+    weight = 100 if endgame_weight is True else int(endgame_weight)
+    if weight <= 0:
         return 0
 
     if base_score > 200:
@@ -28,4 +31,5 @@ def mop_up_score(board: chess.Board, base_score: int, endgame: bool) -> int:
     winning_file = chess.square_file(winning_king)
     king_distance = abs(losing_rank - winning_rank) + abs(losing_file - winning_file)
     score = ((4 * distance_from_center) + (14 - king_distance)) * 10
-    return score if winning_side == chess.WHITE else -score
+    tapered = round(score * weight / 100)
+    return tapered if winning_side == chess.WHITE else -tapered

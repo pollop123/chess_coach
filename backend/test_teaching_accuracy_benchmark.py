@@ -1,4 +1,5 @@
 import unittest
+import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
@@ -16,12 +17,77 @@ from teaching_accuracy_benchmark import (
     accuracy_gate,
     candidate_consistency,
     inversion_rate,
+    load_corpus,
+    limit_positions_per_topic,
     profile_search_settings,
+    parse_feature_weights,
     select_positions,
 )
 
 
 class TeachingAccuracyBenchmarkTests(unittest.TestCase):
+    def test_feature_weight_overrides_support_joint_calibration(self):
+        self.assertEqual(
+            parse_feature_weights(
+                ["pawn_structure=50", "piece_activity=75", "rook_activity=-10"]
+            ),
+            {"pawn_structure": 50, "piece_activity": 75, "rook_activity": -10},
+        )
+
+    def test_feature_weight_overrides_reject_unknown_or_extreme_values(self):
+        with self.assertRaises(ValueError):
+            parse_feature_weights(["mobility=50"])
+        with self.assertRaises(ValueError):
+            parse_feature_weights(["pawn_structure=201"])
+        with self.assertRaises(ValueError):
+            parse_feature_weights(["pawn_structure"])
+
+    def test_external_corpus_filters_whole_game_splits(self):
+        payload = {
+            "schema_version": 1,
+            "positions": [
+                {
+                    "name": "train_position",
+                    "fen": chess.STARTING_FEN,
+                    "topic": "opening",
+                    "game_id": "game_train",
+                    "split": "train",
+                },
+                {
+                    "name": "test_position",
+                    "fen": "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2",
+                    "topic": "opening",
+                    "game_id": "game_test",
+                    "split": "test",
+                },
+            ],
+        }
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "corpus.json"
+            path.write_text(json.dumps(payload), encoding="utf-8")
+
+            positions = load_corpus(path, ["test"])
+
+        self.assertEqual(len(positions), 1)
+        self.assertEqual(positions[0].name, "test_position")
+        self.assertEqual(positions[0].game_id, "game_test")
+        self.assertEqual(positions[0].split, "test")
+
+    def test_screening_limit_is_deterministic_per_topic(self):
+        limited = limit_positions_per_topic(POSITIONS, 2)
+
+        counts = {}
+        for position in limited:
+            counts[position.topic] = counts.get(position.topic, 0) + 1
+        self.assertEqual(counts, {
+            "tactics": 2,
+            "endgame": 2,
+            "opening": 2,
+            "positional": 2,
+        })
+        with self.assertRaises(ValueError):
+            limit_positions_per_topic(POSITIONS, 0)
+
     @staticmethod
     def gate(**overrides):
         values = {
@@ -158,6 +224,50 @@ class TeachingAccuracyBenchmarkTests(unittest.TestCase):
             patch("sys.argv", ["benchmark", "--json", "--require-release-ready"]),
         ):
             self.assertEqual(teaching_accuracy_benchmark.main(), 1)
+
+    def test_release_gate_rejects_corpus_subset_selectors(self):
+        """A tuned slice must not be able to exit zero as "release ready"."""
+        report = {"release_ready": True, "passed": True}
+        subset_arguments = (
+            ["--corpus", "corpus.json"],
+            ["--split", "validation"],
+            ["--limit-per-topic", "5"],
+            ["--topic", "endgame"],
+            ["--profile", "smoke"],
+        )
+        for arguments in subset_arguments:
+            with self.subTest(arguments=arguments):
+                with (
+                    patch.object(
+                        teaching_accuracy_benchmark,
+                        "find_stockfish",
+                        return_value="/fake/stockfish",
+                    ),
+                    patch.object(
+                        teaching_accuracy_benchmark, "run", return_value=report
+                    ) as run,
+                    patch(
+                        "sys.argv",
+                        ["benchmark", "--require-release-ready", *arguments],
+                    ),
+                ):
+                    with self.assertRaises(SystemExit) as context:
+                        teaching_accuracy_benchmark.main()
+                self.assertEqual(context.exception.code, 2)
+                run.assert_not_called()
+
+    def test_release_gate_still_accepts_the_full_release_corpus(self):
+        report = {"release_ready": True, "passed": True}
+        with (
+            patch.object(
+                teaching_accuracy_benchmark,
+                "find_stockfish",
+                return_value="/fake/stockfish",
+            ),
+            patch.object(teaching_accuracy_benchmark, "run", return_value=report),
+            patch("sys.argv", ["benchmark", "--json", "--require-release-ready"]),
+        ):
+            self.assertEqual(teaching_accuracy_benchmark.main(), 0)
 
     def test_cli_profile_selects_default_node_budget(self):
         report = {"release_ready": False, "passed": False}

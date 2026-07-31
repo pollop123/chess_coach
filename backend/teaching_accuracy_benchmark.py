@@ -15,6 +15,7 @@ import chess
 import chess.engine
 
 import chess_engine
+from evaluation import CALIBRATED_FEATURE_WEIGHTS, PositionEvaluator
 from validate_training_lessons import find_stockfish
 
 
@@ -125,6 +126,8 @@ class AccuracyPosition:
     topic: str
     depth: int = 3
     candidate_count: int = 6
+    game_id: str | None = None
+    split: str | None = None
 
 
 def _fen_after(*sans: str) -> str:
@@ -200,17 +203,75 @@ POSITIONS = (
 def select_positions(
     profile: str = PROFILE_RELEASE,
     topics: tuple[str, ...] | list[str] | None = None,
+    positions: tuple[AccuracyPosition, ...] | None = None,
 ) -> tuple[AccuracyPosition, ...]:
+    source = POSITIONS if positions is None else positions
     selected_topics = set(topics or ())
     selected = tuple(
         position
-        for position in POSITIONS
+        for position in source
         if not selected_topics or position.topic in selected_topics
     )
     if profile == PROFILE_RELEASE or selected_topics:
         return selected
+    if source is not POSITIONS:
+        per_topic: dict[str, list[AccuracyPosition]] = {}
+        for position in selected:
+            per_topic.setdefault(position.topic, []).append(position)
+        return tuple(
+            position
+            for topic in sorted(per_topic)
+            for position in per_topic[topic][:2]
+        )
     smoke_names = set(SMOKE_POSITION_NAMES)
     return tuple(position for position in selected if position.name in smoke_names)
+
+
+def load_corpus(
+    path: str | Path,
+    splits: tuple[str, ...] | list[str] | None = None,
+) -> tuple[AccuracyPosition, ...]:
+    payload = json.loads(Path(path).read_text(encoding="utf-8"))
+    if payload.get("schema_version") != 1 or not isinstance(payload.get("positions"), list):
+        raise ValueError("Unsupported evaluation corpus schema")
+    selected_splits = set(splits or ())
+    positions = []
+    for item in payload["positions"]:
+        if selected_splits and item.get("split") not in selected_splits:
+            continue
+        position = AccuracyPosition(
+            name=str(item["name"]),
+            fen=str(item["fen"]),
+            topic=str(item["topic"]),
+            game_id=str(item["game_id"]),
+            split=str(item["split"]),
+        )
+        board = chess.Board(position.fen)
+        if not board.is_valid() or board.is_game_over(claim_draw=True):
+            raise ValueError(f"Invalid or finished corpus position: {position.name}")
+        positions.append(position)
+    if not positions:
+        raise ValueError("No corpus positions matched the requested split")
+    return tuple(positions)
+
+
+def limit_positions_per_topic(
+    positions: tuple[AccuracyPosition, ...], limit: int | None
+) -> tuple[AccuracyPosition, ...]:
+    """Take a deterministic, corpus-ordered screening subset per topic."""
+    if limit is None:
+        return positions
+    if limit <= 0:
+        raise ValueError("Position limit per topic must be positive")
+    counts: dict[str, int] = {}
+    selected = []
+    for position in positions:
+        count = counts.get(position.topic, 0)
+        if count >= limit:
+            continue
+        selected.append(position)
+        counts[position.topic] = count + 1
+    return tuple(selected)
 
 
 def profile_search_settings(position: AccuracyPosition, profile: str) -> dict[str, int | bool]:
@@ -225,6 +286,26 @@ def profile_search_settings(position: AccuracyPosition, profile: str) -> dict[st
         "candidate_count": position.candidate_count,
         "adaptive_depth": True,
     }
+
+
+def parse_feature_weights(values: list[str] | None) -> dict[str, int]:
+    """Parse repeatable NAME=PERCENT overrides for offline joint calibration."""
+    weights: dict[str, int] = {}
+    for value in values or ():
+        try:
+            name, raw_weight = value.split("=", 1)
+            weight = int(raw_weight)
+        except (ValueError, TypeError) as exc:
+            raise ValueError(
+                f"Invalid feature weight {value!r}; expected NAME=PERCENT"
+            ) from exc
+        if name not in CALIBRATED_FEATURE_WEIGHTS:
+            allowed = ", ".join(sorted(CALIBRATED_FEATURE_WEIGHTS))
+            raise ValueError(f"Unknown feature {name!r}; choose from: {allowed}")
+        if not -200 <= weight <= 200:
+            raise ValueError(f"Feature weight {name!r} must be between -200 and 200")
+        weights[name] = weight
+    return weights
 
 
 def stockfish_signature(engine: chess.engine.SimpleEngine) -> str:
@@ -409,11 +490,13 @@ def run(
     cache_path: str | Path = DEFAULT_CACHE_PATH,
     use_cache: bool = True,
     refresh_cache: bool = False,
+    feature_weights: dict[str, int] | None = None,
+    positions: tuple[AccuracyPosition, ...] | None = None,
 ) -> dict:
     if profile not in {PROFILE_RELEASE, PROFILE_SMOKE}:
         raise ValueError(f"Unknown benchmark profile: {profile}")
 
-    benchmark_positions = select_positions(profile, topics)
+    benchmark_positions = select_positions(profile, topics, positions)
     if not benchmark_positions:
         raise ValueError("No benchmark positions matched the selected profile/topics")
 
@@ -423,11 +506,20 @@ def run(
         enabled=use_cache,
         refresh=refresh_cache,
     )
+    original_evaluator = chess_engine.DEFAULT_EVALUATOR
+    active_weights = dict(CALIBRATED_FEATURE_WEIGHTS)
+    if feature_weights:
+        active_weights.update(feature_weights)
+        chess_engine.DEFAULT_EVALUATOR = PositionEvaluator(active_weights)
     results = []
     try:
         with chess.engine.SimpleEngine.popen_uci(stockfish_path) as engine:
             engine_identity = stockfish_signature(engine)
             for position in benchmark_positions:
+                # Calibration positions must be independent. Reusing search
+                # entries across fixtures makes topic-only and full-corpus runs
+                # disagree based on which unrelated position ran first.
+                chess_engine.reset_transposition_table()
                 board = chess.Board(position.fen)
                 multipv = min(3, board.legal_moves.count())
                 oracle_top, oracle_scores = oracle_top_lines(
@@ -506,6 +598,7 @@ def run(
                     "analysis_complete": teaching.get("analysis_complete"),
                 })
     finally:
+        chess_engine.DEFAULT_EVALUATOR = original_evaluator
         cache.save()
 
     count = len(results)
@@ -579,9 +672,16 @@ def run(
         "topics": sorted(set(topics or ())),
         "stockfish": stockfish_path,
         "nodes": nodes,
+        "feature_weights": active_weights,
         "duration_seconds": round(perf_counter() - started_at, 3),
         "oracle_cache": cache.stats(),
         "positions": count,
+        "data_splits": sorted(
+            {position.split for position in benchmark_positions if position.split}
+        ),
+        "game_groups": len(
+            {position.game_id for position in benchmark_positions if position.game_id}
+        ),
         "top1_in_oracle_top3_rate": round(top3_rate, 3),
         "oracle_best_recall_rate": round(recall_rate, 3),
         "average_rank_inversion_rate": round(average_inversion_rate, 3),
@@ -637,13 +737,33 @@ def main() -> int:
         help="Stockfish nodes per query (defaults: smoke=10000, release=50000)",
     )
     parser.add_argument("--cache-path", default=str(DEFAULT_CACHE_PATH))
+    parser.add_argument("--corpus", help="JSON corpus generated by build_evaluation_corpus.py")
+    parser.add_argument(
+        "--split",
+        action="append",
+        choices=("train", "validation", "test"),
+        help="limit an external corpus to one or more game-grouped splits",
+    )
+    parser.add_argument(
+        "--limit-per-topic",
+        type=int,
+        help="deterministic screening limit for each topic in an external corpus",
+    )
     parser.add_argument("--no-cache", action="store_true")
+    parser.add_argument(
+        "--feature-weight",
+        action="append",
+        default=[],
+        metavar="NAME=PERCENT",
+        help="override an evaluator feature weight; repeat to calibrate jointly",
+    )
     parser.add_argument(
         "--refresh-cache",
         action="store_true",
         help="ignore matching reads and replace them with fresh Stockfish results",
     )
     parser.add_argument("--json", action="store_true")
+    parser.add_argument("--output", help="write the complete JSON report to this path")
     parser.add_argument(
         "--require-release-ready",
         action="store_true",
@@ -653,8 +773,15 @@ def main() -> int:
     if args.no_cache and args.refresh_cache:
         parser.error("--no-cache and --refresh-cache cannot be used together")
     if args.require_release_ready and (
-        args.profile != PROFILE_RELEASE or args.topic
+        args.profile != PROFILE_RELEASE
+        or args.topic
+        or args.corpus
+        or args.split
+        or args.limit_per_topic
     ):
+        # The strict gate must certify the full release corpus. Allowing an
+        # external corpus or any subset selector would let a tuned slice exit
+        # zero and advertise release readiness the full set never earned.
         parser.error("--require-release-ready requires the full release corpus")
 
     stockfish_path = find_stockfish(args.stockfish)
@@ -665,6 +792,18 @@ def main() -> int:
         if args.profile == PROFILE_SMOKE
         else DEFAULT_RELEASE_NODES
     )
+    try:
+        feature_weights = parse_feature_weights(args.feature_weight)
+    except ValueError as exc:
+        parser.error(str(exc))
+    try:
+        corpus_positions = load_corpus(args.corpus, args.split) if args.corpus else None
+        if corpus_positions is not None:
+            corpus_positions = limit_positions_per_topic(
+                corpus_positions, args.limit_per_topic
+            )
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        parser.error(str(exc))
     report = run(
         stockfish_path,
         nodes=nodes,
@@ -673,7 +812,16 @@ def main() -> int:
         cache_path=args.cache_path,
         use_cache=not args.no_cache,
         refresh_cache=args.refresh_cache,
+        feature_weights=feature_weights,
+        positions=corpus_positions,
     )
+    if args.output:
+        output_path = Path(args.output)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(
+            json.dumps(report, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
     if args.json:
         print(json.dumps(report, ensure_ascii=False, indent=2))
     else:

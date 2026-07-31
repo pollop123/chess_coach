@@ -1,19 +1,36 @@
-"""Game-phase classification used by the legacy-compatible evaluator."""
+"""Continuous game-phase weights shared by every evaluation component."""
 
 import chess
 
 
+MAXIMUM_PHASE_UNITS = 24
+ENDGAME_LABEL_THRESHOLD = 50
+
+
+def endgame_weight_percent(board: chess.Board) -> int:
+    """Return a 0-100 endgame weight based on remaining non-pawn material.
+
+    Knights and bishops are worth one phase unit, rooks two, and queens four.
+    A normal starting position therefore has 24 units.  Trading material moves
+    the score smoothly toward the endgame instead of crossing a queen/minor
+    piece cliff.
+    """
+    remaining = min(
+        MAXIMUM_PHASE_UNITS,
+        chess.popcount(board.knights | board.bishops)
+        + 2 * chess.popcount(board.rooks)
+        + 4 * chess.popcount(board.queens),
+    )
+    return round((MAXIMUM_PHASE_UNITS - remaining) * 100 / MAXIMUM_PHASE_UNITS)
+
+
+def middlegame_weight_percent(board: chess.Board) -> int:
+    return 100 - endgame_weight_percent(board)
+
+
 def is_endgame(board: chess.Board) -> bool:
-    """Preserve the original evaluator's binary endgame boundary."""
-    queen_count = len(board.pieces(chess.QUEEN, chess.WHITE)) + len(
-        board.pieces(chess.QUEEN, chess.BLACK)
-    )
-    minor_count = sum(
-        len(board.pieces(piece_type, color))
-        for piece_type in (chess.KNIGHT, chess.BISHOP)
-        for color in (chess.WHITE, chess.BLACK)
-    )
-    return queen_count == 0 or minor_count <= 2
+    """Classify labels from the same phase value used by evaluation."""
+    return endgame_weight_percent(board) >= ENDGAME_LABEL_THRESHOLD
 
 
 def phase_name(board: chess.Board) -> str:
@@ -21,21 +38,5 @@ def phase_name(board: chess.Board) -> str:
 
 
 def strategic_weight_percent(board: chess.Board) -> int:
-    """Taper new strategic terms in as forcing material leaves the board."""
-    phase_units = (
-        chess.popcount(board.knights | board.bishops)
-        + 2 * chess.popcount(board.rooks)
-        + 4 * chess.popcount(board.queens)
-    )
-    maximum_phase_units = 24
-    remaining = min(maximum_phase_units, phase_units)
-    removed = maximum_phase_units - remaining
-    # At shallow search depth, switching on strategic terms during an opening
-    # tactic can distort the leaf comparison. The existing PST already covers
-    # early development, so wait until both queens' worth of phase has left the
-    # board before gradually emphasizing the richer strategic terms.
-    warmup_units = 8
-    effective_removed = max(0, removed - warmup_units)
-    return round(
-        effective_removed * 100 / (maximum_phase_units - warmup_units)
-    )
+    """Use the shared continuous phase for strategic endgame features."""
+    return endgame_weight_percent(board)
