@@ -646,8 +646,23 @@ def should_apply_difficulty_error(board, profile):
     return position_bucket < error_rate
 
 
-def select_difficulty_move(board, depth, best_move, best_score, difficulty, style):
-    """Select a reproducible, safe move from a difficulty-specific loss band."""
+def select_difficulty_move(
+    board,
+    depth,
+    best_move,
+    best_score,
+    difficulty,
+    style,
+    *,
+    use_lmr=True,
+    use_tt=True,
+):
+    """Select a reproducible, safe move from a difficulty-specific loss band.
+
+    ``use_lmr`` and ``use_tt`` mirror the primary search so calibration runs
+    stay honest: probing or repopulating the table here while the caller asked
+    for a table-free search would contaminate the A/B it is measuring.
+    """
     if best_move is None:
         return best_move, best_score, 0, 0
 
@@ -665,7 +680,11 @@ def select_difficulty_move(board, depth, best_move, best_score, difficulty, styl
         try:
             board.push(move)
             try:
-                cached_entry = transposition_table.get(tt_key(board))
+                cached_entry = (
+                    transposition_table.get(tt_key(board, use_lmr))
+                    if use_tt
+                    else None
+                )
                 cached_score = None
                 if cached_entry and cached_entry.depth >= candidate_depth:
                     cached_score = score_from_tt(cached_entry.score, 1)
@@ -695,6 +714,8 @@ def select_difficulty_move(board, depth, best_move, best_score, difficulty, styl
                         math.inf,
                         board.turn == chess.WHITE,
                         1,
+                        use_lmr=use_lmr,
+                        use_tt=use_tt,
                     )
             finally:
                 board.pop()
@@ -1384,6 +1405,8 @@ def get_analysis(
                 best_score,
                 difficulty,
                 style,
+                use_lmr=use_lmr,
+                use_tt=use_tt,
             )
         except SearchTimeout:
             timed_out = True

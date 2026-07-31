@@ -4,13 +4,16 @@
 `build_evaluation_corpus.py`. It contains 500 unique, legal, non-terminal
 positions from 40 generated games. Every game belongs to exactly one split, so
 adjacent positions from a game cannot leak across train, validation, and test.
+Positions are also deduplicated globally by FEN, because different games
+routinely transpose into the same position and would otherwise place one copy
+in train and another in validation.
 
 Current distribution:
 
 | Split | Games | Positions | Opening | Positional | Tactics | Endgame |
 |---|---:|---:|---:|---:|---:|---:|
-| train | 28 | 350 | 56 | 214 | 43 | 37 |
-| validation | 6 | 75 | 12 | 30 | 8 | 25 |
+| train | 28 | 351 | 54 | 215 | 44 | 38 |
+| validation | 6 | 74 | 11 | 30 | 8 | 25 |
 | test | 6 | 75 | 12 | 42 | 9 | 12 |
 
 Rebuild it with:

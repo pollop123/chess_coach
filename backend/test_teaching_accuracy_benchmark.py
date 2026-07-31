@@ -225,6 +225,50 @@ class TeachingAccuracyBenchmarkTests(unittest.TestCase):
         ):
             self.assertEqual(teaching_accuracy_benchmark.main(), 1)
 
+    def test_release_gate_rejects_corpus_subset_selectors(self):
+        """A tuned slice must not be able to exit zero as "release ready"."""
+        report = {"release_ready": True, "passed": True}
+        subset_arguments = (
+            ["--corpus", "corpus.json"],
+            ["--split", "validation"],
+            ["--limit-per-topic", "5"],
+            ["--topic", "endgame"],
+            ["--profile", "smoke"],
+        )
+        for arguments in subset_arguments:
+            with self.subTest(arguments=arguments):
+                with (
+                    patch.object(
+                        teaching_accuracy_benchmark,
+                        "find_stockfish",
+                        return_value="/fake/stockfish",
+                    ),
+                    patch.object(
+                        teaching_accuracy_benchmark, "run", return_value=report
+                    ) as run,
+                    patch(
+                        "sys.argv",
+                        ["benchmark", "--require-release-ready", *arguments],
+                    ),
+                ):
+                    with self.assertRaises(SystemExit) as context:
+                        teaching_accuracy_benchmark.main()
+                self.assertEqual(context.exception.code, 2)
+                run.assert_not_called()
+
+    def test_release_gate_still_accepts_the_full_release_corpus(self):
+        report = {"release_ready": True, "passed": True}
+        with (
+            patch.object(
+                teaching_accuracy_benchmark,
+                "find_stockfish",
+                return_value="/fake/stockfish",
+            ),
+            patch.object(teaching_accuracy_benchmark, "run", return_value=report),
+            patch("sys.argv", ["benchmark", "--json", "--require-release-ready"]),
+        ):
+            self.assertEqual(teaching_accuracy_benchmark.main(), 0)
+
     def test_cli_profile_selects_default_node_budget(self):
         report = {"release_ready": False, "passed": False}
         with (

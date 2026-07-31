@@ -773,8 +773,15 @@ def main() -> int:
     if args.no_cache and args.refresh_cache:
         parser.error("--no-cache and --refresh-cache cannot be used together")
     if args.require_release_ready and (
-        args.profile != PROFILE_RELEASE or args.topic
+        args.profile != PROFILE_RELEASE
+        or args.topic
+        or args.corpus
+        or args.split
+        or args.limit_per_topic
     ):
+        # The strict gate must certify the full release corpus. Allowing an
+        # external corpus or any subset selector would let a tuned slice exit
+        # zero and advertise release readiness the full set never earned.
         parser.error("--require-release-ready requires the full release corpus")
 
     stockfish_path = find_stockfish(args.stockfish)

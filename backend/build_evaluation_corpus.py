@@ -88,8 +88,12 @@ def _engine_move(
     return moves[min(choice, len(moves) - 1)]
 
 
+def _fen_key(fen: str) -> str:
+    return " ".join(fen.split()[:4])
+
+
 def _position_key(board: chess.Board) -> str:
-    return " ".join(board.fen().split()[:4])
+    return _fen_key(board.fen())
 
 
 def generate_game(
@@ -137,14 +141,26 @@ def generate_game(
 
 
 def round_robin_sample(games: list[list[dict]], target: int) -> list[dict]:
-    """Sample across games so the final corpus is not dominated by early games."""
+    """Sample across games so the final corpus is not dominated by early games.
+
+    Positions are deduplicated globally rather than per game. Different games
+    routinely transpose into the same position, and keeping both copies would
+    place one in train and the other in validation, leaking training positions
+    into the held-out splits and double-counting repeated measurements.
+    """
     selected = []
+    seen = set()
     for index in range(max((len(game) for game in games), default=0)):
         for game in games:
-            if index < len(game):
-                selected.append(game[index])
-                if len(selected) == target:
-                    return selected
+            if index >= len(game):
+                continue
+            key = _fen_key(game[index]["fen"])
+            if key in seen:
+                continue
+            seen.add(key)
+            selected.append(game[index])
+            if len(selected) == target:
+                return selected
     return selected
 
 

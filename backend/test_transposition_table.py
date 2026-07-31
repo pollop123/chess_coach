@@ -72,6 +72,41 @@ class TranspositionTableTests(unittest.TestCase):
         self.assertEqual(result["tt_cutoffs"], 0)
         self.assertEqual(chess_engine.transposition_table, {})
 
+    def test_difficulty_overlay_respects_disabled_transposition_table(self):
+        """The candidate overlay must not repopulate the table during a TT-off A/B."""
+        for difficulty in ("newbie", "beginner", "intermediate"):
+            with self.subTest(difficulty=difficulty):
+                chess_engine.reset_transposition_table()
+                chess_engine.begin_search_generation()
+
+                result = chess_engine.get_analysis(
+                    chess.Board(),
+                    depth=2,
+                    use_book=False,
+                    adaptive_depth=False,
+                    difficulty=difficulty,
+                    use_tt=False,
+                )
+
+                self.assertIsNotNone(result["best_move"])
+                self.assertEqual(chess_engine.transposition_table, {})
+                self.assertEqual(chess_engine.search_stats["candidate_cache_hits"], 0)
+
+    def test_trickster_overlay_respects_disabled_transposition_table(self):
+        chess_engine.reset_transposition_table()
+        chess_engine.begin_search_generation()
+
+        chess_engine.get_analysis(
+            chess.Board(),
+            depth=2,
+            use_book=False,
+            adaptive_depth=False,
+            style="trickster",
+            use_tt=False,
+        )
+
+        self.assertEqual(chess_engine.transposition_table, {})
+
     def test_bound_entry_is_not_treated_as_exact(self):
         board = chess.Board()
         chess_engine.minimax(board, 2, -10, 10, True)
