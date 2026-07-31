@@ -3,9 +3,11 @@ import itertools
 import math
 import chess.polyglot
 import os
-import threading
 import time
-from dataclasses import dataclass
+from collections.abc import MutableMapping
+from contextlib import contextmanager
+from contextvars import ContextVar
+from dataclasses import dataclass, field
 
 from evaluation import (
     BISHOP_TABLE,
@@ -22,24 +24,10 @@ from evaluation import (
     middlegame_king_exposure_penalty,
 )
 
-# Transposition table shared across iterative-deepening passes and requests.
-transposition_table = {}
 TT_MAX_ENTRIES = 200_000
 TT_EXACT = "exact"
 TT_LOWER = "lower"
 TT_UPPER = "upper"
-tt_generation = 0
-search_stats = {
-    "nodes": 0,
-    "tt_hits": 0,
-    "tt_cutoffs": 0,
-    "pvs_researches": 0,
-    "lmr_reductions": 0,
-    "lmr_researches": 0,
-    "candidate_cache_hits": 0,
-    "candidate_bound_skips": 0,
-}
-search_runtime = threading.local()
 ENGINE_DIR = os.path.dirname(os.path.abspath(__file__))
 BOOK_PATH = os.path.join(ENGINE_DIR, "books", "gm2001.bin")
 
@@ -76,15 +64,159 @@ class TTEntry:
     generation: int
 
 
+def _new_search_stats():
+    return {
+        "nodes": 0,
+        "tt_hits": 0,
+        "tt_cutoffs": 0,
+        "pvs_researches": 0,
+        "lmr_reductions": 0,
+        "lmr_researches": 0,
+        "candidate_cache_hits": 0,
+        "candidate_bound_skips": 0,
+    }
+
+
+@dataclass
+class SearchContext:
+    """Mutable state for one session's currently active search."""
+
+    deadline: float | None = None
+    stats: dict[str, int] = field(default_factory=_new_search_stats)
+
+
+@dataclass
+class EngineSession:
+    """Own all mutable search state for one API request or offline run.
+
+    A session may span the main search and its teaching comparison so both can
+    reuse the same transposition table. It must not be activated concurrently
+    by multiple workers.
+    """
+
+    transposition_table: dict = field(default_factory=dict)
+    tt_generation: int = 0
+    search_context: SearchContext = field(default_factory=SearchContext)
+    tt_max_entries: int = TT_MAX_ENTRIES
+    evaluator: object = field(default_factory=lambda: DEFAULT_EVALUATOR)
+
+    @contextmanager
+    def activate(self):
+        token = _ACTIVE_ENGINE_SESSION.set(self)
+        try:
+            yield self
+        finally:
+            _ACTIVE_ENGINE_SESSION.reset(token)
+
+    def analyze(self, board, **kwargs):
+        with self.activate():
+            return get_analysis(board, **kwargs)
+
+    def teaching_analysis(self, board, base_analysis, **kwargs):
+        with self.activate():
+            return get_teaching_analysis(board, base_analysis, **kwargs)
+
+    def reset(self):
+        with self.activate():
+            reset_transposition_table()
+
+    @property
+    def stats(self):
+        return self.search_context.stats
+
+
+_DEFAULT_ENGINE_SESSION = EngineSession()
+_ACTIVE_ENGINE_SESSION: ContextVar[EngineSession] = ContextVar(
+    "active_engine_session",
+    default=_DEFAULT_ENGINE_SESSION,
+)
+
+
+def current_engine_session():
+    return _ACTIVE_ENGINE_SESSION.get()
+
+
+def current_evaluator():
+    return current_engine_session().evaluator
+
+
+class _SessionMappingProxy(MutableMapping):
+    """Backwards-compatible mapping view over the active engine session."""
+
+    def __init__(self, attribute, nested_attribute=None):
+        self.attribute = attribute
+        self.nested_attribute = nested_attribute
+
+    def _mapping(self):
+        value = getattr(current_engine_session(), self.attribute)
+        if self.nested_attribute:
+            value = getattr(value, self.nested_attribute)
+        return value
+
+    def __getitem__(self, key):
+        return self._mapping()[key]
+
+    def __setitem__(self, key, value):
+        self._mapping()[key] = value
+
+    def __delitem__(self, key):
+        del self._mapping()[key]
+
+    def __iter__(self):
+        return iter(self._mapping())
+
+    def __len__(self):
+        return len(self._mapping())
+
+    def __repr__(self):
+        return repr(self._mapping())
+
+    def __eq__(self, other):
+        return self._mapping() == other
+
+    def get(self, key, default=None):
+        return self._mapping().get(key, default)
+
+    def clear(self):
+        self._mapping().clear()
+
+    def pop(self, key, default=None):
+        return self._mapping().pop(key, default)
+
+
+class _SearchRuntimeProxy:
+    """Compatibility view for callers that set ``search_runtime.deadline``."""
+
+    @property
+    def deadline(self):
+        return current_engine_session().search_context.deadline
+
+    @deadline.setter
+    def deadline(self, value):
+        current_engine_session().search_context.deadline = value
+
+
+# Existing calibration scripts and tests can keep using the module-level
+# mappings. EngineSession activation makes those views resolve per request.
+transposition_table = _SessionMappingProxy("transposition_table")
+search_stats = _SessionMappingProxy("search_context", "stats")
+search_runtime = _SearchRuntimeProxy()
+
+
 class SearchTimeout(Exception):
     pass
 
 
-def visit_search_node():
-    search_stats["nodes"] += 1
-    if search_stats["nodes"] % 64 != 0:
+def visit_search_node(search_context=None):
+    # This is the hottest state-access path in the engine. Resolve the active
+    # session once instead of traversing the compatibility proxy repeatedly at
+    # every minimax and quiescence node.
+    context = search_context or current_engine_session().search_context
+    stats = context.stats
+    stats["nodes"] += 1
+    if stats["nodes"] % 64 != 0:
         return
-    deadline = getattr(search_runtime, "deadline", None)
+    deadline = context.deadline
     if deadline is not None and time.monotonic() >= deadline:
         raise SearchTimeout
 
@@ -137,11 +269,15 @@ def score_from_tt(score, ply_from_root):
 
 
 def store_tt(key, depth, score, flag, best_move, ply_from_root):
+    session = current_engine_session()
     current = transposition_table.get(key)
-    if current and current.generation == tt_generation and current.depth > depth:
+    if current and current.generation == session.tt_generation and current.depth > depth:
         return
 
-    if key not in transposition_table and len(transposition_table) >= TT_MAX_ENTRIES:
+    if (
+        key not in transposition_table
+        and len(transposition_table) >= session.tt_max_entries
+    ):
         transposition_table.pop(next(iter(transposition_table)))
 
     transposition_table[key] = TTEntry(
@@ -149,13 +285,13 @@ def store_tt(key, depth, score, flag, best_move, ply_from_root):
         score=score_to_tt(score, ply_from_root),
         flag=flag,
         best_move=best_move,
-        generation=tt_generation,
+        generation=session.tt_generation,
     )
 
 
 def begin_search_generation(deadline=None):
-    global tt_generation
-    tt_generation += 1
+    session = current_engine_session()
+    session.tt_generation += 1
     search_stats.update(
         nodes=0,
         tt_hits=0,
@@ -168,8 +304,8 @@ def begin_search_generation(deadline=None):
     )
     search_runtime.deadline = deadline
 
-    if len(transposition_table) > TT_MAX_ENTRIES // 2:
-        oldest_allowed = tt_generation - 2
+    if len(transposition_table) > session.tt_max_entries // 2:
+        oldest_allowed = session.tt_generation - 2
         stale_keys = [
             key for key, entry in transposition_table.items()
             if entry.generation < oldest_allowed
@@ -271,12 +407,12 @@ def build_book_line(reader, board, first_move, max_plies=6):
 
 def evaluate_board(board, ply_from_root=0):
     """Compatibility score entrypoint used by search and API fallbacks."""
-    return DEFAULT_EVALUATOR.score(board, ply_from_root)
+    return current_evaluator().score(board, ply_from_root)
 
 
 def evaluate_position(board, ply_from_root=0):
     """Return the modular evaluator's score, phase, and component breakdown."""
-    return DEFAULT_EVALUATOR.evaluate(board, ply_from_root)
+    return current_evaluator().evaluate(board, ply_from_root)
 
 def quiescence_search(
     board,
@@ -292,14 +428,14 @@ def quiescence_search(
 
     if q_depth > 10:
         if board.is_check():
-            return DEFAULT_EVALUATOR.score_nonterminal(board, ply_from_root)
-        return DEFAULT_EVALUATOR.score_quiet_nonterminal(board, ply_from_root)
+            return current_evaluator().score_nonterminal(board, ply_from_root)
+        return current_evaluator().score_quiet_nonterminal(board, ply_from_root)
 
     in_check = board.is_check()
     if in_check:
-        stand_pat = DEFAULT_EVALUATOR.score_nonterminal(board, ply_from_root)
+        stand_pat = current_evaluator().score_nonterminal(board, ply_from_root)
     else:
-        stand_pat = DEFAULT_EVALUATOR.score_quiet_nonterminal(
+        stand_pat = current_evaluator().score_quiet_nonterminal(
             board, ply_from_root
         )
     if in_check:
@@ -1068,15 +1204,51 @@ def _theme_evidence(theme, reason):
     return "heuristic"
 
 
+def _is_immediately_recapturable_sacrifice(board, move):
+    """Flag low-information sacrifices so safer candidates are screened first.
+
+    The move is only deferred when it gives up at least a minor piece for a
+    much cheaper target and the opponent has an immediate legal recapture.
+    Verified forks stay in the primary pool because the material investment
+    has concrete tactical evidence.
+    """
+    attacker = board.piece_at(move.from_square)
+    captured = _captured_piece(board, move)
+    if not attacker or not captured:
+        return False
+    attacker_value = piece_values.get(attacker.piece_type, 0)
+    captured_value = piece_values.get(captured.piece_type, 0)
+    if attacker_value < captured_value + 150:
+        return False
+
+    after = board.copy()
+    after.push(move)
+    immediately_recapturable = any(
+        after.is_capture(reply) and reply.to_square == move.to_square
+        for reply in after.legal_moves
+    )
+    if not immediately_recapturable:
+        return False
+    return not _move_creates_valuable_piece_fork(board, move)
+
+
 def _candidate_moves(board, best_move, candidate_count):
     moves = []
     if best_move and best_move in board.legal_moves:
         moves.append(best_move)
-    for move in order_moves(board):
-        if move not in moves:
+
+    ordered_moves = order_moves(board)
+    deferred_sacrifices = {
+        move for move in ordered_moves
+        if move not in moves and _is_immediately_recapturable_sacrifice(board, move)
+    }
+    for defer_sacrifices in (False, True):
+        for move in ordered_moves:
+            if move in moves or (move in deferred_sacrifices) != defer_sacrifices:
+                continue
             moves.append(move)
-        if len(moves) >= candidate_count:
-            break
+            if len(moves) >= candidate_count:
+                return moves
     return moves
 
 

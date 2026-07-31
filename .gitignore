@@ -23,6 +23,7 @@ dist/
 chroma_db/
 backend/.env
 backend/.cache/
+.artifacts/
 **/*.sqlite
 **/*.db
 

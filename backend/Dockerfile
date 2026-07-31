@@ -22,5 +22,6 @@ COPY . .
 # 告訴 Docker 我們會用 8000 port
 EXPOSE 8000
 
-# 🚀 生產環境啟動指令：使用平台提供的 PORT，沒有設定時預設 8000。
-CMD ["sh", "-c", "uvicorn api:app --host 0.0.0.0 --port ${PORT:-8000}"]
+# 🚀 啟動前先辨識 schema 再執行冪等 migration；legacy／未知 schema 會在
+# Alembic 寫入前安全失敗，避免啟動一個資料端點缺表的服務。
+CMD ["sh", "-c", "python scripts/upgrade_database.py && exec uvicorn api:app --host 0.0.0.0 --port ${PORT:-8000}"]

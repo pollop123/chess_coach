@@ -506,12 +506,16 @@ def run(
         enabled=use_cache,
         refresh=refresh_cache,
     )
-    original_evaluator = chess_engine.DEFAULT_EVALUATOR
     active_weights = dict(CALIBRATED_FEATURE_WEIGHTS)
     if feature_weights:
         active_weights.update(feature_weights)
-        chess_engine.DEFAULT_EVALUATOR = PositionEvaluator(active_weights)
+    engine_session = chess_engine.EngineSession(
+        evaluator=PositionEvaluator(active_weights)
+    )
+    activation = engine_session.activate()
+    activation.__enter__()
     results = []
+    engine_identity = "unknown-stockfish"
     try:
         with chess.engine.SimpleEngine.popen_uci(stockfish_path) as engine:
             engine_identity = stockfish_signature(engine)
@@ -598,7 +602,7 @@ def run(
                     "analysis_complete": teaching.get("analysis_complete"),
                 })
     finally:
-        chess_engine.DEFAULT_EVALUATOR = original_evaluator
+        activation.__exit__(None, None, None)
         cache.save()
 
     count = len(results)
@@ -671,6 +675,7 @@ def run(
         "profile": profile,
         "topics": sorted(set(topics or ())),
         "stockfish": stockfish_path,
+        "stockfish_signature": engine_identity,
         "nodes": nodes,
         "feature_weights": active_weights,
         "duration_seconds": round(perf_counter() - started_at, 3),

@@ -1,16 +1,19 @@
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, Query
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
-from typing import List, Optional
+from typing import List, Optional, Literal
 from datetime import datetime
+from contextlib import contextmanager
 import chess
 import chess.engine
 import chess.pgn
 import io
+import logging
 import math
 import os
 import shutil
+import threading
 import time
 
 # 匯入你的核心引擎
@@ -23,18 +26,59 @@ from database import SessionLocal, Game
 try:
     from rag import get_rag_engine
 except Exception as e:
-    print(f"⚠️ Warning: RAG engine failed to start: {e}")
+    logging.getLogger(__name__).warning("RAG engine failed to start: %s", e)
     get_rag_engine = None
 
+logger = logging.getLogger(__name__)
 app = FastAPI()
+
+
+def _configured_cors_origins():
+    configured = os.getenv(
+        "CORS_ORIGINS",
+        "http://localhost,http://localhost:5173",
+    )
+    origins = [origin.strip() for origin in configured.split(",") if origin.strip()]
+    return origins or ["http://localhost", "http://localhost:5173"]
+
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_configured_cors_origins(),
     allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Accept", "Content-Type"],
 )
+
+# Keep CPU pressure bounded even though EngineSession now isolates mutable
+# search state. The default remains one search per web process; deployments can
+# raise it deliberately after measuring their CPU budget.
+ENGINE_MAX_CONCURRENT_SEARCHES = max(
+    1,
+    int(os.getenv("ENGINE_MAX_CONCURRENT_SEARCHES", "1")),
+)
+engine_search_lock = threading.BoundedSemaphore(ENGINE_MAX_CONCURRENT_SEARCHES)
+ENGINE_QUEUE_TIMEOUT_SECONDS = max(
+    0.0,
+    float(os.getenv("ENGINE_QUEUE_TIMEOUT_SECONDS", "2.0")),
+)
+MAX_REVIEW_PLIES = 400
+
+
+@contextmanager
+def engine_search_slot():
+    acquired = engine_search_lock.acquire(timeout=ENGINE_QUEUE_TIMEOUT_SECONDS)
+    if not acquired:
+        raise HTTPException(
+            status_code=503,
+            detail="Analysis capacity is busy; please retry shortly",
+            headers={"Retry-After": "2"},
+        )
+    try:
+        yield chess_engine.EngineSession()
+    finally:
+        engine_search_lock.release()
+
 
 # --- Dependency: 取得資料庫連線 ---
 def get_db():
@@ -46,37 +90,46 @@ def get_db():
 
 # --- 定義資料模型 (Pydantic) ---
 class BoardRequest(BaseModel):
-    fen: str
-    depth: int = 3
+    fen: str = Field(min_length=1, max_length=120)
+    depth: int = Field(default=3, ge=1, le=8)
 
 class MakeMoveRequest(BaseModel):
-    fen: str
-    time_limit: float = 2.0
-    difficulty: str = "intermediate"
-    bot_style: str = "balanced"
+    fen: str = Field(min_length=1, max_length=120)
+    time_limit: float = Field(default=2.0, ge=0.05, le=5.0)
+    difficulty: str = Field(default="intermediate", max_length=32)
+    bot_style: str = Field(default="balanced", max_length=32)
 
 class GetAnalysisRequest(BaseModel):
-    fen: str
-    history: str = ""
-    question: Optional[str] = None
-    depth: int = 5
-    time_limit: float = 5.0
+    fen: str = Field(min_length=1, max_length=120)
+    history: str = Field(default="", max_length=20_000)
+    question: Optional[str] = Field(default=None, max_length=500)
+    depth: int = Field(default=5, ge=1, le=8)
+    time_limit: float = Field(default=5.0, ge=0.1, le=10.0)
 
 class AnalysisRequest(BaseModel):
-    pgn: str
-    depth: int = 2
-    perspective: str = "white"  # "white" or "black"
+    pgn: str = Field(min_length=1, max_length=200_000)
+    depth: int = Field(default=2, ge=1, le=6)
+    perspective: Literal["white", "black"] = "white"
 
 class GameCreate(BaseModel):
-    pgn: str
-    result: str
-    fen: str
-    player_white: str = "Human"
-    player_black: str = "AI (Minimax)"
+    pgn: str = Field(min_length=1, max_length=200_000)
+    result: str = Field(min_length=1, max_length=16)
+    fen: str = Field(min_length=1, max_length=120)
+    player_white: str = Field(default="Human", max_length=100)
+    player_black: str = Field(default="AI (Minimax)", max_length=100)
 
-class GameResponse(GameCreate):
+class GameResponse(BaseModel):
+    # Response models intentionally do not inherit write-time constraints.
+    # Alembic's legacy baseline preserves the original nullable/unbounded
+    # columns, so historical rows must remain readable after adoption.
     id: int
-    date: datetime
+    date: Optional[datetime] = None
+    pgn: Optional[str] = None
+    result: Optional[str] = None
+    fen: Optional[str] = None
+    player_white: Optional[str] = None
+    player_black: Optional[str] = None
+
     class Config:
         # Pydantic V2 新寫法，解決 UserWarning
         from_attributes = True 
@@ -151,15 +204,16 @@ def make_move(request: MakeMoveRequest):
     bot_style = request.bot_style if request.bot_style in {"balanced", "trickster"} else "balanced"
 
     # 使用難度檔位控制搜尋深度、開局庫與殘局自動加深。
-    analysis = chess_engine.get_analysis(
-        board, 
-        depth=profile["depth"],
-        time_limit=min(request.time_limit, profile["time_limit"]),
-        use_book=profile["use_book"],
-        adaptive_depth=profile["adaptive_depth"],
-        style=bot_style,
-        difficulty=difficulty,
-    )
+    with engine_search_slot() as engine_session:
+        analysis = engine_session.analyze(
+            board,
+            depth=profile["depth"],
+            time_limit=min(request.time_limit, profile["time_limit"]),
+            use_book=profile["use_book"],
+            adaptive_depth=profile["adaptive_depth"],
+            style=bot_style,
+            difficulty=difficulty,
+        )
 
     if not analysis['best_move']:
         raise HTTPException(status_code=500, detail="Engine failed to find move")
@@ -210,17 +264,18 @@ def get_analysis_endpoint(request: GetAnalysisRequest):
         }
 
     # 深度分析
-    analysis = chess_engine.get_analysis(
-        board,
-        depth=request.depth,
-        time_limit=request.time_limit
-    )
-    teaching_time_limit = min(1.0, max(0.2, request.time_limit * 0.25)) if request.time_limit else None
-    teaching_analysis = chess_engine.get_teaching_analysis(
-        board,
-        analysis,
-        time_limit=teaching_time_limit,
-    )
+    with engine_search_slot() as engine_session:
+        analysis = engine_session.analyze(
+            board,
+            depth=request.depth,
+            time_limit=request.time_limit
+        )
+        teaching_time_limit = min(1.0, max(0.2, request.time_limit * 0.25))
+        teaching_analysis = engine_session.teaching_analysis(
+            board,
+            analysis,
+            time_limit=teaching_time_limit,
+        )
     
     game_phase = chess_engine.detect_game_phase(board)
 
@@ -246,7 +301,7 @@ def get_analysis_endpoint(request: GetAnalysisRequest):
                 teaching_analysis=teaching_analysis,
             )
         except Exception as e:
-            print(f"RAG 分析失敗: {e}")
+            logger.warning("RAG analysis failed: %s", e)
             coach_advice = "教練分析暫時無法使用"
 
     return {
@@ -288,11 +343,12 @@ def analyze_game(request: BoardRequest):
         return {"game_over": True, "result": board.result()}
 
     # 使用新的分析引擎，加上時限
-    analysis = chess_engine.get_analysis(
-        board, 
-        depth=request.depth,
-        time_limit=3.0
-    )
+    with engine_search_slot() as engine_session:
+        analysis = engine_session.analyze(
+            board,
+            depth=request.depth,
+            time_limit=3.0
+        )
     game_phase = chess_engine.detect_game_phase(board)
 
     return {
@@ -514,20 +570,35 @@ def analyze_full_game(request: AnalysisRequest):
     game = chess.pgn.read_game(io.StringIO(request.pgn))
     if not game:
         raise HTTPException(status_code=400, detail="Invalid PGN")
+    if sum(1 for _ in game.mainline_moves()) > MAX_REVIEW_PLIES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"PGN exceeds the {MAX_REVIEW_PLIES}-ply review limit",
+        )
 
     perspective = (request.perspective or "white").lower()
     if perspective not in ("white", "black"):
         perspective = "white"
 
     stockfish_path = _find_stockfish_path()
-    if stockfish_path:
-        nodes = max(100, int(os.getenv("STOCKFISH_REVIEW_NODES", "4000")))
-        try:
-            return _analyze_full_with_stockfish(game, perspective, stockfish_path, nodes)
-        except Exception as exc:
-            print(f"Stockfish 賽後分析失敗，改用自製引擎: {exc}")
+    with engine_search_slot() as engine_session:
+        with engine_session.activate():
+            if stockfish_path:
+                nodes = max(100, int(os.getenv("STOCKFISH_REVIEW_NODES", "4000")))
+                try:
+                    return _analyze_full_with_stockfish(
+                        game,
+                        perspective,
+                        stockfish_path,
+                        nodes,
+                    )
+                except Exception as exc:
+                    logger.warning(
+                        "Stockfish review failed; falling back to custom engine: %s",
+                        exc,
+                    )
 
-    return _analyze_full_with_custom_engine(game, perspective, request.depth)
+            return _analyze_full_with_custom_engine(game, perspective, request.depth)
 
 # 3. 儲存比賽
 @app.post("/games", response_model=GameResponse)
@@ -546,17 +617,21 @@ def save_game(game: GameCreate, db: Session = Depends(get_db)):
 
 # 4. 查詢歷史比賽
 @app.get("/games", response_model=List[GameResponse])
-def read_games(skip: int = 0, limit: int = 10, db: Session = Depends(get_db)):
+def read_games(
+    skip: int = Query(default=0, ge=0),
+    limit: int = Query(default=10, ge=1, le=100),
+    db: Session = Depends(get_db),
+):
     games = db.query(Game).order_by(Game.date.desc()).offset(skip).limit(limit).all()
     return games
 
 # 5. 相容性 /explain 端點 (建議使用 /get_analysis 替代)
 class ExplainRequest(BaseModel):
-    fen: str
-    history: str = ""
-    question: Optional[str] = None
-    depth: int = 5
-    max_question_length: int = 200
+    fen: str = Field(min_length=1, max_length=120)
+    history: str = Field(default="", max_length=20_000)
+    question: Optional[str] = Field(default=None, max_length=500)
+    depth: int = Field(default=5, ge=1, le=8)
+    max_question_length: int = Field(default=200, ge=1, le=500)
 
 @app.post("/explain")
 def explain_position(request: ExplainRequest):
@@ -583,21 +658,33 @@ def explain_position(request: ExplainRequest):
     try:
         board = chess.Board(request.fen)
         if not board.is_game_over():
-            analysis = chess_engine.get_analysis(
-                board, 
-                depth=request.depth,
-                time_limit=4.0
+            with engine_search_slot() as engine_session:
+                analysis = engine_session.analyze(
+                    board,
+                    depth=request.depth,
+                    time_limit=4.0
+                )
+                pv_line = analysis['pv']
+                pv_score = analysis['score']
+                teaching_analysis = engine_session.teaching_analysis(
+                    board,
+                    analysis,
+                    time_limit=0.8,
+                )
+            logger.debug(
+                "PV=%s score=%s win=%s from_book=%s",
+                pv_line,
+                analysis["eval_display"],
+                analysis["winning_chance"],
+                analysis.get("from_book", False),
             )
-            pv_line = analysis['pv']
-            pv_score = analysis['score']
-            teaching_analysis = chess_engine.get_teaching_analysis(
-                board,
-                analysis,
-                time_limit=0.8,
-            )
-            print(f"PV Line: {pv_line} | Score: {analysis['eval_display']} | Win%: {analysis['winning_chance']}% | From Book: {analysis.get('from_book', False)}")
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="Invalid FEN string") from exc
+    except HTTPException:
+        raise
     except Exception as e:
-        print(f"引擎分析失敗: {e}")
+        logger.warning("Engine analysis failed: %s", e)
+        return {"advice": "引擎分析暫時無法使用"}
     
     # 傳遞給 RAG 教練
     try:
@@ -612,7 +699,7 @@ def explain_position(request: ExplainRequest):
             teaching_analysis=teaching_analysis,
         )
     except Exception as e:
-        print(f"RAG 分析失敗: {e}")
+        logger.warning("RAG analysis failed: %s", e)
         advice = "教練分析暫時無法使用"
     
     return {"advice": advice}

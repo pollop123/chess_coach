@@ -1,0 +1,39 @@
+{
+  "equals": {
+    "profile": "smoke",
+    "stockfish_signature": "author=the Stockfish developers (see AUTHORS file)|name=Stockfish 18"
+  },
+  "minimum": {
+    "positions": 8,
+    "top1_in_oracle_top3_rate": 0.5,
+    "oracle_best_recall_rate": 0.75,
+    "analysis_completion_rate": 1.0,
+    "mate_score_type_precision_rate": 1.0,
+    "only_move_precision": 1.0,
+    "only_move_recall": 1.0,
+    "loss_field_completion_rate": 1.0
+  },
+  "maximum": {
+    "average_rank_inversion_rate": 0.25,
+    "mean_candidate_loss_error_cp": 100.0,
+    "max_position_loss_mae_cp": 220.0
+  },
+  "topic_minimum": {
+    "opening": {
+      "top3_rate": 0.5,
+      "recall_rate": 0.5
+    },
+    "positional": {
+      "top3_rate": 0.0,
+      "recall_rate": 1.0
+    },
+    "tactics": {
+      "top3_rate": 1.0,
+      "recall_rate": 1.0
+    },
+    "endgame": {
+      "top3_rate": 0.5,
+      "recall_rate": 0.5
+    }
+  }
+}

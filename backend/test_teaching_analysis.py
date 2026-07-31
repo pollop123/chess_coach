@@ -231,6 +231,38 @@ class TeachingAnalysisTests(unittest.TestCase):
         self.assertEqual(teaching["candidates"][1]["loss_cp"], 0)
         self.assertTrue(teaching["candidates"][1]["near_equal"])
 
+    def test_candidate_screen_defers_immediately_recapturable_sacrifice(self):
+        board = chess.Board(
+            "r1bqk2r/ppp2ppp/2np1n2/2b1p3/2B1P3/3P1N2/PPP2PPP/RNBQ1RK1 w kq - 0 6"
+        )
+        book_move = board.parse_san("c3")
+        speculative_capture = board.parse_san("Bxf7+")
+
+        candidates = chess_engine._candidate_moves(board, book_move, 3)
+
+        self.assertTrue(
+            chess_engine._is_immediately_recapturable_sacrifice(
+                board,
+                speculative_capture,
+            )
+        )
+        self.assertEqual(candidates[0], book_move)
+        self.assertNotIn(speculative_capture, candidates)
+
+    def test_candidate_screen_keeps_verified_fork_in_primary_pool(self):
+        board = chess.Board(
+            "r1bqkb1r/ppp2ppp/2n5/3np1N1/2B5/8/PPPP1PPP/RNBQK2R w KQkq - 0 6"
+        )
+        base_move = board.parse_san("Qh5")
+        fork = board.parse_san("Nxf7")
+
+        candidates = chess_engine._candidate_moves(board, base_move, 3)
+
+        self.assertFalse(
+            chess_engine._is_immediately_recapturable_sacrifice(board, fork)
+        )
+        self.assertIn(fork, candidates)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -318,29 +318,30 @@ def run(
     feature_weights=None,
     use_tt=True,
 ):
-    original_evaluator = chess_engine.DEFAULT_EVALUATOR
     active_weights = dict(CALIBRATED_FEATURE_WEIGHTS)
     if feature_weights:
         active_weights.update(feature_weights)
-        chess_engine.DEFAULT_EVALUATOR = PositionEvaluator(active_weights)
+    engine_session = chess_engine.EngineSession(
+        evaluator=PositionEvaluator(active_weights)
+    )
     engine = None
     try:
-        engine = chess.engine.SimpleEngine.popen_uci(stockfish_path)
-        engine.configure({"Threads": 1, "Hash": 64})
-        return {
-            "stockfish": engine.id.get("name", "Stockfish"),
-            "nodes_per_analysis": nodes,
-            "feature_weights": active_weights,
-            "use_tt": use_tt,
-            "reports": [
-                run_config(engine, config, positions, nodes, use_tt=use_tt)
-                for config in configs
-            ],
-        }
+        with engine_session.activate():
+            engine = chess.engine.SimpleEngine.popen_uci(stockfish_path)
+            engine.configure({"Threads": 1, "Hash": 64})
+            return {
+                "stockfish": engine.id.get("name", "Stockfish"),
+                "nodes_per_analysis": nodes,
+                "feature_weights": active_weights,
+                "use_tt": use_tt,
+                "reports": [
+                    run_config(engine, config, positions, nodes, use_tt=use_tt)
+                    for config in configs
+                ],
+            }
     finally:
         if engine is not None:
             engine.quit()
-        chess_engine.DEFAULT_EVALUATOR = original_evaluator
 
 
 def main():

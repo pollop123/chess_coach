@@ -93,19 +93,21 @@
    LICHESS_API_TOKEN=你的_lichess_token  # 選填
    ```
 
-3. **使用 Docker Compose 啟動**
+3. **建立／升級資料庫並啟動**
    ```bash
-   # 啟動所有服務（前端 + 後端）
-   docker-compose up --build
+   # 第一次使用全新 volume
+   docker compose build
+   docker compose run --rm backend python scripts/upgrade_database.py
+   docker compose up
    
    # 背景執行
-   docker-compose up -d --build
+   docker compose up -d
    
    # 查看日誌
-   docker-compose logs -f
+   docker compose logs -f
    
    # 停止服務
-   docker-compose down
+   docker compose down
    ```
 
 4. **訪問服務**
@@ -132,9 +134,14 @@
 
 3. **啟動後端**
    ```bash
+   python3 -m venv .venv
+   .venv/bin/pip install -r backend/requirements.txt
+
+   # 全新資料庫先升級到最新版 schema
+   make PYTHON=.venv/bin/python db-upgrade
+
    cd backend
-   pip install -r requirements.txt
-   python3 main.py
+   ../.venv/bin/python main.py
    # 或使用 uvicorn api:app --reload
    # uvicorn main:app --reload 也會載入同一個 api:app
    ```
@@ -151,6 +158,40 @@
    # 在專案根目錄執行
    ./start_local.sh
    ```
+
+### 資料庫 migration
+
+應用程式啟動時不再隱式執行 `create_all`；schema 只由 Alembic 管理。
+本地啟動腳本、Docker 與 Render 都會先執行安全升級工具：全新或已由
+Alembic 管理的資料庫會冪等升級；舊版或未知 schema 會在任何 Alembic
+寫入前停止並提示人工接管。
+
+全新資料庫：
+
+```bash
+make PYTHON=.venv/bin/python db-upgrade
+make PYTHON=.venv/bin/python db-current
+```
+
+若資料庫是舊版程式建立、已有 `games` 表但還沒有 `alembic_version`，
+先備份，再執行嚴格的 baseline 接管與升級：
+
+```bash
+# 只驗證既有 schema 並 stamp 0001，不會執行 migration
+DATABASE_URL=sqlite:///backend/games.db \
+  make PYTHON=.venv/bin/python db-adopt
+
+# 確認接管成功後才建立背景復盤資料表
+DATABASE_URL=sqlite:///backend/games.db \
+  make PYTHON=.venv/bin/python db-upgrade
+```
+
+接管工具遇到額外資料表、欄位、索引或不相容型別會直接拒絕，不會猜測或
+修改資料。這兩步不會自動套用到目前的 `backend/games.db`。
+
+部署至 Neon 時，應用程式可讓 `DATABASE_URL` 使用 pooled 連線；另將
+direct（非 `-pooler`）連線設為 `MIGRATION_DATABASE_URL`，讓 Alembic
+只透過 direct 連線更新 schema。連線字串只放環境變數，不要提交到版本庫。
 
 ### 用 Stockfish 校準機器人強度
 
@@ -210,6 +251,21 @@ Stockfish oracle 會依引擎版本、nodes、FEN、MultiPV 與候選走法快�
 `--refresh-cache`，完全停用則使用 `--no-cache`。Smoke profile 只供快速方向
 檢查，不能取代完整 release corpus。
 
+### 提交前驗證
+
+在專案根目錄執行：
+
+```bash
+# Backend 單元測試、Frontend lint 與 production build
+make PYTHON=.venv/bin/python verify
+
+# Stockfish smoke benchmark 與回歸門檻
+make PYTHON=.venv/bin/python teaching-smoke
+```
+
+CI 會執行相同命令，並保存 smoke JSON 報告。Smoke gate 只防止已知品質
+退步；正式對外宣稱準確性前仍須執行完整 release benchmark。
+
 ### Docker 相關指令
 
 ```bash
@@ -243,17 +299,24 @@ docker-compose down --rmi all --volumes
 
 1. **建立 Neon 資料庫**
    - 建立一個 Neon Free Postgres 專案
-   - 複製 pooled 或 direct connection string
-   - 將 connection string 作為 Render 的 `DATABASE_URL`
+   - 複製 pooled connection string 作為 Render 的 `DATABASE_URL`
+   - 另複製 direct connection string 作為 `MIGRATION_DATABASE_URL`
 
 2. **部署 Render 後端**
    - 在 Render 建立 Blueprint 或 Web Service，連到 GitHub repo
    - 如果使用 Blueprint，Render 會讀取根目錄的 `render.yaml`
    - 必填環境變數：
      - `GOOGLE_API_KEY`: 你的 Google Gemini API Key
-     - `DATABASE_URL`: Neon 提供的 Postgres 連線字串
+     - `DATABASE_URL`: Neon 提供的 pooled Postgres 連線字串
+     - `MIGRATION_DATABASE_URL`: Neon 提供的 direct Postgres 連線字串
+     - `CORS_ORIGINS`: Vercel 前端網址；多個網址以逗號分隔
    - 選填環境變數：
      - `LICHESS_API_TOKEN`: Lichess Bot 需要時再填
+     - `ENGINE_QUEUE_TIMEOUT_SECONDS`: 引擎忙碌時最多排隊秒數，預設 `2.0`
+   - 每次服務啟動都會以 `MIGRATION_DATABASE_URL` 執行
+     `python scripts/upgrade_database.py`；全新或已管理資料庫會安全升級
+   - 若接管舊資料庫，先備份並執行
+     `python scripts/adopt_alembic_baseline.py`，成功後再執行安全升級工具
    - 部署完成後取得後端網址，例如 `https://chess-coach-api.onrender.com`
 
 3. **部署 Vercel 前端**
@@ -348,6 +411,7 @@ PYTHONPATH=backend .venv/bin/python backend/teaching_benchmark.py
 
 # 前端檢查
 cd frontend
+npm test
 npm run lint
 npm run build
 ```
@@ -367,7 +431,9 @@ npm run build
 │   ├── rag.py               # RAG 教練邏輯
 │   ├── api.py               # FastAPI 端點
 │   ├── lichess_bot.py       # Lichess Bot 客戶端
-│   ├── database.py          # SQLite 資料庫
+│   ├── database.py          # SQLite／Postgres ORM 與復盤 job model
+│   ├── migrations/          # Alembic schema revisions
+│   ├── scripts/             # 安全 migration 與舊資料庫接管工具
 │   └── test_*.py            # 測試腳本
 ├── frontend/
 │   └── src/                 # React 前端

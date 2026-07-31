@@ -5,6 +5,30 @@ import chess_engine
 import threading
 import time
 
+
+def _bounded_positive_int_env(name, default, maximum):
+    try:
+        value = int(os.getenv(name, str(default)))
+    except (TypeError, ValueError):
+        return default
+    return min(max(1, value), maximum)
+
+
+MAX_CONCURRENT_GAMES = _bounded_positive_int_env(
+    "LICHESS_MAX_CONCURRENT_GAMES",
+    default=2,
+    maximum=16,
+)
+LICHESS_TT_MAX_ENTRIES = _bounded_positive_int_env(
+    "LICHESS_TT_MAX_ENTRIES",
+    default=50_000,
+    maximum=chess_engine.TT_MAX_ENTRIES,
+)
+_game_slots = threading.BoundedSemaphore(MAX_CONCURRENT_GAMES)
+_reservation_lock = threading.Lock()
+_reserved_challenges = set()
+
+
 # 取得 Token
 API_TOKEN = os.getenv("LICHESS_API_TOKEN")
 
@@ -17,9 +41,53 @@ if not API_TOKEN:
 session = berserk.TokenSession(API_TOKEN)
 client = berserk.Client(session=session)
 
+
+def _reserve_challenge_slot(challenge_id):
+    with _reservation_lock:
+        if challenge_id in _reserved_challenges:
+            return False
+        if not _game_slots.acquire(blocking=False):
+            return False
+        _reserved_challenges.add(challenge_id)
+        return True
+
+
+def _release_reserved_challenge(challenge_id):
+    with _reservation_lock:
+        if challenge_id not in _reserved_challenges:
+            return False
+        _reserved_challenges.remove(challenge_id)
+    _game_slots.release()
+    return True
+
+
+def _claim_game_slot(game_id):
+    with _reservation_lock:
+        if game_id in _reserved_challenges:
+            _reserved_challenges.remove(game_id)
+            return True
+    return _game_slots.acquire(blocking=False)
+
+
+def _play_game_with_slot(game_id):
+    try:
+        play_game(game_id)
+    except Exception as exc:
+        print(f"❌ 對局執行失敗 {game_id}: {exc}")
+    finally:
+        _game_slots.release()
+
+
 def play_game(game_id):
     """處理單一局遊戲的邏輯"""
     print(f"🎮 開始對局: {game_id}")
+
+    # Each game runs in its own thread, so it must also own its engine state.
+    # Reusing the session for that game's moves preserves iterative TT reuse
+    # without leaking deadlines, counters, or cached positions across games.
+    engine_session = chess_engine.EngineSession(
+        tt_max_entries=LICHESS_TT_MAX_ENTRIES,
+    )
     
     # 建立棋盤
     board = chess.Board()
@@ -46,7 +114,7 @@ def play_game(game_id):
             
             # 如果輪到我，思考並走棋
             if board.turn == (chess.WHITE if is_white else chess.BLACK):
-                make_move(game_id, board)
+                make_move(game_id, board, engine_session)
 
         elif event['type'] == 'gameState':
             # 更新棋盤
@@ -84,14 +152,15 @@ def play_game(game_id):
             # 這裡直接用
             is_my_turn = board.turn == (chess.WHITE if is_white else chess.BLACK)
             if is_my_turn:
-                make_move(game_id, board)
+                make_move(game_id, board, engine_session)
 
-def make_move(game_id, board):
+def make_move(game_id, board, engine_session):
     """思考並走棋"""
     print("🤔 思考中...")
     # 使用我們的引擎算出最佳步
     # 這裡可以設定深度，例如 3 或 4
-    best_move = chess_engine.get_best_move(board, depth=3)
+    analysis = engine_session.analyze(board, depth=3)
+    best_move = analysis["best_move"]
     
     if best_move:
         print(f"🚀 下出: {best_move.uci()}")
@@ -122,19 +191,48 @@ def main():
         if event['type'] == 'challenge':
             challenge = event['challenge']
             print(f"⚔️ 收到挑戰: {challenge['challenger']['name']} ({challenge['speed']})")
-            
+
+            challenge_id = challenge['id']
+            if not _reserve_challenge_slot(challenge_id):
+                print(f"⛔ 對局已滿，拒絕挑戰: {challenge_id}")
+                try:
+                    client.bots.decline_challenge(challenge_id, reason="later")
+                except Exception as exc:
+                    print(f"⚠️ 拒絕挑戰失敗: {exc}")
+                continue
+
             # 自動接受挑戰 (你可以加條件，例如只接 Blitz/Rapid)
             try:
-                client.bots.accept_challenge(challenge['id'])
+                client.bots.accept_challenge(challenge_id)
                 print("✅ 已接受挑戰！")
             except Exception as e:
+                _release_reserved_challenge(challenge_id)
                 print(f"❌ 接受失敗: {e}")
-        
+
+        elif event['type'] in {'challengeCanceled', 'challengeDeclined'}:
+            challenge = event.get('challenge') or {}
+            challenge_id = challenge.get('id') or event.get('challengeId')
+            if challenge_id:
+                _release_reserved_challenge(challenge_id)
+
         elif event['type'] == 'gameStart':
             game_id = event['game']['gameId']
+            if not _claim_game_slot(game_id):
+                print(f"⛔ 對局已滿，不啟動新對局: {game_id}")
+                continue
+
             # 開一個新執行緒去處理這局遊戲 (支援多開)
-            t = threading.Thread(target=play_game, args=(game_id,))
-            t.start()
+            try:
+                game_thread = threading.Thread(
+                    target=_play_game_with_slot,
+                    args=(game_id,),
+                    name=f"lichess-game-{game_id}",
+                    daemon=False,
+                )
+                game_thread.start()
+            except Exception as exc:
+                _game_slots.release()
+                print(f"❌ 無法啟動對局 {game_id}: {exc}")
 
 if __name__ == "__main__":
     main()

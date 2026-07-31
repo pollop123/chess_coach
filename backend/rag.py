@@ -718,7 +718,10 @@ class ChessRAG:
                     engine_best_move_text = board.san(best_move) if isinstance(best_move, chess.Move) else best_move
             else:
                 print("⚠️ RAG 自行呼叫引擎 (Fallback)...")
-                engine_analysis = chess_engine.get_analysis(board, depth=3)
+                engine_analysis = chess_engine.EngineSession().analyze(
+                    board,
+                    depth=3,
+                )
                 best_move = engine_analysis.get('best_move')
                 from_opening_book = engine_analysis.get('from_book', False)
                 book_line_seq = engine_analysis.get('book_line', [])

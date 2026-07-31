@@ -5,12 +5,22 @@ services:
     plan: free
     rootDir: backend
     buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn api:app --host 0.0.0.0 --port $PORT
+    # Free Render web services do not support pre-deploy commands. Run the
+    # safe, idempotent migration before every process start so an empty or stale
+    # database can never hide behind a green root health check. Legacy or unknown
+    # schemas are rejected before Alembic writes anything.
+    startCommand: python scripts/upgrade_database.py && uvicorn api:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /
     envVars:
       - key: GOOGLE_API_KEY
         sync: false
       - key: DATABASE_URL
         sync: false
+      - key: MIGRATION_DATABASE_URL
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
+      - key: ENGINE_MAX_CONCURRENT_SEARCHES
+        value: 1
       - key: PYTHON_VERSION
         value: 3.10.14

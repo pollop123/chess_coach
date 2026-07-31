@@ -21,8 +21,22 @@ elif [ -f "backend/.env" ]; then
     set +a
 fi
 
+if [ -x ".venv/bin/python" ]; then
+    PYTHON_BIN=".venv/bin/python"
+else
+    PYTHON_BIN="python3"
+fi
+
+# 啟動前確認 schema 已在 Alembic head。舊版未 stamp 的資料庫會安全失敗，
+# 請依 README 先備份並執行 db-adopt；此處不自動猜測 legacy schema。
+echo "🗄️  檢查資料庫 migration..."
+if ! PYTHONPATH=backend "$PYTHON_BIN" backend/scripts/upgrade_database.py; then
+    echo "❌ 資料庫 migration 失敗；若是舊版 games.db，請先依 README 執行 db-adopt"
+    exit 1
+fi
+
 cd backend
-if [ -x "../.venv/bin/python" ]; then
+if [ "$PYTHON_BIN" = ".venv/bin/python" ]; then
     ../.venv/bin/python main.py &
 else
     python3 main.py &
