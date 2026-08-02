@@ -67,14 +67,10 @@ def validate_semantics(lessons: list[dict]) -> list[str]:
                     str(learner_step),
                     challenge_steps.get(learner_step, {}),
                 )
-                configured_moves = override.get("acceptedMoves") or [san]
-                accepted_sans = [
-                    candidate if isinstance(candidate, str) else candidate.get("san")
-                    for candidate in configured_moves
-                ]
-                if san not in accepted_sans:
-                    accepted_sans.insert(0, san)
-                for accepted_san in accepted_sans:
+                errors.extend(
+                    _mainline_declaration_errors(lesson_id, override, san, learner_step)
+                )
+                for accepted_san in _accepted_sans(override, san):
                     if accepted_san == san:
                         continue
                     try:
@@ -124,25 +120,82 @@ def first_move_is_acceptable(
     return loss_cp <= engine_loss_limit(lesson) and preserves_outcome
 
 
+def _declared_sans(override: dict) -> list[str]:
+    return [
+        candidate if isinstance(candidate, str) else candidate.get("san")
+        for candidate in override.get("acceptedMoves") or []
+    ]
+
+
 def _accepted_sans(override: dict, primary_san: str) -> list[str]:
+    """Accepted SANs for a step, honouring an explicit rejectsMainline opt-out.
+
+    The mainline move is force-included otherwise, so editing a lesson's move
+    list can never leave a challenge without a reachable answer.
+    """
     candidates = override.get("acceptedMoves") or [primary_san]
     sans = [
         candidate if isinstance(candidate, str) else candidate.get("san")
         for candidate in candidates
     ]
-    if primary_san not in sans:
+    if override.get("rejectsMainline"):
+        sans = [san for san in sans if san != primary_san]
+    elif primary_san not in sans:
         sans.insert(0, primary_san)
     return list(dict.fromkeys(san for san in sans if san))
+
+
+def _mainline_declaration_errors(
+    lesson_id: str, override: dict, primary_san: str, learner_step: int
+) -> list[str]:
+    """Reject silent drift between a lesson's move list and its challengeSteps."""
+    declared = override.get("acceptedMoves")
+    rejects_mainline = bool(override.get("rejectsMainline"))
+    declares_mainline = primary_san in _declared_sans(override)
+    step_label = f"{lesson_id}: learner step {learner_step + 1}"
+
+    if rejects_mainline and not declared:
+        return [f"{step_label} sets rejectsMainline without acceptedMoves"]
+    if rejects_mainline and declares_mainline:
+        return [f"{step_label} sets rejectsMainline but still accepts {primary_san}"]
+    if declared and not declares_mainline and not rejects_mainline:
+        return [
+            f"{step_label} omits mainline {primary_san} from acceptedMoves "
+            "without rejectsMainline"
+        ]
+    return []
+
+
+def _rejected_mainline_keys(lesson: dict) -> set[tuple[str, str]]:
+    """FEN/SAN pairs a lesson deliberately teaches as wrong answers."""
+    keys: set[tuple[str, str]] = set()
+    board = initial_board(lesson)
+    learner_color = chess.BLACK if lesson.get("side") == "black" else chess.WHITE
+    learner_step = 0
+    challenge_steps = lesson.get("challengeSteps") or {}
+    for san in lesson.get("moves") or []:
+        if board.turn == learner_color:
+            override = challenge_steps.get(
+                str(learner_step),
+                challenge_steps.get(learner_step, {}),
+            )
+            if override.get("rejectsMainline"):
+                keys.add((board.fen(), san))
+            learner_step += 1
+        board.push_san(san)
+    return keys
 
 
 def iter_engine_move_cases(lesson: dict) -> list[tuple[int | None, chess.Board, str]]:
     """Return legacy first-move and V2 override cases without duplicates."""
     cases: list[tuple[int | None, chess.Board, str]] = []
     seen: set[tuple[str, str]] = set()
+    # 陷阱課刻意標成錯誤答案的主線不送進引擎閘門，否則會被當成大失誤擋下來。
+    rejected = _rejected_mainline_keys(lesson)
 
     def add_case(step: int | None, board: chess.Board, san: str) -> None:
         key = (board.fen(), san)
-        if key not in seen:
+        if key not in seen and key not in rejected:
             seen.add(key)
             cases.append((step, board.copy(stack=False), san))
 

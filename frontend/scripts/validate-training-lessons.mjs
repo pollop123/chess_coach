@@ -85,6 +85,26 @@ for (const lesson of TRAINING_LESSONS) {
   }
   for (const challenge of buildLessonChallenges(lesson)) {
     assert(challenge.acceptedMoves.length >= 1, `${lesson.id} challenge ${challenge.index} needs accepted moves`);
+
+    // 主線走法漏掉時必須是刻意的，否則課程主線改動後沒有任何檢查會發現不同步。
+    const override = lesson.challengeSteps?.[challenge.index];
+    const declaredSans = (override?.acceptedMoves || []).map(
+      (candidate) => (typeof candidate === "string" ? candidate : candidate?.san)
+    );
+    const declaresMainline = declaredSans.includes(challenge.mainlineMove);
+    assert(
+      !challenge.rejectsMainline || override?.acceptedMoves?.length,
+      `${lesson.id} challenge ${challenge.index} sets rejectsMainline without acceptedMoves`
+    );
+    assert(
+      !override?.acceptedMoves || declaresMainline || challenge.rejectsMainline,
+      `${lesson.id} challenge ${challenge.index} omits mainline ${challenge.mainlineMove} from acceptedMoves without rejectsMainline`
+    );
+    assert(
+      !challenge.rejectsMainline || !declaresMainline,
+      `${lesson.id} challenge ${challenge.index} sets rejectsMainline but still accepts ${challenge.mainlineMove}`
+    );
+
     for (const candidate of challenge.acceptedMoves) {
       const challengeBoard = new Chess(challenge.fen);
       const move = challengeBoard.move(candidate.san);

@@ -24,10 +24,13 @@ export function buildLessonChallenges(lesson) {
       const fallbackExplanation = lesson.ideas?.[
         Math.min(learnerStepIndex, Math.max(0, (lesson.ideas?.length || 1) - 1))
       ] || lesson.goal;
+      // 主線那一手預設一定是可接受答案，課程改動後才不會出現無解的題目。
+      // 陷阱課要把主線標成錯誤答案時，必須明確宣告 rejectsMainline。
+      const rejectsMainline = Boolean(override.rejectsMainline);
       const configuredMoves = (override.acceptedMoves || [san])
         .map((candidate) => normalizeAcceptedMove(candidate, fallbackExplanation))
-        .filter((candidate) => candidate.san);
-      const acceptedMoves = configuredMoves.some((candidate) => candidate.san === san)
+        .filter((candidate) => candidate.san && !(rejectsMainline && candidate.san === san));
+      const acceptedMoves = rejectsMainline || configuredMoves.some((candidate) => candidate.san === san)
         ? configuredMoves
         : [{ san, explanation: fallbackExplanation }, ...configuredMoves];
 
@@ -35,7 +38,9 @@ export function buildLessonChallenges(lesson) {
         index: learnerStepIndex,
         sourcePly: plyIndex,
         fen: board.fen(),
-        primaryMove: san,
+        mainlineMove: san,
+        rejectsMainline,
+        primaryMove: rejectsMainline ? (acceptedMoves[0]?.san || san) : san,
         prompt: override.prompt || (lesson.type === "puzzle" ? "找出局面的最佳手。" : "運用本課觀念選出合適走法。"),
         hints: [
           override.hints?.[0] || fallbackExplanation,

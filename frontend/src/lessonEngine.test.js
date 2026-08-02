@@ -43,6 +43,45 @@ describe("lesson challenge normalization", () => {
     expect(findAcceptedMove(challenges[0], "c3")?.explanation).toBe("準備 d4 中心突破。");
     expect(findAcceptedMove(challenges[0], "Be3")).toBeNull();
   });
+
+  it("force-includes the mainline move when a step omits it", () => {
+    const challenges = buildLessonChallenges({
+      side: "white",
+      type: "guided",
+      goal: "建立中心",
+      moves: ["e4"],
+      ideas: ["先占中心"],
+      challengeSteps: {
+        0: { acceptedMoves: [{ san: "d4", explanation: "另一種中心佔領方式。" }] }
+      }
+    });
+
+    expect(challenges[0].acceptedMoves.map((candidate) => candidate.san)).toEqual(["e4", "d4"]);
+    expect(challenges[0].primaryMove).toBe("e4");
+    expect(challenges[0].rejectsMainline).toBe(false);
+  });
+
+  it("drops the mainline move when a trap step declares rejectsMainline", () => {
+    const challenges = buildLessonChallenges({
+      side: "white",
+      type: "puzzle",
+      goal: "避開自然但錯誤的一手",
+      moves: ["e4"],
+      ideas: ["自然的一手不一定安全"],
+      challengeSteps: {
+        0: {
+          rejectsMainline: true,
+          acceptedMoves: [{ san: "d4", explanation: "這裡只有 d4 站得住。" }]
+        }
+      }
+    });
+
+    expect(challenges[0].acceptedMoves.map((candidate) => candidate.san)).toEqual(["d4"]);
+    expect(findAcceptedMove(challenges[0], "e4")).toBeNull();
+    // 主線仍然保留下來供驗證器比對，但不再是這一題的答案。
+    expect(challenges[0].mainlineMove).toBe("e4");
+    expect(challenges[0].primaryMove).toBe("d4");
+  });
 });
 
 describe("lesson completion scoring", () => {

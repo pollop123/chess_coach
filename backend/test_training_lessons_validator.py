@@ -38,6 +38,55 @@ class TrainingLessonValidatorTests(unittest.TestCase):
         self.assertEqual(len(errors), 1)
         self.assertIn("illegal accepted SAN at learner step 1", errors[0])
 
+    def test_rejects_silent_drift_between_moves_and_accepted_moves(self):
+        lessons = [{
+            "id": "drifted",
+            "moves": ["e4"],
+            "challengeSteps": {"0": {"acceptedMoves": [{"san": "d4"}]}},
+        }]
+        errors = validate_training_lessons.validate_semantics(lessons)
+        self.assertEqual(len(errors), 1)
+        self.assertIn("omits mainline e4 from acceptedMoves", errors[0])
+
+    def test_rejects_contradictory_or_empty_mainline_opt_out(self):
+        contradictory = [{
+            "id": "contradictory",
+            "moves": ["e4"],
+            "challengeSteps": {
+                "0": {"rejectsMainline": True, "acceptedMoves": [{"san": "e4"}, {"san": "d4"}]}
+            },
+        }]
+        empty = [{
+            "id": "empty-opt-out",
+            "moves": ["e4"],
+            "challengeSteps": {"0": {"rejectsMainline": True}},
+        }]
+
+        self.assertIn(
+            "still accepts e4",
+            validate_training_lessons.validate_semantics(contradictory)[0],
+        )
+        self.assertIn(
+            "rejectsMainline without acceptedMoves",
+            validate_training_lessons.validate_semantics(empty)[0],
+        )
+
+    def test_accepts_a_declared_trap_step_and_keeps_it_out_of_the_engine_gate(self):
+        lesson = {
+            "id": "trap",
+            "type": "puzzle",
+            "side": "white",
+            "moves": ["e4"],
+            "challengeSteps": {
+                "0": {"rejectsMainline": True, "acceptedMoves": [{"san": "d4"}]}
+            },
+        }
+
+        self.assertEqual(validate_training_lessons.validate_semantics([lesson]), [])
+        # 主線是刻意標錯的答案，連 legacy 首手案例都不該送進 Stockfish 閘門。
+        cases = validate_training_lessons.iter_engine_move_cases(lesson)
+        self.assertEqual([(step, san) for step, _board, san in cases], [(0, "d4")])
+
     def test_engine_cases_include_late_v2_alternatives_and_skip_plain_openings(self):
         plain_opening = {
             "id": "plain-opening",

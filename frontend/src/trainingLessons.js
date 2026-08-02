@@ -417,7 +417,8 @@ function lessonLineSignature(lesson) {
   const challengeSignature = Object.entries(lesson.challengeSteps || {})
     .sort(([left], [right]) => Number(left) - Number(right))
     .map(([stepIndex, step]) => (
-      `${stepIndex}=${(step.acceptedMoves || []).map((candidate) => candidate.san || candidate).join(",")}`
+      // rejectsMainline 會改變引擎閘門覆蓋的走法，翻動它必須重新驗證正確性。
+      `${stepIndex}${step.rejectsMainline ? "!" : ""}=${(step.acceptedMoves || []).map((candidate) => candidate.san || candidate).join(",")}`
     ))
     .join(";");
   const base = `${lesson.type}|${lesson.startFen || "start"}|${lesson.moves.join(" ")}`;
