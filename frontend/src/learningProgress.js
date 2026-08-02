@@ -3,7 +3,47 @@ export const LEARNING_PROGRESS_STORAGE_KEY = "chess-coach-learning-progress-v1";
 const REVIEW_INTERVAL_DAYS = [0, 1, 3, 7, 14, 30];
 
 export function createEmptyLearningProgress() {
-  return { version: 1, lessons: {} };
+  return { version: 2, lessons: {} };
+}
+
+function normalizeLessonProgress(value = {}, fromVersion = 2) {
+  const completions = Math.max(0, Number(value.completions) || 0);
+  return {
+    attempts: Math.max(0, Number(value.attempts) || 0),
+    completions,
+    firstTryCompletions: Math.max(0, Number(value.firstTryCompletions) || 0),
+    totalMistakes: Math.max(0, Number(value.totalMistakes) || 0),
+    totalHints: Math.max(0, Number(value.totalHints) || 0),
+    mastery: Math.max(0, Math.min(5, Number(value.mastery) || 0)),
+    lastPracticedAt: value.lastPracticedAt || null,
+    nextReviewAt: value.nextReviewAt || null,
+    bestScore: Math.max(
+      0,
+      Math.min(100, Number(value.bestScore) || (fromVersion === 1 && completions ? 70 : 0))
+    ),
+    lastScore: Number.isFinite(Number(value.lastScore))
+      ? Math.max(0, Math.min(100, Number(value.lastScore)))
+      : null,
+    currentStreak: Math.max(0, Number(value.currentStreak) || 0),
+    lastMissedSteps: Array.isArray(value.lastMissedSteps)
+      ? [...new Set(value.lastMissedSteps.filter(Number.isInteger))]
+      : []
+  };
+}
+
+export function migrateLearningProgress(value) {
+  if (!value?.lessons || typeof value.lessons !== "object" || ![1, 2].includes(value.version)) {
+    return createEmptyLearningProgress();
+  }
+  return {
+    version: 2,
+    lessons: Object.fromEntries(
+      Object.entries(value.lessons).map(([lessonId, progress]) => [
+        lessonId,
+        normalizeLessonProgress(progress, value.version)
+      ])
+    )
+  };
 }
 
 export function loadLearningProgress(storage) {
@@ -14,10 +54,7 @@ export function loadLearningProgress(storage) {
     const raw = targetStorage.getItem(LEARNING_PROGRESS_STORAGE_KEY);
     if (!raw) return createEmptyLearningProgress();
     const parsed = JSON.parse(raw);
-    if (parsed?.version !== 1 || !parsed.lessons || typeof parsed.lessons !== "object") {
-      return createEmptyLearningProgress();
-    }
-    return parsed;
+    return migrateLearningProgress(parsed);
   } catch {
     return createEmptyLearningProgress();
   }
@@ -35,7 +72,7 @@ export function saveLearningProgress(progress, storage) {
 }
 
 export function getLessonProgress(progress, lessonId) {
-  return progress.lessons[lessonId] || {
+  return progress.lessons[lessonId] || normalizeLessonProgress({
     attempts: 0,
     completions: 0,
     firstTryCompletions: 0,
@@ -44,7 +81,7 @@ export function getLessonProgress(progress, lessonId) {
     mastery: 0,
     lastPracticedAt: null,
     nextReviewAt: null
-  };
+  });
 }
 
 export function recordLessonResult(progress, lessonId, result, now = new Date()) {
@@ -52,6 +89,10 @@ export function recordLessonResult(progress, lessonId, result, now = new Date())
   const completed = Boolean(result.completed);
   const mistakes = Math.max(0, Number(result.mistakes) || 0);
   const hintsUsed = Math.max(0, Number(result.hintsUsed) || 0);
+  const score = Math.max(0, Math.min(100, Number(result.score) || 0));
+  const missedSteps = Array.isArray(result.missedSteps)
+    ? [...new Set(result.missedSteps.filter(Number.isInteger))]
+    : [];
   const firstTry = completed && mistakes === 0 && hintsUsed === 0;
 
   let mastery = previous.mastery || 0;
@@ -75,10 +116,29 @@ export function recordLessonResult(progress, lessonId, result, now = new Date())
         totalHints: previous.totalHints + hintsUsed,
         mastery,
         lastPracticedAt: now.toISOString(),
-        nextReviewAt: reviewDate.toISOString()
+        nextReviewAt: reviewDate.toISOString(),
+        bestScore: Math.max(previous.bestScore || 0, score),
+        lastScore: score,
+        currentStreak: completed ? (previous.currentStreak || 0) + 1 : 0,
+        lastMissedSteps: missedSteps
       }
     }
   };
+}
+
+export function getLessonLockReason(lesson, lessons, progress) {
+  const missing = (lesson.prerequisites || []).filter(
+    (lessonId) => getLessonProgress(progress, lessonId).completions === 0
+  );
+  if (!missing.length) return null;
+  const names = missing.map((lessonId) => (
+    lessons.find((candidate) => candidate.id === lessonId)?.variation || lessonId
+  ));
+  return `先完成：${names.join("、")}`;
+}
+
+export function isLessonUnlocked(lesson, lessons, progress) {
+  return getLessonLockReason(lesson, lessons, progress) === null;
 }
 
 export function isLessonDue(progress, lessonId, now = new Date()) {
@@ -106,26 +166,28 @@ export function getLearningStats(progress, lessons, now = new Date()) {
 
 export function buildLearningPlan(lessons, progress, reviewRecommendations = [], now = new Date()) {
   const recommendationIds = new Set(reviewRecommendations.map((lesson) => lesson.id));
-  const ranked = lessons.map((lesson, index) => {
-    const lessonProgress = getLessonProgress(progress, lesson.id);
-    const due = isLessonDue(progress, lesson.id, now);
-    const reviewMatch = recommendationIds.has(lesson.id);
-    const unseen = lessonProgress.attempts === 0;
-    const score = (due ? 100 : 0)
-      + (reviewMatch ? 70 : 0)
-      + (unseen ? 25 : 0)
-      + (5 - lessonProgress.mastery) * 4
-      - index / 100;
+  const ranked = lessons
+    .filter((lesson) => isLessonUnlocked(lesson, lessons, progress))
+    .map((lesson, index) => {
+      const lessonProgress = getLessonProgress(progress, lesson.id);
+      const due = isLessonDue(progress, lesson.id, now);
+      const reviewMatch = recommendationIds.has(lesson.id);
+      const unseen = lessonProgress.attempts === 0;
+      const score = (due ? 100 : 0)
+        + (reviewMatch ? 70 : 0)
+        + (unseen ? 25 : 0)
+        + (5 - lessonProgress.mastery) * 4
+        - index / 100;
 
-    let reason = "繼續建立完整棋局觀念";
-    if (due && reviewMatch) reason = "這盤暴露的弱點，而且已到複習時間";
-    else if (due) reason = "已到間隔複習時間";
-    else if (reviewMatch) reason = "根據最近一盤的失誤推薦";
-    else if (unseen) reason = "尚未完成的新課程";
-    else if (lessonProgress.mastery < 3) reason = "熟練度仍需加強";
+      let reason = "繼續建立完整棋局觀念";
+      if (due && reviewMatch) reason = "這盤暴露的弱點，而且已到複習時間";
+      else if (due) reason = "已到間隔複習時間";
+      else if (reviewMatch) reason = "根據最近一盤的失誤推薦";
+      else if (unseen) reason = "尚未完成的新課程";
+      else if (lessonProgress.mastery < 3) reason = "熟練度仍需加強";
 
-    return { lesson, reason, score };
-  });
+      return { lesson, reason, score };
+    });
 
   return ranked
     .sort((a, b) => b.score - a.score || a.lesson.id.localeCompare(b.lesson.id))
@@ -139,7 +201,8 @@ export function getNextLesson(lessons, currentLessonId, progress) {
     ...lessons.slice(currentIndex + 1),
     ...lessons.slice(0, Math.max(0, currentIndex + 1))
   ];
-  return ordered.find((lesson) => getLessonProgress(progress, lesson.id).completions === 0)
-    || ordered[0]
+  const unlocked = ordered.filter((lesson) => isLessonUnlocked(lesson, lessons, progress));
+  return unlocked.find((lesson) => getLessonProgress(progress, lesson.id).completions === 0)
+    || unlocked[0]
     || lessons[0];
 }

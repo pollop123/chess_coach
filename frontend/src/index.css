@@ -1093,6 +1093,43 @@ button:disabled {
   gap: 8px;
 }
 
+.lesson-result {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #f5f7f2;
+}
+
+.lesson-result > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.lesson-result strong {
+  font-size: 1.5rem;
+}
+
+.lesson-result p,
+.lesson-result small {
+  margin: 0;
+  color: var(--ink-soft);
+  line-height: 1.45;
+}
+
+.lesson-result.is-passed {
+  border-color: #9acbae;
+  background: #edf7f0;
+}
+
+.lesson-result.is-retry {
+  border-color: #efc48e;
+  background: #fff4e6;
+}
+
 .learning-dashboard {
   width: min(100%, 1120px);
   margin: 0 auto;
@@ -1333,6 +1370,19 @@ button:disabled {
 
 .curriculum-row:hover {
   background: #f0f6ee;
+}
+
+.curriculum-row.is-locked,
+.curriculum-row:disabled {
+  color: var(--muted);
+  background: #f7f8f5;
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
+.curriculum-row.is-locked:hover,
+.curriculum-row:disabled:hover {
+  background: #f7f8f5;
 }
 
 .curriculum-status {

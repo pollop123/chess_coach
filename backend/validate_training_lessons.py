@@ -58,7 +58,33 @@ def validate_semantics(lessons: list[dict]) -> list[str]:
             )
             continue
 
+        learner_color = chess.BLACK if lesson.get("side") == "black" else chess.WHITE
+        learner_step = 0
+        challenge_steps = lesson.get("challengeSteps") or {}
         for ply, san in enumerate(lesson.get("moves") or [], start=1):
+            if board.turn == learner_color:
+                override = challenge_steps.get(
+                    str(learner_step),
+                    challenge_steps.get(learner_step, {}),
+                )
+                configured_moves = override.get("acceptedMoves") or [san]
+                accepted_sans = [
+                    candidate if isinstance(candidate, str) else candidate.get("san")
+                    for candidate in configured_moves
+                ]
+                if san not in accepted_sans:
+                    accepted_sans.insert(0, san)
+                for accepted_san in accepted_sans:
+                    if accepted_san == san:
+                        continue
+                    try:
+                        board.parse_san(accepted_san)
+                    except (TypeError, ValueError) as exc:
+                        errors.append(
+                            f"{lesson_id}: illegal accepted SAN at learner step "
+                            f"{learner_step + 1}: {accepted_san}: {exc}"
+                        )
+                learner_step += 1
             try:
                 board.push_san(san)
             except ValueError as exc:
@@ -98,6 +124,51 @@ def first_move_is_acceptable(
     return loss_cp <= engine_loss_limit(lesson) and preserves_outcome
 
 
+def _accepted_sans(override: dict, primary_san: str) -> list[str]:
+    candidates = override.get("acceptedMoves") or [primary_san]
+    sans = [
+        candidate if isinstance(candidate, str) else candidate.get("san")
+        for candidate in candidates
+    ]
+    if primary_san not in sans:
+        sans.insert(0, primary_san)
+    return list(dict.fromkeys(san for san in sans if san))
+
+
+def iter_engine_move_cases(lesson: dict) -> list[tuple[int | None, chess.Board, str]]:
+    """Return legacy first-move and V2 override cases without duplicates."""
+    cases: list[tuple[int | None, chess.Board, str]] = []
+    seen: set[tuple[str, str]] = set()
+
+    def add_case(step: int | None, board: chess.Board, san: str) -> None:
+        key = (board.fen(), san)
+        if key not in seen:
+            seen.add(key)
+            cases.append((step, board.copy(stack=False), san))
+
+    moves = lesson.get("moves") or []
+    if lesson.get("type") != "opening" and moves:
+        add_case(None, initial_board(lesson), moves[0])
+
+    board = initial_board(lesson)
+    learner_color = chess.BLACK if lesson.get("side") == "black" else chess.WHITE
+    learner_step = 0
+    challenge_steps = lesson.get("challengeSteps") or {}
+    for san in moves:
+        if board.turn == learner_color:
+            override = challenge_steps.get(
+                str(learner_step),
+                challenge_steps.get(learner_step),
+            )
+            if override:
+                for accepted_san in _accepted_sans(override, san):
+                    add_case(learner_step, board, accepted_san)
+            learner_step += 1
+        board.push_san(san)
+
+    return cases
+
+
 def validate_first_moves_with_stockfish(
     lessons: list[dict], stockfish_path: str, nodes: int = 50_000
 ) -> tuple[list[str], list[dict]]:
@@ -105,57 +176,68 @@ def validate_first_moves_with_stockfish(
     results: list[dict] = []
     with chess.engine.SimpleEngine.popen_uci(stockfish_path) as engine:
         for lesson in lessons:
-            if lesson.get("type") == "opening":
-                continue
-            board = initial_board(lesson)
-            if not board.is_valid() or not lesson.get("moves"):
-                continue
             lesson_id = lesson["id"]
-            try:
-                lesson_move = board.parse_san(lesson["moves"][0])
-            except ValueError:
+            cases = iter_engine_move_cases(lesson)
+            if not cases:
                 continue
+            root_by_fen: dict[str, dict] = {}
+            for learner_step, board, candidate_san in cases:
+                if not board.is_valid():
+                    continue
+                try:
+                    lesson_move = board.parse_san(candidate_san)
+                except ValueError:
+                    continue
 
-            root = engine.analyse(board, chess.engine.Limit(nodes=nodes))
-            best_move = root.get("pv", [None])[0]
-            if best_move is None:
-                errors.append(f"{lesson_id}: Stockfish returned no principal variation")
-                continue
-
-            after = board.copy(stack=False)
-            after.push(lesson_move)
-            played = engine.analyse(
-                board,
-                chess.engine.Limit(nodes=nodes),
-                root_moves=[lesson_move],
-            )
-            root_score = root["score"].pov(board.turn)
-            played_score = played["score"].pov(board.turn)
-            best_cp = root_score.score(mate_score=100_000)
-            played_cp = played_score.score(mate_score=100_000)
-            loss_cp = max(0, (best_cp or 0) - (played_cp or 0))
-            preserves_outcome = _outcome_bucket(root_score) == _outcome_bucket(played_score)
-            max_loss = engine_loss_limit(lesson)
-            accepted = first_move_is_acceptable(
-                lesson,
-                loss_cp=loss_cp,
-                preserves_outcome=preserves_outcome,
-                delivers_checkmate=after.is_checkmate(),
-            )
-            result = {
-                "id": lesson_id,
-                "played": board.san(lesson_move),
-                "best": board.san(best_move),
-                "loss_cp": loss_cp,
-                "preserves_outcome": preserves_outcome,
-                "accepted": accepted,
-            }
-            results.append(result)
-            if not accepted:
-                errors.append(
-                    f"{lesson_id}: {result['played']} vs {result['best']} loses {loss_cp}cp "
-                    f"(limit {max_loss}, preserves_outcome={preserves_outcome})"
+                root = root_by_fen.get(board.fen())
+                if root is None:
+                    root = engine.analyse(board, chess.engine.Limit(nodes=nodes))
+                    root_by_fen[board.fen()] = root
+                best_move = root.get("pv", [None])[0]
+                case_label = (
+                    lesson_id
+                    if learner_step is None
+                    else f"{lesson_id} challenge {learner_step + 1}"
                 )
+                if best_move is None:
+                    errors.append(f"{case_label}: Stockfish returned no principal variation")
+                    continue
+
+                after = board.copy(stack=False)
+                after.push(lesson_move)
+                played = engine.analyse(
+                    board,
+                    chess.engine.Limit(nodes=nodes),
+                    root_moves=[lesson_move],
+                )
+                root_score = root["score"].pov(board.turn)
+                played_score = played["score"].pov(board.turn)
+                best_cp = root_score.score(mate_score=100_000)
+                played_cp = played_score.score(mate_score=100_000)
+                loss_cp = max(0, (best_cp or 0) - (played_cp or 0))
+                preserves_outcome = _outcome_bucket(root_score) == _outcome_bucket(played_score)
+                max_loss = engine_loss_limit(lesson)
+                accepted = first_move_is_acceptable(
+                    lesson,
+                    loss_cp=loss_cp,
+                    preserves_outcome=preserves_outcome,
+                    delivers_checkmate=after.is_checkmate(),
+                )
+                result = {
+                    "id": lesson_id,
+                    "challenge_step": None if learner_step is None else learner_step + 1,
+                    "played": board.san(lesson_move),
+                    "best": board.san(best_move),
+                    "loss_cp": loss_cp,
+                    "preserves_outcome": preserves_outcome,
+                    "accepted": accepted,
+                }
+                results.append(result)
+                if not accepted:
+                    errors.append(
+                        f"{case_label}: {result['played']} vs {result['best']} loses {loss_cp}cp "
+                        f"(limit {max_loss}, preserves_outcome={preserves_outcome})"
+                    )
     return errors, results
 
 
