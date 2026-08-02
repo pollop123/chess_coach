@@ -101,6 +101,20 @@ describe("learning progress persistence", () => {
       lastMissedSteps: []
     });
   });
+
+  it("keeps missed steps reloadable and drops entries that are not step indexes", () => {
+    const storage = {
+      getItem: () => JSON.stringify({
+        version: 2,
+        lessons: {
+          opening: { ...lessonProgress(), lastMissedSteps: [2, 2, "4", null, 0] }
+        }
+      })
+    };
+
+    // 重整頁面後仍要能接續重練上次的錯題。
+    expect(loadLearningProgress(storage).lessons.opening.lastMissedSteps).toEqual([2, 0]);
+  });
 });
 
 describe("recordLessonResult", () => {

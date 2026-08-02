@@ -178,6 +178,7 @@ function App() {
   const [trainingStepSolved, setTrainingStepSolved] = useState(false);
   const [trainingMissedSteps, setTrainingMissedSteps] = useState([]);
   const [trainingRetryDrill, setTrainingRetryDrill] = useState(false);
+  const [trainingRunFromMissedSteps, setTrainingRunFromMissedSteps] = useState(false);
   const [trainingFeedback, setTrainingFeedback] = useState({
     tone: "neutral",
     text: "先觀察局面再走棋；需要時可逐步開啟提示。"
@@ -356,6 +357,19 @@ function App() {
   const trainingProgressPercent = trainingStepOrder.length
     ? Math.round(((trainingStepCursor + (trainingStepSolved ? 1 : 0)) / trainingStepOrder.length) * 100)
     : 0;
+  // 上次留下的錯題只在還沒動手時提供，才不會把舊紀錄混進本次作答。
+  const trainingRunUntouched = trainingStepCursor === 0
+    && !trainingStepSolved
+    && trainingMistakes === 0
+    && trainingHints === 0;
+  const savedMissedSteps = useMemo(() => {
+    const knownSteps = new Set(trainingChallenges.map((challenge) => challenge.index));
+    return (getLessonProgress(learningProgress, selectedLesson.id).lastMissedSteps || [])
+      .filter((index) => knownSteps.has(index));
+  }, [trainingChallenges, learningProgress, selectedLesson.id]);
+  const resumableMissedSteps = trainingRunUntouched && !trainingRunFromMissedSteps
+    ? savedMissedSteps
+    : [];
   const boardFen = appMode === "training" ? trainingGame.fen() : displayFen;
   const boardOrientation = appMode === "training" ? selectedLesson.side : humanColor;
   const selectedDifficulty = BOT_DIFFICULTIES.find((difficulty) => difficulty.id === botDifficulty) || BOT_DIFFICULTIES[2];
@@ -471,7 +485,9 @@ function App() {
     setTrainingPhase(lesson.phase);
     setSelectedLessonId(lesson.id);
     setTrainingStepOrder(stepOrder);
+    // 只重練部分挑戰才算練習；錯題剛好涵蓋整堂時仍是一次完整作答。
     setTrainingRetryDrill(stepOrder.length < allStepIndexes.length);
+    setTrainingRunFromMissedSteps(requestedSteps.length > 0);
     setTrainingStepCursor(0);
     setTrainingStepSolved(false);
     setTrainingMissedSteps([]);
@@ -543,6 +559,10 @@ function App() {
 
   function retryMissedTrainingSteps() {
     resetTraining(selectedLesson.id, trainingMissedSteps);
+  }
+
+  function resumeSavedMissedSteps() {
+    resetTraining(selectedLesson.id, savedMissedSteps);
   }
 
   function playTrainingMove(sourceSquare, targetSquare) {
@@ -939,6 +959,8 @@ function App() {
               lessonProgress={getLessonProgress(learningProgress, selectedLesson.id)}
               attemptResult={trainingAttemptResult}
               missedStepsCount={trainingMissedSteps.length}
+              resumableMissedCount={resumableMissedSteps.length}
+              onResumeMissed={resumeSavedMissedSteps}
               isRetryDrill={trainingRetryDrill}
               nextLesson={nextLesson}
               onHint={revealTrainingHint}
@@ -1118,12 +1140,14 @@ export function OpeningTrainingPanel({
   lessonProgress,
   attemptResult,
   missedStepsCount,
+  resumableMissedCount,
   isRetryDrill,
   nextLesson,
   onHint,
   onReset,
   onAdvance,
   onRetryMissed,
+  onResumeMissed,
   onNext,
   onBack
 }) {
@@ -1282,6 +1306,9 @@ export function OpeningTrainingPanel({
           )}
           {complete && missedStepsCount > 0 && (
             <button className="btn btn-secondary" onClick={onRetryMissed}>只重練錯題（{missedStepsCount}）</button>
+          )}
+          {resumableMissedCount > 0 && (
+            <button className="btn btn-secondary" onClick={onResumeMissed}>接續上次錯題（{resumableMissedCount}）</button>
           )}
           {complete && attemptResult.passed && !isRetryDrill && nextLesson && (
             <button className="btn btn-primary" onClick={onNext}>下一課：{nextLesson.variation}</button>

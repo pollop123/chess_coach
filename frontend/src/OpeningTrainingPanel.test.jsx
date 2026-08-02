@@ -32,6 +32,7 @@ function renderPanel(overrides = {}) {
     onReset: vi.fn(),
     onAdvance: vi.fn(),
     onRetryMissed: vi.fn(),
+    onResumeMissed: vi.fn(),
     onNext: vi.fn(),
     onBack: vi.fn()
   };
@@ -67,6 +68,7 @@ function renderPanel(overrides = {}) {
       grade: "再試一次"
     },
     missedStepsCount: 1,
+    resumableMissedCount: 0,
     nextLesson: null,
     ...callbacks,
     ...overrides
@@ -110,5 +112,26 @@ describe("OpeningTrainingPanel", () => {
     );
     expect(screen.queryByRole("region", { name: "課程結業成績" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /下一課/ })).not.toBeInTheDocument();
+  });
+
+  it("offers to resume the missed steps saved from a previous session", async () => {
+    const user = userEvent.setup();
+    const { callbacks } = renderPanel({
+      complete: false,
+      stepSolved: false,
+      mistakes: 0,
+      progressPercentage: 0,
+      missedStepsCount: 0,
+      resumableMissedCount: 2
+    });
+
+    await user.click(screen.getByRole("button", { name: "接續上次錯題（2）" }));
+    expect(callbacks.onResumeMissed).toHaveBeenCalledOnce();
+  });
+
+  it("hides the resume button once no missed steps remain", () => {
+    renderPanel({ complete: false, stepSolved: false, missedStepsCount: 0, resumableMissedCount: 0 });
+
+    expect(screen.queryByRole("button", { name: /接續上次錯題/ })).not.toBeInTheDocument();
   });
 });
