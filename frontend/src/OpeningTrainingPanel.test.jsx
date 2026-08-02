@@ -89,4 +89,26 @@ describe("OpeningTrainingPanel", () => {
     await user.click(screen.getByRole("button", { name: "只重練錯題（1）" }));
     expect(callbacks.onRetryMissed).toHaveBeenCalledOnce();
   });
+
+  it("labels a missed-step retry as practice and withholds the next-lesson button", () => {
+    renderPanel({
+      isRetryDrill: true,
+      totalSteps: 2,
+      missedStepsCount: 0,
+      nextLesson: { id: "advanced", variation: "進階課" },
+      attemptResult: {
+        score: 100,
+        accuracy: 100,
+        passScore: 70,
+        passed: true,
+        grade: "精準掌握"
+      }
+    });
+
+    expect(screen.getByRole("region", { name: "錯題重練結果" })).toHaveTextContent(
+      "這次只重練了 2 題錯題，不會計入結業成績或熟練度。"
+    );
+    expect(screen.queryByRole("region", { name: "課程結業成績" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /下一課/ })).not.toBeInTheDocument();
+  });
 });

@@ -166,6 +166,62 @@ describe("recordLessonResult", () => {
     });
     expect(repeatedFailure.lessons.endgame.mastery).toBe(0);
   });
+
+  it("treats a missed-step retry as practice instead of a lesson completion", () => {
+    const progress = {
+      version: 2,
+      lessons: {
+        opening: lessonProgress({
+          attempts: 1,
+          completions: 0,
+          mastery: 1,
+          bestScore: 60,
+          lastScore: 60,
+          currentStreak: 0,
+          lastMissedSteps: [1, 3]
+        })
+      }
+    };
+
+    // 錯題重練的滿分只代表那兩題答對，不能換到完成次數、熟練度或最佳分數。
+    const updated = recordLessonResult(
+      progress,
+      "opening",
+      { completed: true, partial: true, mistakes: 0, hintsUsed: 0, score: 100, missedSteps: [] },
+      NOW
+    );
+
+    expect(updated.lessons.opening).toMatchObject({
+      attempts: 2,
+      completions: 0,
+      firstTryCompletions: 0,
+      mastery: 1,
+      bestScore: 60,
+      lastScore: 60,
+      currentStreak: 0,
+      lastMissedSteps: []
+    });
+  });
+
+  it("keeps an existing streak intact across a missed-step retry", () => {
+    const progress = {
+      version: 2,
+      lessons: {
+        opening: lessonProgress({ currentStreak: 3, mastery: 4 })
+      }
+    };
+
+    const updated = recordLessonResult(
+      progress,
+      "opening",
+      { completed: false, partial: true, mistakes: 1, hintsUsed: 0, score: 50, missedSteps: [2] },
+      NOW
+    );
+
+    expect(updated.lessons.opening.currentStreak).toBe(3);
+    expect(updated.lessons.opening.mastery).toBe(4);
+    expect(updated.lessons.opening.lastMissedSteps).toEqual([2]);
+  });
 });
 
 describe("learning statistics and recommendations", () => {

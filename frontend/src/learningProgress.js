@@ -86,7 +86,10 @@ export function getLessonProgress(progress, lessonId) {
 
 export function recordLessonResult(progress, lessonId, result, now = new Date()) {
   const previous = getLessonProgress(progress, lessonId);
-  const completed = Boolean(result.completed);
+  // 只重練錯題是練習，不是結業：分數的分母只有錯題子集合，不能拿來換
+  // 完成次數、熟練度或最佳分數，否則失敗後重練兩題就能拿到滿分紀錄。
+  const partial = Boolean(result.partial);
+  const completed = !partial && Boolean(result.completed);
   const mistakes = Math.max(0, Number(result.mistakes) || 0);
   const hintsUsed = Math.max(0, Number(result.hintsUsed) || 0);
   const score = Math.max(0, Math.min(100, Number(result.score) || 0));
@@ -96,9 +99,11 @@ export function recordLessonResult(progress, lessonId, result, now = new Date())
   const firstTry = completed && mistakes === 0 && hintsUsed === 0;
 
   let mastery = previous.mastery || 0;
-  if (completed && firstTry) mastery += 2;
-  else if (completed) mastery += 1;
-  else mastery -= 1;
+  if (!partial) {
+    if (completed && firstTry) mastery += 2;
+    else if (completed) mastery += 1;
+    else mastery -= 1;
+  }
   mastery = Math.max(0, Math.min(5, mastery));
 
   const reviewDate = new Date(now);
@@ -117,9 +122,11 @@ export function recordLessonResult(progress, lessonId, result, now = new Date())
         mastery,
         lastPracticedAt: now.toISOString(),
         nextReviewAt: reviewDate.toISOString(),
-        bestScore: Math.max(previous.bestScore || 0, score),
-        lastScore: score,
-        currentStreak: completed ? (previous.currentStreak || 0) + 1 : 0,
+        bestScore: partial ? previous.bestScore : Math.max(previous.bestScore || 0, score),
+        lastScore: partial ? previous.lastScore : score,
+        currentStreak: partial
+          ? (previous.currentStreak || 0)
+          : (completed ? (previous.currentStreak || 0) + 1 : 0),
         lastMissedSteps: missedSteps
       }
     }

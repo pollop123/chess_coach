@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState, useEffect, useRef } from "react";
+import { lazy, Suspense, useMemo, useState, useEffect, useRef } from "react";
 import { Chess } from "chess.js";
 import { Chessboard } from "react-chessboard";
 import axios from "axios";
@@ -156,11 +156,20 @@ function getPracticeRecommendations(analysisData, humanColor, lessons, progress)
   };
 }
 
+function createTrainingGame(challenges, challengeIndex = 0, fallbackFen) {
+  const challenge = challenges[challengeIndex] || challenges[0];
+  return new Chess(challenge?.fen || fallbackFen);
+}
+
 function App() {
   const [game, setGame] = useState(new Chess());
   const [appMode, setAppMode] = useState("play");
   const [trainingPhase, setTrainingPhase] = useState("opening");
-  const [trainingGame, setTrainingGame] = useState(() => createTrainingGame(TRAINING_LESSONS[0]));
+  const [trainingGame, setTrainingGame] = useState(() => createTrainingGame(
+    buildLessonChallenges(TRAINING_LESSONS[0]),
+    0,
+    TRAINING_LESSONS[0].startFen
+  ));
   const [selectedLessonId, setSelectedLessonId] = useState(TRAINING_LESSONS[0].id);
   const [trainingStepOrder, setTrainingStepOrder] = useState(() => (
     buildLessonChallenges(TRAINING_LESSONS[0]).map((challenge) => challenge.index)
@@ -168,6 +177,7 @@ function App() {
   const [trainingStepCursor, setTrainingStepCursor] = useState(0);
   const [trainingStepSolved, setTrainingStepSolved] = useState(false);
   const [trainingMissedSteps, setTrainingMissedSteps] = useState([]);
+  const [trainingRetryDrill, setTrainingRetryDrill] = useState(false);
   const [trainingFeedback, setTrainingFeedback] = useState({
     tone: "neutral",
     text: "先觀察局面再走棋；需要時可逐步開啟提示。"
@@ -327,7 +337,7 @@ function App() {
   const selectedEvaluationShare = selectedWdl?.expected_score ?? calculateEvaluationBarShare(selectedWhiteScore);
   const phaseLessons = TRAINING_LESSONS.filter((lesson) => lesson.phase === trainingPhase);
   const selectedLesson = TRAINING_LESSONS.find((lesson) => lesson.id === selectedLessonId) || phaseLessons[0] || TRAINING_LESSONS[0];
-  const trainingChallenges = buildLessonChallenges(selectedLesson);
+  const trainingChallenges = useMemo(() => buildLessonChallenges(selectedLesson), [selectedLesson]);
   const activeTrainingStepIndex = trainingStepOrder[trainingStepCursor] ?? 0;
   const currentTrainingChallenge = trainingChallenges[activeTrainingStepIndex] || trainingChallenges[0];
   const trainingHistory = trainingGame.history();
@@ -371,7 +381,8 @@ function App() {
       mistakes: trainingMistakes,
       hintsUsed: trainingHints,
       score: trainingAttemptResult.score,
-      missedSteps: trainingMissedSteps
+      missedSteps: trainingMissedSteps,
+      partial: trainingRetryDrill
     }));
     setTrainingResultRecorded(true);
   }, [
@@ -381,6 +392,7 @@ function App() {
     trainingHints,
     trainingMistakes,
     trainingMissedSteps,
+    trainingRetryDrill,
     trainingAttemptResult.passed,
     trainingAttemptResult.score,
     trainingResultRecorded
@@ -440,12 +452,6 @@ function App() {
     return new Chess(chessInstance.fen());
   }
 
-  function createTrainingGame(lesson, challengeIndex = 0) {
-    const challenges = buildLessonChallenges(lesson);
-    const challenge = challenges[challengeIndex] || challenges[0];
-    return new Chess(challenge?.fen || lesson?.startFen);
-  }
-
   function resetTraining(nextLessonId = selectedLessonId, retryStepIndexes = null) {
     const lesson = TRAINING_LESSONS.find((item) => item.id === nextLessonId) || TRAINING_LESSONS[0];
     const lockReason = getLessonLockReason(lesson, TRAINING_LESSONS, learningProgress);
@@ -465,10 +471,11 @@ function App() {
     setTrainingPhase(lesson.phase);
     setSelectedLessonId(lesson.id);
     setTrainingStepOrder(stepOrder);
+    setTrainingRetryDrill(stepOrder.length < allStepIndexes.length);
     setTrainingStepCursor(0);
     setTrainingStepSolved(false);
     setTrainingMissedSteps([]);
-    setTrainingGame(createTrainingGame(lesson, stepOrder[0]));
+    setTrainingGame(createTrainingGame(challenges, stepOrder[0], lesson.startFen));
     setSelectedSquare(null);
     setTrainingMistakes(0);
     setTrainingHints(0);
@@ -488,10 +495,18 @@ function App() {
   }
 
   function selectTrainingPhase(nextPhase) {
-    const firstLesson = TRAINING_LESSONS.find(
+    const firstUnlocked = TRAINING_LESSONS.find(
       (lesson) => lesson.phase === nextPhase && isLessonUnlocked(lesson, TRAINING_LESSONS, learningProgress)
-    ) || TRAINING_LESSONS[0];
-    resetTraining(firstLesson.id);
+    );
+    // 沒有可上的課時留在原階段，否則會靜默跳到別的階段。
+    if (!firstUnlocked) {
+      setTrainingFeedback({
+        tone: "warn",
+        text: "這個階段的課程都還沒解鎖，請先完成對應的先修課程。"
+      });
+      return;
+    }
+    resetTraining(firstUnlocked.id);
   }
 
   function openLearningArea() {
@@ -522,7 +537,7 @@ function App() {
     setTrainingStepSolved(false);
     setHintLevel(0);
     setSelectedSquare(null);
-    setTrainingGame(createTrainingGame(selectedLesson, nextStepIndex));
+    setTrainingGame(createTrainingGame(trainingChallenges, nextStepIndex, selectedLesson.startFen));
     setTrainingFeedback({ tone: "neutral", text: nextChallenge.prompt });
   }
 
@@ -924,6 +939,7 @@ function App() {
               lessonProgress={getLessonProgress(learningProgress, selectedLesson.id)}
               attemptResult={trainingAttemptResult}
               missedStepsCount={trainingMissedSteps.length}
+              isRetryDrill={trainingRetryDrill}
               nextLesson={nextLesson}
               onHint={revealTrainingHint}
               onReset={() => resetTraining(selectedLessonId)}
@@ -1102,6 +1118,7 @@ export function OpeningTrainingPanel({
   lessonProgress,
   attemptResult,
   missedStepsCount,
+  isRetryDrill,
   nextLesson,
   onHint,
   onReset,
@@ -1150,15 +1167,14 @@ export function OpeningTrainingPanel({
             value={selectedLessonId}
             onChange={(event) => onSelectLesson(event.target.value)}
           >
-            {lessons.map((lesson) => (
-              <option
-                key={lesson.id}
-                value={lesson.id}
-                disabled={Boolean(getLessonLockReason(lesson, allLessons, learningProgress))}
-              >
-                {lesson.variation}{getLessonLockReason(lesson, allLessons, learningProgress) ? "（需先修）" : ""}
-              </option>
-            ))}
+            {lessons.map((lesson) => {
+              const lockReason = getLessonLockReason(lesson, allLessons, learningProgress);
+              return (
+                <option key={lesson.id} value={lesson.id} disabled={Boolean(lockReason)}>
+                  {lesson.variation}{lockReason ? "（需先修）" : ""}
+                </option>
+              );
+            })}
           </select>
         </div>
 
@@ -1169,7 +1185,11 @@ export function OpeningTrainingPanel({
 
         <div className="training-metrics">
           <div className="metric-card">
-            <span>{complete ? "結業結果" : `挑戰 ${stepNumber}/${totalSteps}`}</span>
+            <span>
+              {complete
+                ? (isRetryDrill ? "錯題重練結果" : "結業結果")
+                : `${isRetryDrill ? "錯題" : "挑戰"} ${stepNumber}/${totalSteps}`}
+            </span>
             <strong>
               {complete
                 ? attemptResult.grade
@@ -1207,7 +1227,21 @@ export function OpeningTrainingPanel({
           <span>目前分數 {attemptResult.score}</span>
         </div>
 
-        {complete && (
+        {complete && isRetryDrill && (
+          <section className="lesson-result is-retry" aria-label="錯題重練結果">
+            <div>
+              <span>錯題重練</span>
+              <strong>{attemptResult.score}</strong>
+            </div>
+            <p>
+              這次只重練了 {totalSteps} 題錯題，不會計入結業成績或熟練度。
+              {attemptResult.passed ? " 這幾題已經掌握，回頭重練整堂就能結業。" : " 建議再看一次學習重點後重練。"}
+            </p>
+            <small>歷史最高 {lessonProgress.bestScore || 0} 分</small>
+          </section>
+        )}
+
+        {complete && !isRetryDrill && (
           <section className={`lesson-result ${attemptResult.passed ? "is-passed" : "is-retry"}`} aria-label="課程結業成績">
             <div>
               <span>本次成績</span>
@@ -1249,7 +1283,7 @@ export function OpeningTrainingPanel({
           {complete && missedStepsCount > 0 && (
             <button className="btn btn-secondary" onClick={onRetryMissed}>只重練錯題（{missedStepsCount}）</button>
           )}
-          {complete && attemptResult.passed && nextLesson && (
+          {complete && attemptResult.passed && !isRetryDrill && nextLesson && (
             <button className="btn btn-primary" onClick={onNext}>下一課：{nextLesson.variation}</button>
           )}
         </div>
