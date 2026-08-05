@@ -143,6 +143,40 @@ class TeachingAnalysisTests(unittest.TestCase):
         self.assertFalse(teaching["candidates"][0]["base_engine_choice"])
         self.assertTrue(teaching["candidates"][2]["base_engine_choice"])
 
+    def test_near_equal_rescore_does_not_demote_the_base_engine_choice(self):
+        # _candidate_score searches shallower than the analysis that produced
+        # best_move, so it must not reorder moves it cannot really separate.
+        board = chess.Board()
+        moves = [board.parse_san(san) for san in ("e4", "Nf3", "d4")]
+        scores = {moves[0]: 0, moves[1]: 20, moves[2]: 10}
+
+        with (
+            patch.object(chess_engine, "_candidate_moves", return_value=moves),
+            patch.object(chess_engine, "_candidate_score", side_effect=lambda child, _depth: scores[child.peek()]),
+        ):
+            teaching = chess_engine.get_teaching_analysis(
+                board, {"best_move": moves[0], "score": 0, "depth": 2}, depth=1
+            )
+
+        self.assertEqual([item["san"] for item in teaching["candidates"]], ["e4", "Nf3", "d4"])
+        self.assertTrue(teaching["candidates"][0]["base_engine_choice"])
+
+    def test_materially_better_candidate_still_outranks_the_base_choice(self):
+        board = chess.Board()
+        moves = [board.parse_san(san) for san in ("e4", "Nf3")]
+        # One centipawn past the near-equal band is enough to overrule it.
+        scores = {moves[0]: 0, moves[1]: chess_engine.NEAR_EQUAL_CP + 1}
+
+        with (
+            patch.object(chess_engine, "_candidate_moves", return_value=moves),
+            patch.object(chess_engine, "_candidate_score", side_effect=lambda child, _depth: scores[child.peek()]),
+        ):
+            teaching = chess_engine.get_teaching_analysis(
+                board, {"best_move": moves[0], "score": 0, "depth": 2}, depth=1
+            )
+
+        self.assertEqual([item["san"] for item in teaching["candidates"]], ["Nf3", "e4"])
+
     def test_black_candidates_use_black_perspective_for_ranking(self):
         board = chess.Board()
         board.push_san("e4")

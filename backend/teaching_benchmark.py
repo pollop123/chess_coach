@@ -25,8 +25,12 @@ POSITIONS = (
     TeachingPosition(
         name="opening_development",
         topic="opening",
-        fen=chess.STARTING_FEN,
-        expected_best_san=("Nf3",),
+        # Ruy Lopez / Italian junction, where developing a minor piece is the
+        # point. The starting position is a poor fixture for this: the best
+        # first move is a pawn move, so it only ever produced the development
+        # theme while the engine happened to prefer Nf3 over e4.
+        fen="r1bqkbnr/pppp1ppp/2n5/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 3",
+        expected_best_san=("Bb5", "Bc4"),
         expected_themes=("opening_principle", "development"),
         note="Teaching output should recognize normal development in the opening.",
     ),

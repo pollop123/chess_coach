@@ -34,6 +34,9 @@ BOOK_PATH = os.path.join(ENGINE_DIR, "books", "gm2001.bin")
 # --- 評估與搜尋合約常數 ---
 MATE_THRESHOLD = 15000
 ONLY_MOVE_LOSS_CP = 250
+# Candidates within this many centipawns are treated as equally good, both for
+# the near_equal flag shown to learners and for tie-breaking candidate order.
+NEAR_EQUAL_CP = 25
 
 # Backwards-compatible aliases for search helpers and external callers. The
 # authoritative definitions now live under backend/evaluation/.
@@ -1333,6 +1336,25 @@ def get_teaching_analysis(
         })
 
     candidates.sort(key=lambda item: item["perspective_score"], reverse=True)
+    # _candidate_score rescores each move with a plain minimax from the child
+    # position, without the iterative deepening that produced best_move, so it
+    # is the weaker judge of two near-equal moves. Break that tie for the base
+    # analysis instead of letting the shallower search demote the engine's own
+    # choice; a materially better candidate — a mate, or anything outside the
+    # near-equal band — still ranks first.
+    if best_move and candidates:
+        base_index = next(
+            (
+                index
+                for index, item in enumerate(candidates)
+                if item["move_obj"] == best_move
+            ),
+            None,
+        )
+        if base_index is not None:
+            gap = candidates[0]["perspective_score"] - candidates[base_index]["perspective_score"]
+            if 0 < gap <= NEAR_EQUAL_CP:
+                candidates.insert(0, candidates.pop(base_index))
     if not candidates and best_move and best_move in board.legal_moves:
         score = int(base_analysis.get("score") or 0)
         analysis_complete = False
@@ -1365,7 +1387,7 @@ def get_teaching_analysis(
         item["comparison_loss"] = comparison_loss
         comparable_cp = best_score_type == "centipawn" and item["score_type"] == "centipawn"
         item["loss_cp"] = comparison_loss if comparable_cp else None
-        item["near_equal"] = comparable_cp and comparison_loss <= 25
+        item["near_equal"] = comparable_cp and comparison_loss <= NEAR_EQUAL_CP
         if comparison_loss >= 150 and "large_eval_drop" not in item["warnings"]:
             item["warnings"].append("large_eval_drop")
 
