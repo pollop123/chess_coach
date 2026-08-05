@@ -31,3 +31,7 @@ backend/.cache/
 .agents/
 .codex/
 skills-lock.json
+
+# Claude Code: share the dev-server config, keep local settings out
+.claude/*
+!.claude/launch.json
