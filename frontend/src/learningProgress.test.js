@@ -5,7 +5,9 @@ import {
   buildLearningPlan,
   createEmptyLearningProgress,
   getLearningStats,
+  getLessonLockReason,
   getNextLesson,
+  isLessonUnlocked,
   isLessonDue,
   loadLearningProgress,
   recordLessonResult,
@@ -31,6 +33,10 @@ function lessonProgress(overrides = {}) {
     mastery: 2,
     lastPracticedAt: "2026-01-10T12:00:00.000Z",
     nextReviewAt: "2026-01-18T12:00:00.000Z",
+    bestScore: 70,
+    lastScore: 70,
+    currentStreak: 1,
+    lastMissedSteps: [],
     ...overrides
   };
 }
@@ -43,7 +49,7 @@ describe("learning progress persistence", () => {
       setItem: (key, value) => values.set(key, value)
     };
     const progress = {
-      version: 1,
+      version: 2,
       lessons: { opening: lessonProgress() }
     };
 
@@ -56,12 +62,58 @@ describe("learning progress persistence", () => {
   it.each([
     ["missing data", null],
     ["malformed JSON", "{"],
-    ["unsupported version", JSON.stringify({ version: 2, lessons: {} })],
-    ["missing lesson map", JSON.stringify({ version: 1 })]
+    ["unsupported version", JSON.stringify({ version: 3, lessons: {} })],
+    ["missing lesson map", JSON.stringify({ version: 2 })]
   ])("falls back to empty progress for %s", (_label, storedValue) => {
     const storage = { getItem: () => storedValue };
 
     expect(loadLearningProgress(storage)).toEqual(createEmptyLearningProgress());
+  });
+
+  it("migrates version one progress without losing completions or mastery", () => {
+    const storage = {
+      getItem: () => JSON.stringify({
+        version: 1,
+        lessons: {
+          opening: {
+            attempts: 3,
+            completions: 2,
+            firstTryCompletions: 1,
+            totalMistakes: 2,
+            totalHints: 1,
+            mastery: 4,
+            lastPracticedAt: "2026-01-10T12:00:00.000Z",
+            nextReviewAt: "2026-01-24T12:00:00.000Z"
+          }
+        }
+      })
+    };
+
+    const migrated = loadLearningProgress(storage);
+
+    expect(migrated.version).toBe(2);
+    expect(migrated.lessons.opening).toMatchObject({
+      attempts: 3,
+      completions: 2,
+      mastery: 4,
+      bestScore: 70,
+      currentStreak: 0,
+      lastMissedSteps: []
+    });
+  });
+
+  it("keeps missed steps reloadable and drops entries that are not step indexes", () => {
+    const storage = {
+      getItem: () => JSON.stringify({
+        version: 2,
+        lessons: {
+          opening: { ...lessonProgress(), lastMissedSteps: [2, 2, "4", null, 0] }
+        }
+      })
+    };
+
+    // 重整頁面後仍要能接續重練上次的錯題。
+    expect(loadLearningProgress(storage).lessons.opening.lastMissedSteps).toEqual([2, 0]);
   });
 });
 
@@ -72,7 +124,7 @@ describe("recordLessonResult", () => {
     const updated = recordLessonResult(
       original,
       "opening",
-      { completed: true, mistakes: 0, hintsUsed: 0 },
+      { completed: true, mistakes: 0, hintsUsed: 0, score: 100, missedSteps: [] },
       NOW
     );
 
@@ -83,6 +135,10 @@ describe("recordLessonResult", () => {
       totalMistakes: 0,
       totalHints: 0,
       mastery: 2,
+      bestScore: 100,
+      lastScore: 100,
+      currentStreak: 1,
+      lastMissedSteps: [],
       lastPracticedAt: "2026-01-15T12:00:00.000Z",
       nextReviewAt: "2026-01-18T12:00:00.000Z"
     });
@@ -91,7 +147,7 @@ describe("recordLessonResult", () => {
 
   it("reduces mastery after an incomplete attempt without going below zero", () => {
     const progress = {
-      version: 1,
+      version: 2,
       lessons: {
         endgame: lessonProgress({ mastery: 1, completions: 0 })
       }
@@ -100,13 +156,13 @@ describe("recordLessonResult", () => {
     const updated = recordLessonResult(
       progress,
       "endgame",
-      { completed: false, mistakes: 2, hintsUsed: 1 },
+      { completed: false, mistakes: 2, hintsUsed: 1, score: 40, missedSteps: [0] },
       NOW
     );
     const repeatedFailure = recordLessonResult(
       updated,
       "endgame",
-      { completed: false, mistakes: 1, hintsUsed: 0 },
+      { completed: false, mistakes: 1, hintsUsed: 0, score: 60, missedSteps: [0] },
       NOW
     );
 
@@ -116,15 +172,75 @@ describe("recordLessonResult", () => {
       totalMistakes: 3,
       totalHints: 1,
       mastery: 0,
+      bestScore: 70,
+      lastScore: 40,
+      currentStreak: 0,
+      lastMissedSteps: [0],
       nextReviewAt: "2026-01-15T12:00:00.000Z"
     });
     expect(repeatedFailure.lessons.endgame.mastery).toBe(0);
+  });
+
+  it("treats a missed-step retry as practice instead of a lesson completion", () => {
+    const progress = {
+      version: 2,
+      lessons: {
+        opening: lessonProgress({
+          attempts: 1,
+          completions: 0,
+          mastery: 1,
+          bestScore: 60,
+          lastScore: 60,
+          currentStreak: 0,
+          lastMissedSteps: [1, 3]
+        })
+      }
+    };
+
+    // 錯題重練的滿分只代表那兩題答對，不能換到完成次數、熟練度或最佳分數。
+    const updated = recordLessonResult(
+      progress,
+      "opening",
+      { completed: true, partial: true, mistakes: 0, hintsUsed: 0, score: 100, missedSteps: [] },
+      NOW
+    );
+
+    expect(updated.lessons.opening).toMatchObject({
+      attempts: 2,
+      completions: 0,
+      firstTryCompletions: 0,
+      mastery: 1,
+      bestScore: 60,
+      lastScore: 60,
+      currentStreak: 0,
+      lastMissedSteps: []
+    });
+  });
+
+  it("keeps an existing streak intact across a missed-step retry", () => {
+    const progress = {
+      version: 2,
+      lessons: {
+        opening: lessonProgress({ currentStreak: 3, mastery: 4 })
+      }
+    };
+
+    const updated = recordLessonResult(
+      progress,
+      "opening",
+      { completed: false, partial: true, mistakes: 1, hintsUsed: 0, score: 50, missedSteps: [2] },
+      NOW
+    );
+
+    expect(updated.lessons.opening.currentStreak).toBe(3);
+    expect(updated.lessons.opening.mastery).toBe(4);
+    expect(updated.lessons.opening.lastMissedSteps).toEqual([2]);
   });
 });
 
 describe("learning statistics and recommendations", () => {
   const progress = {
-    version: 1,
+    version: 2,
     lessons: {
       opening: lessonProgress({
         mastery: 4,
@@ -183,5 +299,22 @@ describe("learning statistics and recommendations", () => {
       }
     };
     expect(getNextLesson(LESSONS, "endgame", tacticsCompleted)?.id).toBe("middlegame");
+  });
+
+  it("enforces prerequisites and unlocks a lesson after its dependency is completed", () => {
+    const lessons = [
+      { id: "fundamentals", variation: "基本觀念", prerequisites: [] },
+      { id: "advanced", variation: "進階運用", prerequisites: ["fundamentals"] }
+    ];
+    const empty = createEmptyLearningProgress();
+
+    expect(isLessonUnlocked(lessons[1], lessons, empty)).toBe(false);
+    expect(getLessonLockReason(lessons[1], lessons, empty)).toBe("先完成：基本觀念");
+
+    const completed = {
+      version: 2,
+      lessons: { fundamentals: lessonProgress() }
+    };
+    expect(isLessonUnlocked(lessons[1], lessons, completed)).toBe(true);
   });
 });

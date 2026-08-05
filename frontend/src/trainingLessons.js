@@ -13,6 +13,20 @@ const LESSON_CATALOG = [
     variation: "Giuoco Piano",
     goal: "快速發展子力，主教瞄準 f7，穩定完成短易位。",
     moves: ["e4", "e5", "Nf3", "Nc6", "Bc4", "Bc5", "c3", "Nf6", "d3", "d6", "O-O"],
+    challengeSteps: {
+      3: {
+        prompt: "黑方主教已站到 c5。選一個兼顧發展與王安全的穩健計畫。",
+        hints: [
+          "不用急著攻擊；先找能準備中心突破或完成王安全的走法。",
+          "c3、d3 與 O-O 都符合目前的開局原則。"
+        ],
+        acceptedMoves: [
+          { san: "c3", explanation: "c3 準備 d4，建立義大利開局常見的中心突破。" },
+          { san: "d3", explanation: "d3 穩固 e4，讓白方可以安全完成短易位。" },
+          { san: "O-O", explanation: "O-O 先處理王安全，再回頭準備 c3、d4。" }
+        ]
+      }
+    },
     ideas: [
       "e4 先占中心，打開后與主教的路線。",
       "Nf3 發展騎士並攻擊 e5 兵，是義大利開局的核心節奏。",
@@ -24,6 +38,7 @@ const LESSON_CATALOG = [
   {
     id: "italian-two-knights",
     phase: "opening",
+    prerequisites: ["italian-giuoco-piano"],
     tags: ["opening", "development", "calculation"],
     opening: "義大利開局",
     variation: "Two Knights Defense",
@@ -106,6 +121,20 @@ const LESSON_CATALOG = [
     goal: "在完成王翼發展後，用車支援中心兵，為後續突破做準備。",
     startFen: "r1bqk2r/ppp2ppp/2np1n2/2b1p3/2B1P3/3P1N2/PPP2PPP/RNBQ1RK1 w kq - 0 6",
     moves: ["Re1"],
+    challengeSteps: {
+      0: {
+        prompt: "沒有立即戰術時，找一個能改善中心控制的穩健走法。",
+        hints: [
+          "先檢查 e4 的支援，以及 c3、d4 的突破準備。",
+          "Re1、c3、Nbd2 都能讓更多子力參與中心。"
+        ],
+        acceptedMoves: [
+          { san: "Re1", explanation: "Re1 直接支援 e4，讓後續中心突破更可靠。" },
+          { san: "c3", explanation: "c3 為 d4 做準備，建立完整的中心計畫。" },
+          { san: "Nbd2", explanation: "Nbd2 完成后翼發展，也能支援 e4 與未來的中心行動。" }
+        ]
+      }
+    },
     ideas: [
       "Re1 先保護 e4，讓白方之後更有餘裕準備 c3、d4。",
       "中局不一定每步都是戰術；先讓子力共同支援中心，通常比單子冒進可靠。",
@@ -115,6 +144,7 @@ const LESSON_CATALOG = [
   {
     id: "middlegame-two-knights-fork",
     phase: "middlegame",
+    prerequisites: ["middlegame-scholar-mate"],
     tags: ["tactics", "calculation", "king_safety"],
     opening: "中局戰術",
     variation: "騎士叉擊：Nxf7",
@@ -232,6 +262,21 @@ const LESSON_CATALOG = [
     goal: "在車兵殘局中把車放到主動位置，限制對方王與兵。",
     startFen: "8/5pk1/6p1/3R4/7P/6P1/5PK1/r7 w - - 0 1",
     moves: ["Rd7"],
+    challengeSteps: {
+      0: {
+        prompt: "這個車兵殘局沒有強迫戰術。找一個能讓車或兵更主動的走法。",
+        hints: [
+          "主動車、限制黑王，以及製造通路兵都是合理方向。",
+          "Rd7、Rd3、Rd6、h5 都能維持局面並提出具體問題。"
+        ],
+        acceptedMoves: [
+          { san: "Rd7", explanation: "Rd7 進入第七排，攻擊 f7 並限制黑王。" },
+          { san: "Rd3", explanation: "Rd3 保持橫向機動，準備從側面攻擊黑兵。" },
+          { san: "Rd6", explanation: "Rd6 把車放到主動橫線，同時盯住 g6 與 f7。" },
+          { san: "h5", explanation: "h5 固定王翼兵型並爭取製造遠方通路兵。" }
+        ]
+      }
+    },
     ideas: [
       "車兵殘局裡，主動車通常比被動守兵更重要。",
       "Rd7 讓白車進入第七排，同時攻擊 f7 兵並限制黑王。這是近似等價的主動走法，不是唯一解。",
@@ -274,6 +319,7 @@ const LESSON_CATALOG = [
     id: "endgame-lucena-bridge",
     phase: "endgame",
     type: "guided",
+    prerequisites: ["endgame-rook-activity"],
     tags: ["endgame", "promotion", "conversion"],
     opening: "殘局訓練",
     variation: "車兵升變：架橋概念",
@@ -344,13 +390,13 @@ const LESSON_CATALOG = [
 // Only unchanged, independently reviewed lesson lines may be used by the postgame recommender.
 // Opening lines are manually reviewed; non-opening lines were checked with Stockfish 18 at 50k nodes.
 const VERIFIED_LESSON_LINES = {
-  "italian-giuoco-piano": "opening|start|e4 e5 Nf3 Nc6 Bc4 Bc5 c3 Nf6 d3 d6 O-O",
+  "italian-giuoco-piano": "opening|start|e4 e5 Nf3 Nc6 Bc4 Bc5 c3 Nf6 d3 d6 O-O|v2:3=c3,d3,O-O",
   "italian-two-knights": "opening|start|e4 e5 Nf3 Nc6 Bc4 Nf6 d3 Bc5 c3 d6 O-O",
   "italian-evans-gambit": "opening|start|e4 e5 Nf3 Nc6 Bc4 Bc5 b4 Bxb4 c3 Ba5 d4",
   "london-system-development": "opening|start|d4 d5 Nf3 Nf6 Bf4 e6 e3 c5 c3 Nc6 Nbd2",
   "sicilian-alapin-center": "opening|start|e4 c5 c3 Nf6 e5 Nd5 d4 cxd4 Nf3 Nc6 cxd4",
   "middlegame-scholar-mate": "puzzle|r1bqkb1r/pppp1ppp/2n2n2/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR w KQkq - 4 4|Qxf7#",
-  "middlegame-center-pressure": "guided|r1bqk2r/ppp2ppp/2np1n2/2b1p3/2B1P3/3P1N2/PPP2PPP/RNBQ1RK1 w kq - 0 6|Re1",
+  "middlegame-center-pressure": "guided|r1bqk2r/ppp2ppp/2np1n2/2b1p3/2B1P3/3P1N2/PPP2PPP/RNBQ1RK1 w kq - 0 6|Re1|v2:0=Re1,c3,Nbd2",
   "middlegame-two-knights-fork": "puzzle|r1bqkb1r/ppp2ppp/2n5/3np1N1/2B5/8/PPPP1PPP/RNBQK2R w KQkq - 0 6|Nxf7",
   "middlegame-hanging-queen": "guided|7r/4k2p/8/7Q/8/8/8/4K3 w - - 0 1|Qe5+",
   "middlegame-back-rank-mate": "puzzle|6k1/5ppp/8/8/8/8/5PPP/R5K1 w - - 0 1|Ra8#",
@@ -358,7 +404,7 @@ const VERIFIED_LESSON_LINES = {
   "middlegame-pin-pressure": "guided|r1bqkbnr/pppp1ppp/2n5/4p3/4P3/2N2N2/PPPP1PPP/R1BQKB1R w KQkq - 2 3|Bb5",
   "endgame-queen-mate-net": "puzzle|7k/8/5KQ1/8/8/8/8/8 w - - 0 1|Qg7#",
   "endgame-pawn-promotion": "guided|8/4P3/4K3/8/8/8/8/4k3 w - - 0 1|e8=Q",
-  "endgame-rook-activity": "guided|8/5pk1/6p1/3R4/7P/6P1/5PK1/r7 w - - 0 1|Rd7",
+  "endgame-rook-activity": "guided|8/5pk1/6p1/3R4/7P/6P1/5PK1/r7 w - - 0 1|Rd7|v2:0=Rd7,Rd3,Rd6,h5",
   "endgame-king-opposition": "guided|8/8/4k3/8/4P3/4K3/8/8 w - - 0 1|Kf4",
   "endgame-king-activation": "guided|8/8/5k2/8/4P3/4K3/8/8 w - - 0 1|Kd4",
   "endgame-lucena-bridge": "guided|1K1k4/1P6/8/8/8/8/r7/2R5 w - - 4 1|Rd1+ Ke7 Rd4 Ke6 Kc7 Rc2+ Kb6 Rh2 Rb4",
@@ -368,7 +414,15 @@ const VERIFIED_LESSON_LINES = {
 };
 
 function lessonLineSignature(lesson) {
-  return `${lesson.type}|${lesson.startFen || "start"}|${lesson.moves.join(" ")}`;
+  const challengeSignature = Object.entries(lesson.challengeSteps || {})
+    .sort(([left], [right]) => Number(left) - Number(right))
+    .map(([stepIndex, step]) => (
+      // rejectsMainline 會改變引擎閘門覆蓋的走法，翻動它必須重新驗證正確性。
+      `${stepIndex}${step.rejectsMainline ? "!" : ""}=${(step.acceptedMoves || []).map((candidate) => candidate.san || candidate).join(",")}`
+    ))
+    .join(";");
+  const base = `${lesson.type}|${lesson.startFen || "start"}|${lesson.moves.join(" ")}`;
+  return challengeSignature ? `${base}|v2:${challengeSignature}` : base;
 }
 
 export const TRAINING_LESSONS = LESSON_CATALOG.map((lesson) => ({
@@ -380,6 +434,7 @@ export const TRAINING_LESSONS = LESSON_CATALOG.map((lesson) => ({
   recommendationVerified: VERIFIED_LESSON_LINES[lesson.id] === lessonLineSignature({
     type: lesson.type || (lesson.phase === "opening" ? "opening" : "puzzle"),
     startFen: lesson.startFen,
-    moves: lesson.moves
+    moves: lesson.moves,
+    challengeSteps: lesson.challengeSteps
   })
 }));

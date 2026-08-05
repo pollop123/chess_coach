@@ -1,4 +1,4 @@
-import { getLessonProgress } from "./learningProgress";
+import { getLessonLockReason, getLessonProgress } from "./learningProgress";
 
 const LESSON_TYPE_LABELS = {
   opening: "主線課",
@@ -80,6 +80,7 @@ export function LearningDashboard({ phases, lessons, progress, stats, plan, onSt
                       key={lesson.id}
                       lesson={lesson}
                       lessonProgress={getLessonProgress(progress, lesson.id)}
+                      lockReason={getLessonLockReason(lesson, lessons, progress)}
                       onStart={() => onStartLesson(lesson.id)}
                     />
                   ))}
@@ -125,18 +126,25 @@ function LessonCard({ lesson, lessonProgress, reason, rank, onStart }) {
   );
 }
 
-function CurriculumRow({ lesson, lessonProgress, onStart }) {
+function CurriculumRow({ lesson, lessonProgress, lockReason, onStart }) {
   const completed = lessonProgress.completions > 0;
   return (
-    <button className="curriculum-row" onClick={onStart}>
+    <button
+      className={`curriculum-row ${lockReason ? "is-locked" : ""}`}
+      onClick={onStart}
+      disabled={Boolean(lockReason)}
+      title={lockReason || undefined}
+    >
       <span className={`curriculum-status ${completed ? "is-complete" : ""}`} aria-hidden="true">
-        {completed ? "✓" : lesson.difficulty}
+        {lockReason ? "🔒" : completed ? "✓" : lesson.difficulty}
       </span>
       <span className="curriculum-copy">
         <strong>{lesson.variation}</strong>
-        <small>{LESSON_TYPE_LABELS[lesson.type] || "課程"} · {lesson.side === "black" ? "執黑" : "執白"}</small>
+        <small>
+          {lockReason || `${LESSON_TYPE_LABELS[lesson.type] || "課程"} · ${lesson.side === "black" ? "執黑" : "執白"}`}
+        </small>
       </span>
-      <span className="curriculum-mastery">{lessonProgress.mastery}/5</span>
+      <span className="curriculum-mastery">{lockReason ? "鎖定" : `${lessonProgress.mastery}/5`}</span>
     </button>
   );
 }

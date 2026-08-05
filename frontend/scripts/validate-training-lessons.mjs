@@ -1,4 +1,5 @@
 import { Chess } from "chess.js";
+import { buildLessonChallenges } from "../src/lessonEngine.js";
 import { TRAINING_LESSONS } from "../src/trainingLessons.js";
 
 const REQUIRED_PHASES = new Set(["opening", "middlegame", "endgame"]);
@@ -70,6 +71,10 @@ for (const lesson of TRAINING_LESSONS) {
   assert(lesson.opening && lesson.variation && lesson.goal, `${lesson.id} is missing display copy`);
   assert(Array.isArray(lesson.moves) && lesson.moves.length >= 1, `${lesson.id} needs moves`);
   assert(Array.isArray(lesson.ideas) && lesson.ideas.length >= 2, `${lesson.id} needs learning ideas`);
+  assert(
+    lesson.passScore === undefined || (Number.isInteger(lesson.passScore) && lesson.passScore >= 50 && lesson.passScore <= 100),
+    `${lesson.id} has invalid passScore`
+  );
 
   const board = lesson.startFen ? new Chess(lesson.startFen) : new Chess();
   validatePositionSemantics(board, lesson.id, lesson.startFen || board.fen());
@@ -77,6 +82,35 @@ for (const lesson of TRAINING_LESSONS) {
   for (const san of lesson.moves) {
     const move = board.move(san);
     assert(move, `${lesson.id} has illegal SAN ${san} from ${board.fen()}`);
+  }
+  for (const challenge of buildLessonChallenges(lesson)) {
+    assert(challenge.acceptedMoves.length >= 1, `${lesson.id} challenge ${challenge.index} needs accepted moves`);
+
+    // 主線走法漏掉時必須是刻意的，否則課程主線改動後沒有任何檢查會發現不同步。
+    const override = lesson.challengeSteps?.[challenge.index];
+    const declaredSans = (override?.acceptedMoves || []).map(
+      (candidate) => (typeof candidate === "string" ? candidate : candidate?.san)
+    );
+    const declaresMainline = declaredSans.includes(challenge.mainlineMove);
+    assert(
+      !challenge.rejectsMainline || override?.acceptedMoves?.length,
+      `${lesson.id} challenge ${challenge.index} sets rejectsMainline without acceptedMoves`
+    );
+    assert(
+      !override?.acceptedMoves || declaresMainline || challenge.rejectsMainline,
+      `${lesson.id} challenge ${challenge.index} omits mainline ${challenge.mainlineMove} from acceptedMoves without rejectsMainline`
+    );
+    assert(
+      !challenge.rejectsMainline || !declaresMainline,
+      `${lesson.id} challenge ${challenge.index} sets rejectsMainline but still accepts ${challenge.mainlineMove}`
+    );
+
+    for (const candidate of challenge.acceptedMoves) {
+      const challengeBoard = new Chess(challenge.fen);
+      const move = challengeBoard.move(candidate.san);
+      assert(move, `${lesson.id} challenge ${challenge.index} has illegal accepted SAN ${candidate.san}`);
+      assert(candidate.explanation, `${lesson.id} challenge ${challenge.index} needs an explanation for ${candidate.san}`);
+    }
   }
 
   phaseCounts.set(lesson.phase, (phaseCounts.get(lesson.phase) || 0) + 1);
@@ -87,6 +121,28 @@ for (const lesson of TRAINING_LESSONS) {
     assert(seenIds.has(prerequisite), `${lesson.id} has missing prerequisite ${prerequisite}`);
     assert(prerequisite !== lesson.id, `${lesson.id} cannot require itself`);
   }
+}
+
+const lessonById = new Map(TRAINING_LESSONS.map((lesson) => [lesson.id, lesson]));
+const visited = new Set();
+const visiting = new Set();
+
+function visitPrerequisites(lessonId, path = []) {
+  if (visiting.has(lessonId)) {
+    throw new Error(`prerequisite cycle: ${[...path, lessonId].join(" -> ")}`);
+  }
+  if (visited.has(lessonId)) return;
+  visiting.add(lessonId);
+  const lesson = lessonById.get(lessonId);
+  for (const prerequisite of lesson?.prerequisites || []) {
+    visitPrerequisites(prerequisite, [...path, lessonId]);
+  }
+  visiting.delete(lessonId);
+  visited.add(lessonId);
+}
+
+for (const lesson of TRAINING_LESSONS) {
+  visitPrerequisites(lesson.id);
 }
 
 for (const phase of REQUIRED_PHASES) {

@@ -26,6 +26,7 @@ const LESSONS = [
     type: "endgame",
     side: "black",
     difficulty: 2,
+    prerequisites: ["italian"],
     variation: "車兵殘局",
     opening: "Rook Endgame",
     goal: "讓王與車保持主動"
@@ -33,7 +34,7 @@ const LESSONS = [
 ];
 
 const PROGRESS = {
-  version: 1,
+  version: 2,
   lessons: {
     italian: {
       attempts: 2,
@@ -43,7 +44,11 @@ const PROGRESS = {
       totalHints: 1,
       mastery: 3,
       lastPracticedAt: "2026-01-15T12:00:00.000Z",
-      nextReviewAt: "2026-01-22T12:00:00.000Z"
+      nextReviewAt: "2026-01-22T12:00:00.000Z",
+      bestScore: 85,
+      lastScore: 80,
+      currentStreak: 1,
+      lastMissedSteps: []
     }
   }
 };
@@ -117,5 +122,16 @@ describe("LearningDashboard", () => {
     await user.click(screen.getByRole("button", { name: "返回對局" }));
 
     expect(onReturnToGame).toHaveBeenCalledOnce();
+  });
+
+  it("disables locked curriculum lessons and explains the missing prerequisite", () => {
+    renderDashboard({
+      progress: { version: 2, lessons: {} },
+      plan: [{ lesson: LESSONS[0], reason: "尚未完成的新課程" }],
+      stats: { completed: 0, due: 0, started: 0, masteryPercent: 0 }
+    });
+
+    expect(screen.getByRole("button", { name: /車兵殘局/ })).toBeDisabled();
+    expect(screen.getByText("先完成：義大利開局")).toBeVisible();
   });
 });

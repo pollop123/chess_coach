@@ -1,14 +1,21 @@
-import { lazy, Suspense, useState, useEffect, useRef } from "react";
+import { lazy, Suspense, useMemo, useState, useEffect, useRef } from "react";
 import { Chess } from "chess.js";
 import { Chessboard } from "react-chessboard";
 import axios from "axios";
 import { TRAINING_LESSONS, TRAINING_PHASES } from "./trainingLessons";
 import { LearningDashboard } from "./LearningDashboard";
 import {
+  buildLessonChallenges,
+  findAcceptedMove,
+  scoreLessonAttempt
+} from "./lessonEngine";
+import {
   buildLearningPlan,
   getLearningStats,
+  getLessonLockReason,
   getLessonProgress,
   getNextLesson,
+  isLessonUnlocked,
   loadLearningProgress,
   recordLessonResult,
   saveLearningProgress
@@ -103,8 +110,10 @@ function tagsForReviewMove(item) {
   return [...tags];
 }
 
-function getPracticeRecommendations(analysisData, humanColor, lessons) {
-  const eligibleLessons = lessons.filter((lesson) => lesson.recommendationVerified);
+function getPracticeRecommendations(analysisData, humanColor, lessons, progress) {
+  const eligibleLessons = lessons.filter(
+    (lesson) => lesson.recommendationVerified && isLessonUnlocked(lesson, lessons, progress)
+  );
   const humanSide = humanColor === "black" ? "black" : "white";
   const reviewMoves = analysisData
     .filter((item) => item.move && item.side_to_move === humanSide)
@@ -147,12 +156,29 @@ function getPracticeRecommendations(analysisData, humanColor, lessons) {
   };
 }
 
+function createTrainingGame(challenges, challengeIndex = 0, fallbackFen) {
+  const challenge = challenges[challengeIndex] || challenges[0];
+  return new Chess(challenge?.fen || fallbackFen);
+}
+
 function App() {
   const [game, setGame] = useState(new Chess());
   const [appMode, setAppMode] = useState("play");
   const [trainingPhase, setTrainingPhase] = useState("opening");
-  const [trainingGame, setTrainingGame] = useState(() => createTrainingGame(TRAINING_LESSONS[0]));
+  const [trainingGame, setTrainingGame] = useState(() => createTrainingGame(
+    buildLessonChallenges(TRAINING_LESSONS[0]),
+    0,
+    TRAINING_LESSONS[0].startFen
+  ));
   const [selectedLessonId, setSelectedLessonId] = useState(TRAINING_LESSONS[0].id);
+  const [trainingStepOrder, setTrainingStepOrder] = useState(() => (
+    buildLessonChallenges(TRAINING_LESSONS[0]).map((challenge) => challenge.index)
+  ));
+  const [trainingStepCursor, setTrainingStepCursor] = useState(0);
+  const [trainingStepSolved, setTrainingStepSolved] = useState(false);
+  const [trainingMissedSteps, setTrainingMissedSteps] = useState([]);
+  const [trainingRetryDrill, setTrainingRetryDrill] = useState(false);
+  const [trainingRunFromMissedSteps, setTrainingRunFromMissedSteps] = useState(false);
   const [trainingFeedback, setTrainingFeedback] = useState({
     tone: "neutral",
     text: "先觀察局面再走棋；需要時可逐步開啟提示。"
@@ -312,14 +338,48 @@ function App() {
   const selectedEvaluationShare = selectedWdl?.expected_score ?? calculateEvaluationBarShare(selectedWhiteScore);
   const phaseLessons = TRAINING_LESSONS.filter((lesson) => lesson.phase === trainingPhase);
   const selectedLesson = TRAINING_LESSONS.find((lesson) => lesson.id === selectedLessonId) || phaseLessons[0] || TRAINING_LESSONS[0];
+  const trainingChallenges = useMemo(() => buildLessonChallenges(selectedLesson), [selectedLesson]);
+  const activeTrainingStepIndex = trainingStepOrder[trainingStepCursor] ?? 0;
+  const currentTrainingChallenge = trainingChallenges[activeTrainingStepIndex] || trainingChallenges[0];
   const trainingHistory = trainingGame.history();
-  const expectedTrainingMove = selectedLesson.moves[trainingHistory.length];
-  const trainingComplete = trainingHistory.length >= selectedLesson.moves.length;
+  const expectedTrainingMove = currentTrainingChallenge?.primaryMove;
+  const trainingComplete = Boolean(
+    currentTrainingChallenge
+    && trainingStepSolved
+    && trainingStepCursor >= trainingStepOrder.length - 1
+  );
+  const trainingAttemptResult = scoreLessonAttempt({
+    totalSteps: trainingStepOrder.length,
+    mistakes: trainingMistakes,
+    hintsUsed: trainingHints,
+    passScore: selectedLesson.passScore || 70
+  });
+  const trainingProgressPercent = trainingStepOrder.length
+    ? Math.round(((trainingStepCursor + (trainingStepSolved ? 1 : 0)) / trainingStepOrder.length) * 100)
+    : 0;
+  // 上次留下的錯題只在還沒動手時提供，才不會把舊紀錄混進本次作答。
+  const trainingRunUntouched = trainingStepCursor === 0
+    && !trainingStepSolved
+    && trainingMistakes === 0
+    && trainingHints === 0;
+  const savedMissedSteps = useMemo(() => {
+    const knownSteps = new Set(trainingChallenges.map((challenge) => challenge.index));
+    return (getLessonProgress(learningProgress, selectedLesson.id).lastMissedSteps || [])
+      .filter((index) => knownSteps.has(index));
+  }, [trainingChallenges, learningProgress, selectedLesson.id]);
+  const resumableMissedSteps = trainingRunUntouched && !trainingRunFromMissedSteps
+    ? savedMissedSteps
+    : [];
   const boardFen = appMode === "training" ? trainingGame.fen() : displayFen;
   const boardOrientation = appMode === "training" ? selectedLesson.side : humanColor;
   const selectedDifficulty = BOT_DIFFICULTIES.find((difficulty) => difficulty.id === botDifficulty) || BOT_DIFFICULTIES[2];
   const selectedStyle = BOT_STYLES.find((style) => style.id === botStyle) || BOT_STYLES[0];
-  const practiceRecommendations = getPracticeRecommendations(analysisData, humanColor, TRAINING_LESSONS);
+  const practiceRecommendations = getPracticeRecommendations(
+    analysisData,
+    humanColor,
+    TRAINING_LESSONS,
+    learningProgress
+  );
   const learningStats = getLearningStats(learningProgress, TRAINING_LESSONS);
   const learningPlan = buildLearningPlan(
     TRAINING_LESSONS,
@@ -331,9 +391,12 @@ function App() {
   useEffect(() => {
     if (appMode !== "training" || !trainingComplete || trainingResultRecorded) return;
     setLearningProgress((current) => recordLessonResult(current, selectedLesson.id, {
-      completed: true,
+      completed: trainingAttemptResult.passed,
       mistakes: trainingMistakes,
-      hintsUsed: trainingHints
+      hintsUsed: trainingHints,
+      score: trainingAttemptResult.score,
+      missedSteps: trainingMissedSteps,
+      partial: trainingRetryDrill
     }));
     setTrainingResultRecorded(true);
   }, [
@@ -342,6 +405,10 @@ function App() {
     trainingComplete,
     trainingHints,
     trainingMistakes,
+    trainingMissedSteps,
+    trainingRetryDrill,
+    trainingAttemptResult.passed,
+    trainingAttemptResult.score,
     trainingResultRecorded
   ]);
 
@@ -396,26 +463,35 @@ function App() {
   }
 
   function cloneChess(chessInstance) {
-    const update = new Chess();
-    const pgn = chessInstance.pgn();
-    if (pgn) update.loadPgn(pgn);
-    return update;
+    return new Chess(chessInstance.fen());
   }
 
-  function createTrainingGame(lesson) {
-    const training = lesson?.startFen ? new Chess(lesson.startFen) : new Chess();
-    const learnerTurn = lesson?.side === "black" ? "b" : "w";
-    if (lesson?.moves?.length && training.turn() !== learnerTurn) {
-      training.move(lesson.moves[0]);
-    }
-    return training;
-  }
-
-  function resetTraining(nextLessonId = selectedLessonId) {
+  function resetTraining(nextLessonId = selectedLessonId, retryStepIndexes = null) {
     const lesson = TRAINING_LESSONS.find((item) => item.id === nextLessonId) || TRAINING_LESSONS[0];
+    const lockReason = getLessonLockReason(lesson, TRAINING_LESSONS, learningProgress);
+    if (lockReason) {
+      setStatus(lockReason);
+      setAppMode("learning");
+      return false;
+    }
+    const challenges = buildLessonChallenges(lesson);
+    const allStepIndexes = challenges.map((challenge) => challenge.index);
+    const requestedSteps = Array.isArray(retryStepIndexes)
+      ? [...new Set(retryStepIndexes)].filter((index) => allStepIndexes.includes(index))
+      : [];
+    const stepOrder = requestedSteps.length ? requestedSteps : allStepIndexes;
+    if (!stepOrder.length) return false;
+
     setTrainingPhase(lesson.phase);
     setSelectedLessonId(lesson.id);
-    setTrainingGame(createTrainingGame(lesson));
+    setTrainingStepOrder(stepOrder);
+    // 只重練部分挑戰才算練習；錯題剛好涵蓋整堂時仍是一次完整作答。
+    setTrainingRetryDrill(stepOrder.length < allStepIndexes.length);
+    setTrainingRunFromMissedSteps(requestedSteps.length > 0);
+    setTrainingStepCursor(0);
+    setTrainingStepSolved(false);
+    setTrainingMissedSteps([]);
+    setTrainingGame(createTrainingGame(challenges, stepOrder[0], lesson.startFen));
     setSelectedSquare(null);
     setTrainingMistakes(0);
     setTrainingHints(0);
@@ -423,19 +499,30 @@ function App() {
     setTrainingResultRecorded(false);
     setTrainingFeedback({
       tone: "neutral",
-      text: `${lesson.opening}：${lesson.variation}。先觀察局面，目標是：${lesson.goal}`
+      text: challenges[stepOrder[0]]?.prompt || `${lesson.opening}：${lesson.variation}。目標：${lesson.goal}`
     });
+    return true;
   }
 
   function startRecommendedLesson(lessonId) {
-    resetTraining(lessonId);
+    if (!resetTraining(lessonId)) return;
     setAppMode("training");
     setStatus("已切換到推薦練習");
   }
 
   function selectTrainingPhase(nextPhase) {
-    const firstLesson = TRAINING_LESSONS.find((lesson) => lesson.phase === nextPhase) || TRAINING_LESSONS[0];
-    resetTraining(firstLesson.id);
+    const firstUnlocked = TRAINING_LESSONS.find(
+      (lesson) => lesson.phase === nextPhase && isLessonUnlocked(lesson, TRAINING_LESSONS, learningProgress)
+    );
+    // 沒有可上的課時留在原階段，否則會靜默跳到別的階段。
+    if (!firstUnlocked) {
+      setTrainingFeedback({
+        tone: "warn",
+        text: "這個階段的課程都還沒解鎖，請先完成對應的先修課程。"
+      });
+      return;
+    }
+    resetTraining(firstUnlocked.id);
   }
 
   function openLearningArea() {
@@ -444,23 +531,43 @@ function App() {
   }
 
   function revealTrainingHint() {
-    if (trainingComplete) return;
+    if (trainingStepSolved || !currentTrainingChallenge) return;
     const nextLevel = Math.min(2, hintLevel + 1);
     setHintLevel(nextLevel);
     setTrainingHints((count) => count + 1);
-    const learnerMoveIndex = Math.max(0, Math.floor(trainingHistory.length / 2));
-    const idea = selectedLesson.ideas[Math.min(learnerMoveIndex, selectedLesson.ideas.length - 1)];
     setTrainingFeedback({
       tone: "neutral",
       text: nextLevel === 1
-        ? `觀念提示：${idea}`
-        : `走法提示：這一步要找 ${expectedTrainingMove}。想想它如何達成本課目標。`
+        ? `觀念提示：${currentTrainingChallenge.hints[0]}`
+        : `走法提示：${currentTrainingChallenge.hints[1]}`
     });
   }
 
+  function advanceTrainingStep() {
+    if (!trainingStepSolved || trainingComplete) return;
+    const nextCursor = trainingStepCursor + 1;
+    const nextStepIndex = trainingStepOrder[nextCursor];
+    const nextChallenge = trainingChallenges[nextStepIndex];
+    if (!nextChallenge) return;
+    setTrainingStepCursor(nextCursor);
+    setTrainingStepSolved(false);
+    setHintLevel(0);
+    setSelectedSquare(null);
+    setTrainingGame(createTrainingGame(trainingChallenges, nextStepIndex, selectedLesson.startFen));
+    setTrainingFeedback({ tone: "neutral", text: nextChallenge.prompt });
+  }
+
+  function retryMissedTrainingSteps() {
+    resetTraining(selectedLesson.id, trainingMissedSteps);
+  }
+
+  function resumeSavedMissedSteps() {
+    resetTraining(selectedLesson.id, savedMissedSteps);
+  }
+
   function playTrainingMove(sourceSquare, targetSquare) {
-    if (trainingComplete) {
-      setTrainingFeedback({ tone: "neutral", text: "這條變體已完成。可以重練，或切換其他變體。" });
+    if (trainingStepSolved || !currentTrainingChallenge) {
+      setTrainingFeedback({ tone: "neutral", text: trainingComplete ? "本次課程已完成。" : "這一步已完成，請前往下一題。" });
       return false;
     }
     const learnerTurn = selectedLesson.side === "black" ? "b" : "w";
@@ -475,41 +582,27 @@ function App() {
     }
     if (!move) return false;
 
-    const expectedMove = selectedLesson.moves[trainingHistory.length];
-    if (move.san !== expectedMove) {
+    const acceptedMove = findAcceptedMove(currentTrainingChallenge, move.san);
+    if (!acceptedMove) {
       const nextMistakeCount = trainingMistakes + 1;
       setTrainingMistakes(nextMistakeCount);
-      const ideaIndex = Math.min(Math.floor(trainingHistory.length / 2), selectedLesson.ideas.length - 1);
+      setTrainingMissedSteps((current) => (
+        current.includes(activeTrainingStepIndex) ? current : [...current, activeTrainingStepIndex]
+      ));
       setTrainingFeedback({
         tone: "warn",
         text: nextMistakeCount >= 2
-          ? `這步 ${move.san} 是合法棋，但沒有命中本題重點。可以開啟第二層提示查看走法。`
-          : `再想一次：${selectedLesson.ideas[ideaIndex]}`
+          ? `這步 ${move.san} 合法，但沒有命中本題重點；可以開啟第二層提示。`
+          : `再想一次：${currentTrainingChallenge.hints[0]}`
       });
       return false;
     }
 
-    const ideaIndex = Math.min(Math.floor(trainingHistory.length / 2), selectedLesson.ideas.length - 1);
-    const reply = selectedLesson.moves[nextGame.history().length];
-    if (reply) {
-      try {
-        nextGame.move(reply);
-      } catch {
-        setTrainingFeedback({
-          tone: "warn",
-          text: `主線資料在 ${reply} 這步無法套用，請檢查變體設定。`
-        });
-        return true;
-      }
-    }
-
-    const remaining = selectedLesson.moves.length - nextGame.history().length;
     setTrainingGame(nextGame);
+    setTrainingStepSolved(true);
     setTrainingFeedback({
-      tone: remaining <= 0 ? "success" : "success",
-      text: remaining <= 0
-        ? `完成 ${selectedLesson.variation}。重點：${selectedLesson.goal}`
-        : `正確：${move.san}。${selectedLesson.ideas[ideaIndex]} 輪到你時再找下一個符合目標的走法。`
+      tone: "success",
+      text: `好棋：${move.san}。${acceptedMove.explanation}`
     });
     return true;
   }
@@ -846,20 +939,34 @@ function App() {
               trainingPhase={trainingPhase}
               onSelectPhase={selectTrainingPhase}
               lessons={phaseLessons}
+              allLessons={TRAINING_LESSONS}
+              learningProgress={learningProgress}
               selectedLesson={selectedLesson}
               selectedLessonId={selectedLessonId}
               onSelectLesson={resetTraining}
               feedback={trainingFeedback}
               history={trainingHistory}
               expectedMove={expectedTrainingMove}
+              challenge={currentTrainingChallenge}
+              stepNumber={trainingStepCursor + 1}
+              totalSteps={trainingStepOrder.length}
+              stepSolved={trainingStepSolved}
+              progressPercentage={trainingProgressPercent}
               complete={trainingComplete}
               mistakes={trainingMistakes}
               hints={trainingHints}
               hintLevel={hintLevel}
               lessonProgress={getLessonProgress(learningProgress, selectedLesson.id)}
+              attemptResult={trainingAttemptResult}
+              missedStepsCount={trainingMissedSteps.length}
+              resumableMissedCount={resumableMissedSteps.length}
+              onResumeMissed={resumeSavedMissedSteps}
+              isRetryDrill={trainingRetryDrill}
               nextLesson={nextLesson}
               onHint={revealTrainingHint}
               onReset={() => resetTraining(selectedLessonId)}
+              onAdvance={advanceTrainingStep}
+              onRetryMissed={retryMissedTrainingSteps}
               onNext={() => nextLesson && resetTraining(nextLesson.id)}
               onBack={openLearningArea}
             />
@@ -1008,36 +1115,43 @@ function App() {
   );
 }
 
-function OpeningTrainingPanel({
+export function OpeningTrainingPanel({
   phases,
   trainingPhase,
   onSelectPhase,
   lessons,
+  allLessons,
+  learningProgress,
   selectedLesson,
   selectedLessonId,
   onSelectLesson,
   feedback,
   history,
   expectedMove,
+  challenge,
+  stepNumber,
+  totalSteps,
+  stepSolved,
+  progressPercentage,
   complete,
   mistakes,
   hints,
   hintLevel,
   lessonProgress,
+  attemptResult,
+  missedStepsCount,
+  resumableMissedCount,
+  isRetryDrill,
   nextLesson,
   onHint,
   onReset,
+  onAdvance,
+  onRetryMissed,
+  onResumeMissed,
   onNext,
   onBack
 }) {
-  const initialTurn = selectedLesson.startFen ? new Chess(selectedLesson.startFen).turn() : "w";
-  const learnerTurn = selectedLesson.side === "black" ? "b" : "w";
-  const learnerOffset = initialTurn === learnerTurn ? 0 : 1;
-  const totalLearnerMoves = selectedLesson.moves.filter((_, index) => index % 2 === learnerOffset).length;
-  const completedLearnerMoves = history.filter((_, index) => index % 2 === learnerOffset).length;
-  const progress = totalLearnerMoves
-    ? Math.min(100, Math.round((completedLearnerMoves / totalLearnerMoves) * 100))
-    : 0;
+  const acceptedMoveLabel = challenge?.acceptedMoves?.map((candidate) => candidate.san).join("、") || expectedMove;
 
   return (
     <div className="training-card">
@@ -1077,11 +1191,14 @@ function OpeningTrainingPanel({
             value={selectedLessonId}
             onChange={(event) => onSelectLesson(event.target.value)}
           >
-            {lessons.map((lesson) => (
-              <option key={lesson.id} value={lesson.id}>
-                {lesson.variation}
-              </option>
-            ))}
+            {lessons.map((lesson) => {
+              const lockReason = getLessonLockReason(lesson, allLessons, learningProgress);
+              return (
+                <option key={lesson.id} value={lesson.id} disabled={Boolean(lockReason)}>
+                  {lesson.variation}{lockReason ? "（需先修）" : ""}
+                </option>
+              );
+            })}
           </select>
         </div>
 
@@ -1092,24 +1209,36 @@ function OpeningTrainingPanel({
 
         <div className="training-metrics">
           <div className="metric-card">
-            <span>{complete ? "課程狀態" : "目前任務"}</span>
-            <strong>{complete ? "完成" : hintLevel >= 2 ? expectedMove : selectedLesson.type === "puzzle" ? "找出最佳手" : "運用本課觀念"}</strong>
+            <span>
+              {complete
+                ? (isRetryDrill ? "錯題重練結果" : "結業結果")
+                : `${isRetryDrill ? "錯題" : "挑戰"} ${stepNumber}/${totalSteps}`}
+            </span>
+            <strong>
+              {complete
+                ? attemptResult.grade
+                : stepSolved
+                  ? "本題完成"
+                  : hintLevel >= 2
+                    ? acceptedMoveLabel
+                    : challenge?.prompt || (selectedLesson.type === "puzzle" ? "找出最佳手" : "運用本課觀念")}
+            </strong>
           </div>
           <div className="metric-card">
             <span>進度</span>
-            <strong>{progress}%</strong>
+            <strong>{progressPercentage}%</strong>
           </div>
         </div>
 
         <div className="progress-track">
-          <div style={{ width: `${progress}%` }} />
+          <div style={{ width: `${progressPercentage}%` }} />
         </div>
 
         <div className={`feedback-box tone-${feedback.tone}`}>
           {feedback.text}
         </div>
 
-        {!complete && (
+        {!complete && !stepSolved && (
           <button className="btn btn-secondary hint-button" onClick={onHint} disabled={hintLevel >= 2}>
             {hintLevel === 0 ? "給我觀念提示" : hintLevel === 1 ? "顯示走法提示" : "提示已全部開啟"}
           </button>
@@ -1119,10 +1248,39 @@ function OpeningTrainingPanel({
           <span>錯誤 {mistakes}</span>
           <span>提示 {hints}</span>
           <span>熟練度 {lessonProgress.mastery}/5</span>
+          <span>目前分數 {attemptResult.score}</span>
         </div>
 
+        {complete && isRetryDrill && (
+          <section className="lesson-result is-retry" aria-label="錯題重練結果">
+            <div>
+              <span>錯題重練</span>
+              <strong>{attemptResult.score}</strong>
+            </div>
+            <p>
+              這次只重練了 {totalSteps} 題錯題，不會計入結業成績或熟練度。
+              {attemptResult.passed ? " 這幾題已經掌握，回頭重練整堂就能結業。" : " 建議再看一次學習重點後重練。"}
+            </p>
+            <small>歷史最高 {lessonProgress.bestScore || 0} 分</small>
+          </section>
+        )}
+
+        {complete && !isRetryDrill && (
+          <section className={`lesson-result ${attemptResult.passed ? "is-passed" : "is-retry"}`} aria-label="課程結業成績">
+            <div>
+              <span>本次成績</span>
+              <strong>{attemptResult.score}</strong>
+            </div>
+            <p>
+              正確率 {attemptResult.accuracy}% · 及格標準 {attemptResult.passScore} 分 ·
+              {attemptResult.passed ? " 已通過，可以前往下一課。" : " 尚未通過，建議重練錯題。"}
+            </p>
+            <small>歷史最高 {lessonProgress.bestScore || attemptResult.score} 分</small>
+          </section>
+        )}
+
         <div>
-          <div className="setting-label">目前棋譜</div>
+          <div className="setting-label">本題走法</div>
           <div className="move-line">
             {history.length ? history.join(" ") : "尚未開始"}
           </div>
@@ -1142,8 +1300,17 @@ function OpeningTrainingPanel({
         </div>
 
         <div className="training-actions">
-          <button className="btn btn-secondary" onClick={onReset}>重練這堂課</button>
-          {complete && nextLesson && (
+          <button className="btn btn-secondary" onClick={onReset}>重練整堂</button>
+          {stepSolved && !complete && (
+            <button className="btn btn-primary" onClick={onAdvance}>下一個挑戰</button>
+          )}
+          {complete && missedStepsCount > 0 && (
+            <button className="btn btn-secondary" onClick={onRetryMissed}>只重練錯題（{missedStepsCount}）</button>
+          )}
+          {resumableMissedCount > 0 && (
+            <button className="btn btn-secondary" onClick={onResumeMissed}>接續上次錯題（{resumableMissedCount}）</button>
+          )}
+          {complete && attemptResult.passed && !isRetryDrill && nextLesson && (
             <button className="btn btn-primary" onClick={onNext}>下一課：{nextLesson.variation}</button>
           )}
         </div>

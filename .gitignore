@@ -29,5 +29,6 @@ backend/.cache/
 
 # Local Codex/agent tool state
 .agents/
+.claude/
 .codex/
 skills-lock.json
