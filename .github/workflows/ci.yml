@@ -52,6 +52,9 @@ jobs:
   teaching-smoke:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    # The oracle cache is gitignored, so this gate only passes where it was
+    # calibrated. Non-blocking until the oracle is reproducible: see issue #7.
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
 
