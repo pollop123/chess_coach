@@ -133,10 +133,12 @@ class StockfishOracleCache:
         return entry.get("value")
 
     def _miss_message(self, query: dict[str, Any]) -> str:
+        move = query.get("move")
+        move_hint = f" move={move}" if move else ""
         return (
             f"no frozen oracle answer in {self.path} for "
             f"{query.get('kind')} nodes={query.get('nodes')} fen={query.get('fen')!r}"
-            f"{f' move={query['move']}' if query.get('move') else ''}"
+            f"{move_hint}"
             "\nRegenerate the fixture with --write-oracle-fixture using a"
             " Stockfish binary, then commit the result."
         )
