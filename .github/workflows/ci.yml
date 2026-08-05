@@ -14,11 +14,14 @@ jobs:
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    env:
-      DATABASE_URL: sqlite:///${{ runner.temp }}/chess-ai-ci.db
-      MIGRATION_DATABASE_URL: sqlite:///${{ runner.temp }}/chess-ai-ci.db
     steps:
       - uses: actions/checkout@v4
+
+      # runner context is unavailable in job-level env, so export the paths here.
+      - name: Configure the test database
+        run: |
+          echo "DATABASE_URL=sqlite:///${RUNNER_TEMP}/chess-ai-ci.db" >> "${GITHUB_ENV}"
+          echo "MIGRATION_DATABASE_URL=sqlite:///${RUNNER_TEMP}/chess-ai-ci.db" >> "${GITHUB_ENV}"
 
       - uses: actions/setup-python@v5
         with:
@@ -49,10 +52,14 @@ jobs:
   teaching-smoke:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
-    env:
-      STOCKFISH_PATH: ${{ runner.temp }}/stockfish-18/stockfish-ubuntu-x86-64-avx2
     steps:
       - uses: actions/checkout@v4
+
+      # runner context is unavailable in job-level env, so export the path here.
+      - name: Configure the pinned Stockfish path
+        run: |
+          echo "STOCKFISH_PATH=${RUNNER_TEMP}/stockfish-18/stockfish-ubuntu-x86-64-avx2" \
+            >> "${GITHUB_ENV}"
 
       - uses: actions/setup-python@v5
         with:
