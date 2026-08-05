@@ -191,6 +191,56 @@ class TeachingAccuracyBenchmarkTests(unittest.TestCase):
             self.assertIsNone(refreshed.get(query))
             self.assertEqual(refreshed.stats()["misses"], 1)
 
+    def test_cache_written_by_another_engine_build_is_not_reused(self):
+        query = {"kind": "top_lines", "nodes": 10_000, "fen": chess.STARTING_FEN}
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "oracle.json"
+            cache = StockfishOracleCache(path, engine_identity="Stockfish 18|sha256=aaa")
+            cache.set(query, {"moves": ["e2e4"], "scores": [20]})
+            cache.save()
+
+            same_build = StockfishOracleCache(path, engine_identity="Stockfish 18|sha256=aaa")
+            self.assertIsNotNone(same_build.get(query))
+            # Same release, different binary: the answers are not interchangeable.
+            other_build = StockfishOracleCache(path, engine_identity="Stockfish 18|sha256=bbb")
+            self.assertIsNone(other_build.get(query))
+
+    def test_strict_fixture_raises_instead_of_recomputing_a_missing_answer(self):
+        present = {"kind": "top_lines", "nodes": 10_000, "fen": chess.STARTING_FEN}
+        absent = {**present, "fen": "8/8/4k3/8/4P3/4K3/8/8 w - - 0 1"}
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "fixture.json"
+            writer = StockfishOracleCache(path, engine_identity="Stockfish 18|sha256=aaa")
+            writer.set(present, {"moves": ["e2e4"], "scores": [20]})
+            writer.save()
+
+            frozen = StockfishOracleCache(path, readonly=True, strict=True)
+            self.assertIsNotNone(frozen.get(present))
+            with self.assertRaises(teaching_accuracy_benchmark.OracleMiss):
+                frozen.get(absent)
+
+    def test_frozen_fixture_never_writes_back(self):
+        query = {"kind": "top_lines", "nodes": 10_000, "fen": chess.STARTING_FEN}
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "fixture.json"
+            writer = StockfishOracleCache(path, engine_identity="Stockfish 18|sha256=aaa")
+            writer.set(query, {"moves": ["e2e4"], "scores": [20]})
+            writer.save()
+            before = path.read_text(encoding="utf-8")
+
+            frozen = StockfishOracleCache(path, readonly=True)
+            frozen.set({**query, "nodes": 50_000}, {"moves": ["d2d4"], "scores": [15]})
+            frozen.save()
+
+            self.assertEqual(path.read_text(encoding="utf-8"), before)
+            self.assertEqual(frozen.stats()["writes"], 0)
+
+    def test_missing_fixture_is_a_strict_error_not_an_empty_oracle(self):
+        with TemporaryDirectory() as directory:
+            missing = Path(directory) / "absent.json"
+            with self.assertRaises(teaching_accuracy_benchmark.OracleMiss):
+                StockfishOracleCache(missing, readonly=True, strict=True)
+
     def test_accuracy_gate_rejects_partial_candidate_analysis(self):
         self.assertFalse(self.gate(completion_rate=0.99))
         self.assertTrue(self.gate())

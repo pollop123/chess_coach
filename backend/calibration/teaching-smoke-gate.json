@@ -1,7 +1,7 @@
 {
   "equals": {
     "profile": "smoke",
-    "stockfish_signature": "author=the Stockfish developers (see AUTHORS file)|name=Stockfish 18"
+    "stockfish_signature": "author=the Stockfish developers (see AUTHORS file)|name=Stockfish 18|sha256=ae4c93fa9676ca7750d0714342fd8a5b1d018000fc6e0f6cedf112067b5ef374"
   },
   "minimum": {
     "positions": 8,
