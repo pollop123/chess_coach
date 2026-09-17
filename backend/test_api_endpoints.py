@@ -5,6 +5,7 @@ import chess
 import chess.engine
 from fastapi.testclient import TestClient
 
+from coach_generation import CoachReply
 from api import _stockfish_wdl, app
 
 
@@ -83,7 +84,7 @@ class ApiEndpointTests(unittest.TestCase):
 
     def test_normal_question_containing_system_is_not_rejected(self):
         rag_engine = Mock()
-        rag_engine.get_advice.return_value = "請先完成子力發展。"
+        rag_engine.get_response.return_value = CoachReply("請先完成子力發展。")
         with patch("api.get_rag_engine", return_value=rag_engine):
             response = self.client.post(
                 "/get_analysis",
@@ -98,11 +99,11 @@ class ApiEndpointTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["coach_advice"], "請先完成子力發展。")
-        self.assertEqual(rag_engine.get_advice.call_args.args[2], "這個 system 性的弱點該怎麼守？")
+        self.assertEqual(rag_engine.get_response.call_args.args[2], "這個 system 性的弱點該怎麼守？")
 
     def test_explain_passes_verified_teaching_analysis_to_rag(self):
         rag_engine = Mock()
-        rag_engine.get_advice.return_value = "推薦手：Nf3"
+        rag_engine.get_response.return_value = CoachReply("推薦手：Nf3")
         analysis = {
             "best_move": None,
             "from_book": False,
@@ -130,14 +131,14 @@ class ApiEndpointTests(unittest.TestCase):
                 json={
                     "fen": self.analysis_fen,
                     "history": "1. e4 e5",
-                    "question": "為什麼要發展騎士？",
+                    "question": "這個局面為什麼要發展騎士？",
                     "depth": 2,
                 },
             )
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(
-            rag_engine.get_advice.call_args.kwargs["teaching_analysis"],
+            rag_engine.get_response.call_args.kwargs["teaching_analysis"],
             teaching_analysis,
         )
 

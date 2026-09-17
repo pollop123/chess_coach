@@ -7,6 +7,9 @@
 ## 核心特色
 
 ### AI 教練系統
+- **依問題調整的 RAG 問答**：檢索相關棋理，讓 Gemini 自然解釋、比較或給提示，支援同盤面的追問
+- **引用與語意核對**：檢查來源、棋步與數值，再核對回答是否有依據及切題；來源原文可展開查看
+- **無 Key 也可使用**：未設定 Gemini、模型逾時或引用不合格時，提供基礎分析與相關棋理
 - **PV Line 深度講解**：解析引擎計算的最佳變例，逐步拆解戰術意圖
 - **具體路徑分析**：不只說「這步好」，更說明「為什麼好」與「對手偏離會怎樣」
 - **戰術識別**：自動識別叉王、牽制、棄子攻擊等戰術主題
@@ -73,10 +76,42 @@
 
 ## 快速開始
 
+### 教練問答與 RAG 模式
+
+目前採用**有證據約束的自然回答**：模型可以改寫、解釋與摘要，每段附上來源 ID。
+程式先檢查 JSON、引用來源、棋步與數值，再以第二次模型呼叫檢查支持性、切題程度、
+不確定性與回答模式。只有通過核對的文字才顯示；語意審核仍可能出錯，並非正確性保證。
+引擎負責推薦手，模型不得自行替換；證據不足時會明說無法確認。
+
+一般規則、局面問答、候選比較、提示與完整分析採不同回答方式。一般規則不需等待
+引擎搜尋；只有「分析目前局面」預設要求完整分析，平常問答不再附固定六段報告。
+提示模式會移除推薦手、變例與含座標的來源，限制回答不洩漏具體走法。
+前端傳入同一盤面最近最多 8 則訊息（每則最多 1,500 字），用於「再講簡單一點」等追問；
+舊訊息不能作為棋理證據。盤面改變或開新局時取消尚未完成的教練請求。
+來源原文收在「查看依據」中，可按需展開。
+
+來源分為「一般棋理」與「本局分析」：前者來自 `backend/coach_evidence.py` 的
+19 條版本控制知識，後者來自引擎分析、候選手比較、合法走法與 ECO 比對。
+一般棋理不代表目前局面已經出現該戰術；未完成候選比較時不提供確定的排名／掉分結論。
+歷史棋局的 FEN 文字相似度尚未作為可引用證據。
+
+- 預設使用本機關鍵字檢索，玩家問題的明確關鍵字優先於局面階段。
+- 設定 `GOOGLE_API_KEY` 後啟用 Gemini 自然問答；成功回答通常需要生成、審核共兩次模型呼叫，會增加免費額度用量。未設定時仍可取得基礎分析與相關棋理。
+- 選填 `ENABLE_CHROMA_RAG=1` 加入向量檢索。向量庫只負責排序，引用文字仍以本機審核過的知識為準；初始化會同步同一份知識，檢索失敗時回退本機檢索。
+- 選填 `RAG_TIMEOUT_SECONDS=20` 設定生成與審核共用的時間預算（20–30 秒，較小設定自動提升至 20 秒）。單次請求與備援模型僅在剩餘預算至少 10 秒時啟動，沒有 SDK 自動重試。逾時或核對失敗時回退基礎回覆；此時間不包含引擎分析或向量庫初始化。
+- 回答保留原有 `/explain` 的 `advice` 與 `/get_analysis` 的 `coach_advice` 字串介面，另附 `sources`、`mode`、`status`（後者加上 `coach_` 前綴）；請求可傳 `conversation` 與 `mode`（`auto`、`overview`、`hint`）。
+
+離線回歸測試不需要 Key，也不會呼叫外部模型：
+
+```bash
+PYTHONPATH=backend .venv/bin/python -m unittest \
+  backend/test_rag_grounding.py backend/test_rag_answers.py
+```
+
 ### 前置需求
 
 - Docker & Docker Compose
-- [Google Gemini API Key](https://aistudio.google.com/)
+- [Google Gemini API Key](https://aistudio.google.com/)（啟用依問題選取證據的問答時需要；基礎分析選填）
 - [Lichess API Token](https://lichess.org/account/oauth/token)（選填）
 
 ### 方式一：使用 Docker（推薦用於生產環境）
@@ -315,11 +350,11 @@ docker-compose down --rmi all --volumes
    - 在 Render 建立 Blueprint 或 Web Service，連到 GitHub repo
    - 如果使用 Blueprint，Render 會讀取根目錄的 `render.yaml`
    - 必填環境變數：
-     - `GOOGLE_API_KEY`: 你的 Google Gemini API Key
      - `DATABASE_URL`: Neon 提供的 pooled Postgres 連線字串
      - `MIGRATION_DATABASE_URL`: Neon 提供的 direct Postgres 連線字串
      - `CORS_ORIGINS`: Vercel 前端網址；多個網址以逗號分隔
    - 選填環境變數：
+     - `GOOGLE_API_KEY`: 啟用 Gemini 問答時設定；未設定仍提供基礎分析
      - `LICHESS_API_TOKEN`: Lichess Bot 需要時再填
      - `ENGINE_QUEUE_TIMEOUT_SECONDS`: 引擎忙碌時最多排隊秒數，預設 `2.0`
    - 每次服務啟動都會以 `MIGRATION_DATABASE_URL` 執行

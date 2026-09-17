@@ -4,6 +4,8 @@ import { Chessboard } from "react-chessboard";
 import axios from "axios";
 import { TRAINING_LESSONS, TRAINING_PHASES } from "./trainingLessons";
 import { LearningDashboard } from "./LearningDashboard";
+import { CoachMessage } from "./CoachMessage";
+import { buildCoachConversation } from "./coachConversation";
 import {
   buildLessonChallenges,
   findAcceptedMove,
@@ -211,6 +213,14 @@ function App() {
 
   // 只捲動聊天室本身，避免 scrollIntoView 帶著整個頁面跳到底部。
   const chatFeedRef = useRef(null);
+  const coachControllerRef = useRef(null);
+
+  function resetCoach(messages = []) {
+    coachControllerRef.current?.abort();
+    coachControllerRef.current = null;
+    setIsCoachThinking(false);
+    setChatHistory(messages);
+  }
 
   // 1. 初始化載入歷史
   useEffect(() => {
@@ -273,7 +283,7 @@ function App() {
       setCurrentMoveIndex(-1);
       setIsResigned(false);
       // 載入新局時，重置聊天室，但保留歡迎訊息
-      setChatHistory([{ role: "model", text: "已切換賽局，請隨時問我問題！" }]);
+      resetCoach([{ role: "model", text: "已切換賽局，請隨時問我問題！" }]);
     } catch (e) {
       console.error("PGN 載入失敗", e);
     }
@@ -331,6 +341,9 @@ function App() {
   const displayFen = (currentMoveIndex !== -1 && analysisData.length > 0)
     ? analysisData[currentMoveIndex].fen
     : game.fen();
+  useEffect(() => () => {
+    coachControllerRef.current?.abort();
+  }, [displayFen]);
   const selectedReviewIndex = currentMoveIndex >= 0 ? currentMoveIndex : analysisData.length - 1;
   const selectedReviewPoint = selectedReviewIndex >= 0 ? analysisData[selectedReviewIndex] : null;
   const selectedWhiteScore = selectedReviewPoint?.rawScore ?? 0;
@@ -415,13 +428,16 @@ function App() {
   // 🔥 核心修改：發送訊息給 AI 教練
   // manualQuestion: 如果有的話，代表是玩家手動打字；如果沒有，代表是按「分析按鈕」
   async function askCoach(manualQuestion = null) {
-    if (isCoachThinking) return;
+    if (isCoachThinking || coachControllerRef.current) return;
+    const controller = new AbortController();
+    coachControllerRef.current = controller;
 
     // 1. 決定顯示在聊天室的文字
     const questionText = manualQuestion || "請幫我分析目前的盤面局勢與優劣。";
 
     // 2. 更新聊天室 (顯示玩家訊息)
-    setChatHistory(prev => [...prev, { role: "user", text: questionText }]);
+    const conversation = buildCoachConversation(chatHistory, displayFen);
+    setChatHistory(prev => [...prev, { role: "user", text: questionText, fen: displayFen }]);
     setIsCoachThinking(true);
     setUserInput(""); // 清空輸入框
 
@@ -430,16 +446,27 @@ function App() {
       const res = await axios.post(`${API_URL}/explain`, {
         fen: displayFen, // 針對目前顯示的盤面 (支援復盤)
         history: game.pgn(),
-        question: manualQuestion // 如果是 null，後端會用預設 Prompt
-      });
+        question: manualQuestion,
+        conversation,
+        mode: manualQuestion ? "auto" : "overview"
+      }, { signal: controller.signal });
 
       // 4. 顯示教練回應
-      setChatHistory(prev => [...prev, { role: "model", text: res.data.advice }]);
+      if (controller.signal.aborted) return;
+      setChatHistory(prev => [...prev, {
+        role: "model", text: res.data.advice, fen: displayFen,
+        sources: res.data.sources, mode: res.data.mode || "position",
+        error: res.data.status === "unavailable"
+      }]);
     } catch (err) {
+      if (controller.signal.aborted || axios.isCancel(err)) return;
       console.error(err);
-      setChatHistory(prev => [...prev, { role: "model", text: "❌ 教練連線失敗，請檢查後端 API。" }]);
+      setChatHistory(prev => [...prev, { role: "model", text: "❌ 教練連線失敗，請檢查後端 API。", error: true }]);
     } finally {
-      setIsCoachThinking(false);
+      if (coachControllerRef.current === controller) {
+        coachControllerRef.current = null;
+        setIsCoachThinking(false);
+      }
     }
   }
 
@@ -874,7 +901,7 @@ function App() {
           <div className="control-bar">
             <button className={`btn ${appMode === "play" ? "btn-primary" : "btn-muted"}`} onClick={() => setAppMode("play")}>對局</button>
             <button className="btn btn-success" onClick={openLearningArea}>學習專區</button>
-            <button className="btn btn-primary" onClick={() => { const ng = new Chess(); setGame(ng); setStatus("新局開始"); setAnalysisData([]); setCurrentMoveIndex(-1); setIsResigned(false); setChatHistory([]); if (humanColor === "black") makeAIMove(ng.fen()); }}>新局</button>
+            <button className="btn btn-primary" onClick={() => { const ng = new Chess(); setGame(ng); setStatus("新局開始"); setAnalysisData([]); setCurrentMoveIndex(-1); setIsResigned(false); resetCoach(); if (humanColor === "black") makeAIMove(ng.fen()); }}>新局</button>
             {appMode === "play" && (
               <button
                 className="btn btn-danger"
@@ -988,9 +1015,7 @@ function App() {
             {/* 訊息列表 */}
             <div className="chat-feed" ref={chatFeedRef}>
               {chatHistory.map((msg, idx) => (
-                <div key={idx} className={`chat-bubble ${msg.role === "user" ? "is-user" : "is-model"}`}>
-                  {msg.text}
-                </div>
+                <CoachMessage key={idx} message={msg} />
               ))}
               {isCoachThinking && (
                 <div className="thinking-line">

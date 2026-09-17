@@ -7,7 +7,9 @@ services:
       - "8000:8000"
     environment:
       # API Key 不要寫死，要在雲端平台的變數設定中填寫
-      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
+      - ENABLE_CHROMA_RAG=${ENABLE_CHROMA_RAG:-0}
+      - RAG_TIMEOUT_SECONDS=${RAG_TIMEOUT_SECONDS:-20}
       - DATABASE_URL=sqlite:////data/games.db
       - MIGRATION_DATABASE_URL=${MIGRATION_DATABASE_URL:-}
       - STOCKFISH_PATH=/usr/games/stockfish
