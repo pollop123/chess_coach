@@ -24,6 +24,9 @@ PROFILE_SMOKE = "smoke"
 DEFAULT_RELEASE_NODES = 50_000
 DEFAULT_SMOKE_NODES = 10_000
 DEFAULT_CACHE_PATH = Path(__file__).resolve().parent / ".cache" / "teaching_accuracy_stockfish.json"
+DEFAULT_SMOKE_ORACLE_FIXTURE = (
+    Path(__file__).resolve().parent / "calibration" / "teaching-oracle-smoke.json"
+)
 SMOKE_POSITION_NAMES = (
     "two_knights_tactic",
     "queen_safety",
@@ -36,10 +39,24 @@ SMOKE_POSITION_NAMES = (
 )
 
 
-class StockfishOracleCache:
-    """Persistent cache for deterministic, node-limited Stockfish queries."""
+class OracleMiss(LookupError):
+    """A strict oracle lookup found no frozen answer for a query."""
 
-    SCHEMA_VERSION = 1
+
+class StockfishOracleCache:
+    """Persistent store for deterministic, node-limited Stockfish queries.
+
+    Entries are keyed by the query alone; the engine build that produced them
+    is recorded once in the file header. Two Stockfish builds report the same
+    UCI id, so the header carries the binary digest and a file written by a
+    different build is discarded rather than silently reused.
+
+    A read-only, strict instance backed by a committed file turns this into a
+    frozen oracle fixture: every answer is pinned, and a query the fixture does
+    not cover raises instead of quietly consulting whatever engine is present.
+    """
+
+    SCHEMA_VERSION = 2
 
     def __init__(
         self,
@@ -47,10 +64,17 @@ class StockfishOracleCache:
         *,
         enabled: bool = True,
         refresh: bool = False,
+        readonly: bool = False,
+        strict: bool = False,
+        engine_identity: str | None = None,
     ) -> None:
         self.path = Path(path)
         self.enabled = enabled
         self.refresh = refresh
+        self.readonly = readonly
+        self.strict = strict
+        self.engine_identity = engine_identity
+        self.source_engine: str | None = None
         self.entries: dict[str, dict[str, Any]] = {}
         self.hits = 0
         self.misses = 0
@@ -68,8 +92,26 @@ class StockfishOracleCache:
         try:
             payload = json.loads(self.path.read_text(encoding="utf-8"))
         except (OSError, ValueError, TypeError):
+            if self.strict:
+                raise OracleMiss(
+                    f"oracle fixture is missing or unreadable: {self.path}"
+                ) from None
             return
         if payload.get("schema_version") != self.SCHEMA_VERSION:
+            if self.strict:
+                raise OracleMiss(
+                    f"oracle fixture {self.path} has schema_version "
+                    f"{payload.get('schema_version')!r}, expected {self.SCHEMA_VERSION}"
+                )
+            return
+        self.source_engine = payload.get("engine")
+        # A file written by a different Stockfish build answers the same
+        # queries differently, so reuse it only when the builds match.
+        if (
+            self.engine_identity is not None
+            and self.source_engine is not None
+            and self.source_engine != self.engine_identity
+        ):
             return
         entries = payload.get("entries")
         if isinstance(entries, dict):
@@ -78,41 +120,59 @@ class StockfishOracleCache:
     def get(self, query: dict[str, Any]) -> Any | None:
         if not self.enabled or self.refresh:
             self.misses += 1
+            if self.strict:
+                raise OracleMiss(self._miss_message(query))
             return None
         entry = self.entries.get(self._digest(query))
         if not isinstance(entry, dict) or entry.get("query") != query:
             self.misses += 1
+            if self.strict:
+                raise OracleMiss(self._miss_message(query))
             return None
         self.hits += 1
         return entry.get("value")
 
+    def _miss_message(self, query: dict[str, Any]) -> str:
+        move = query.get("move")
+        move_hint = f" move={move}" if move else ""
+        return (
+            f"no frozen oracle answer in {self.path} for "
+            f"{query.get('kind')} nodes={query.get('nodes')} fen={query.get('fen')!r}"
+            f"{move_hint}"
+            "\nRegenerate the fixture with --write-oracle-fixture using a"
+            " Stockfish binary, then commit the result."
+        )
+
     def set(self, query: dict[str, Any], value: Any) -> None:
-        if not self.enabled:
+        if not self.enabled or self.readonly:
             return
         self.entries[self._digest(query)] = {"query": query, "value": value}
         self.writes += 1
         self._dirty = True
 
     def save(self) -> None:
-        if not self.enabled or not self._dirty:
+        if not self.enabled or self.readonly or not self._dirty:
             return
         self.path.parent.mkdir(parents=True, exist_ok=True)
         temporary_path = self.path.with_suffix(f"{self.path.suffix}.tmp")
         payload = {
             "schema_version": self.SCHEMA_VERSION,
+            "engine": self.engine_identity or self.source_engine,
             "entries": self.entries,
         }
         temporary_path.write_text(
-            json.dumps(payload, ensure_ascii=False, sort_keys=True),
+            json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True),
             encoding="utf-8",
         )
         os.replace(temporary_path, self.path)
         self._dirty = False
 
-    def stats(self) -> dict[str, int | bool | str]:
+    def stats(self) -> dict[str, int | bool | str | None]:
         return {
             "enabled": self.enabled,
             "path": str(self.path),
+            "frozen": self.readonly,
+            "source_engine": self.source_engine,
             "hits": self.hits,
             "misses": self.misses,
             "writes": self.writes,
@@ -308,16 +368,37 @@ def parse_feature_weights(values: list[str] | None) -> dict[str, int]:
     return weights
 
 
-def stockfish_signature(engine: chess.engine.SimpleEngine) -> str:
+def binary_digest(path: str | Path | None) -> str:
+    """SHA-256 of the engine binary, or "unknown" when it cannot be read."""
+    if not path:
+        return "unknown"
+    digest = hashlib.sha256()
+    try:
+        with open(path, "rb") as handle:
+            for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                digest.update(chunk)
+    except OSError:
+        return "unknown"
+    return digest.hexdigest()
+
+
+def stockfish_signature(
+    engine: chess.engine.SimpleEngine, path: str | Path | None = None
+) -> str:
+    """Identify the exact binary, not just the release it claims to be.
+
+    Stockfish reports the same UCI id from every build, but a macOS arm64 and
+    a Linux x86-64 avx2 build of one release return different moves at the same
+    node budget, so the digest is what makes an oracle answer attributable.
+    """
     identity = engine.id or {}
-    return "|".join(
-        f"{key}={identity[key]}" for key in sorted(identity)
-    ) or "unknown-stockfish"
+    fields = [f"{key}={identity[key]}" for key in sorted(identity)]
+    fields.append(f"sha256={binary_digest(path)}")
+    return "|".join(fields)
 
 
 def _oracle_query(
     *,
-    engine_signature: str,
     board: chess.Board,
     nodes: int,
     kind: str,
@@ -325,7 +406,6 @@ def _oracle_query(
     move: chess.Move | None = None,
 ) -> dict[str, Any]:
     return {
-        "engine": engine_signature,
         "fen": board.fen(),
         "nodes": nodes,
         "kind": kind,
@@ -336,16 +416,49 @@ def _oracle_query(
     }
 
 
+class LazyStockfish:
+    """Start Stockfish only when an oracle answer is not already frozen.
+
+    A fully covered fixture never touches this, so a strict run needs no engine
+    installed at all.
+    """
+
+    def __init__(self, path: str | Path | None) -> None:
+        self.path = path
+        self.identity: str | None = None
+        self._engine: chess.engine.SimpleEngine | None = None
+
+    def __call__(self) -> chess.engine.SimpleEngine:
+        if self._engine is None:
+            if not self.path:
+                raise OracleMiss(
+                    "an oracle answer is missing and no Stockfish binary is available"
+                )
+            self._engine = chess.engine.SimpleEngine.popen_uci(self.path)
+            # Pin the search-affecting options rather than inheriting whatever
+            # the installed build defaults to.
+            self._engine.configure({"Threads": 1, "Hash": 16})
+            self.identity = stockfish_signature(self._engine, self.path)
+        return self._engine
+
+    def close(self) -> None:
+        if self._engine is not None:
+            self._engine.quit()
+            self._engine = None
+
+
 def oracle_top_lines(
-    engine: chess.engine.SimpleEngine,
+    engine: LazyStockfish,
     board: chess.Board,
     nodes: int,
     multipv: int,
     cache: StockfishOracleCache,
-    engine_signature: str,
 ) -> tuple[list[chess.Move], list[int]]:
+    # Every query passes a fresh game so python-chess sends ucinewgame: without
+    # it Stockfish carries its hash between positions and an answer depends on
+    # which unrelated position ran first, exactly the independence the local
+    # engine already gets from reset_transposition_table().
     query = _oracle_query(
-        engine_signature=engine_signature,
         board=board,
         nodes=nodes,
         kind="top_lines",
@@ -361,10 +474,11 @@ def oracle_top_lines(
         except (KeyError, TypeError, ValueError):
             pass
 
-    analysis = engine.analyse(
+    analysis = engine().analyse(
         board,
         chess.engine.Limit(nodes=nodes),
         multipv=multipv,
+        game=object(),
     )
     moves = [item["pv"][0] for item in analysis if item.get("pv")]
     scores = [
@@ -380,15 +494,13 @@ def oracle_top_lines(
 
 
 def oracle_forced_score(
-    engine: chess.engine.SimpleEngine,
+    engine: LazyStockfish,
     board: chess.Board,
     move: chess.Move,
     nodes: int,
     cache: StockfishOracleCache,
-    engine_signature: str,
 ) -> int:
     query = _oracle_query(
-        engine_signature=engine_signature,
         board=board,
         nodes=nodes,
         kind="forced_move",
@@ -398,10 +510,11 @@ def oracle_forced_score(
     if isinstance(cached, int):
         return cached
 
-    analysis = engine.analyse(
+    analysis = engine().analyse(
         board,
         chess.engine.Limit(nodes=nodes),
         root_moves=[move],
+        game=object(),
     )
     score = analysis["score"].pov(board.turn).score(mate_score=100_000) or 0
     cache.set(query, int(score))
@@ -492,6 +605,8 @@ def run(
     refresh_cache: bool = False,
     feature_weights: dict[str, int] | None = None,
     positions: tuple[AccuracyPosition, ...] | None = None,
+    oracle_fixture: str | Path | None = None,
+    strict_oracle: bool = False,
 ) -> dict:
     if profile not in {PROFILE_RELEASE, PROFILE_SMOKE}:
         raise ValueError(f"Unknown benchmark profile: {profile}")
@@ -501,11 +616,22 @@ def run(
         raise ValueError("No benchmark positions matched the selected profile/topics")
 
     started_at = perf_counter()
-    cache = StockfishOracleCache(
-        cache_path,
-        enabled=use_cache,
-        refresh=refresh_cache,
-    )
+    engine = LazyStockfish(stockfish_path)
+    if oracle_fixture:
+        # Frozen answers: read-only, and a gap is an error rather than a
+        # silent recomputation against whichever build happens to be present.
+        cache = StockfishOracleCache(
+            oracle_fixture,
+            readonly=True,
+            strict=strict_oracle,
+        )
+    else:
+        cache = StockfishOracleCache(
+            cache_path,
+            enabled=use_cache,
+            refresh=refresh_cache,
+            engine_identity=stockfish_signature(engine(), stockfish_path),
+        )
     active_weights = dict(CALIBRATED_FEATURE_WEIGHTS)
     if feature_weights:
         active_weights.update(feature_weights)
@@ -515,94 +641,90 @@ def run(
     activation = engine_session.activate()
     activation.__enter__()
     results = []
-    engine_identity = "unknown-stockfish"
     try:
-        with chess.engine.SimpleEngine.popen_uci(stockfish_path) as engine:
-            engine_identity = stockfish_signature(engine)
-            for position in benchmark_positions:
-                # Calibration positions must be independent. Reusing search
-                # entries across fixtures makes topic-only and full-corpus runs
-                # disagree based on which unrelated position ran first.
-                chess_engine.reset_transposition_table()
-                board = chess.Board(position.fen)
-                multipv = min(3, board.legal_moves.count())
-                oracle_top, oracle_scores = oracle_top_lines(
+        for position in benchmark_positions:
+            # Calibration positions must be independent. Reusing search
+            # entries across fixtures makes topic-only and full-corpus runs
+            # disagree based on which unrelated position ran first.
+            chess_engine.reset_transposition_table()
+            board = chess.Board(position.fen)
+            multipv = min(3, board.legal_moves.count())
+            oracle_top, oracle_scores = oracle_top_lines(
+                engine,
+                board,
+                nodes,
+                multipv,
+                cache,
+            )
+            oracle_best = oracle_top[0]
+
+            settings = profile_search_settings(position, profile)
+            base = chess_engine.get_analysis(
+                board,
+                depth=int(settings["depth"]),
+                adaptive_depth=bool(settings["adaptive_depth"]),
+            )
+            teaching = chess_engine.get_teaching_analysis(
+                board,
+                base,
+                candidate_count=int(settings["candidate_count"]),
+                depth=int(settings["depth"]),
+            )
+            candidates = teaching.get("candidates") or []
+            candidate_moves = [chess.Move.from_uci(item["move"]) for item in candidates]
+            forced_scores = [
+                oracle_forced_score(
                     engine,
                     board,
+                    move,
                     nodes,
-                    multipv,
                     cache,
-                    engine_identity,
                 )
-                oracle_best = oracle_top[0]
+                for move in candidate_moves
+            ]
 
-                settings = profile_search_settings(position, profile)
-                base = chess_engine.get_analysis(
-                    board,
-                    depth=int(settings["depth"]),
-                    adaptive_depth=bool(settings["adaptive_depth"]),
-                )
-                teaching = chess_engine.get_teaching_analysis(
-                    board,
-                    base,
-                    candidate_count=int(settings["candidate_count"]),
-                    depth=int(settings["depth"]),
-                )
-                candidates = teaching.get("candidates") or []
-                candidate_moves = [chess.Move.from_uci(item["move"]) for item in candidates]
-                forced_scores = [
-                    oracle_forced_score(
-                        engine,
-                        board,
-                        move,
-                        nodes,
-                        cache,
-                        engine_identity,
-                    )
-                    for move in candidate_moves
-                ]
-
-                reported_top = candidate_moves[0] if candidate_moves else None
-                consistency = candidate_consistency(candidates, forced_scores)
-                loss_errors = consistency["loss_errors"]
-                oracle_gap = (
-                    max(0, oracle_scores[0] - oracle_scores[1])
-                    if len(oracle_scores) >= 2
-                    else 100_000
-                )
-                oracle_only_move = oracle_gap >= 150
-                reported_only_move = teaching.get("criticality") == "only_move"
-                oracle_top_is_mate = abs(oracle_scores[0]) >= 90_000
-                reported_top_is_mate = bool(
-                    candidates and candidates[0].get("score_type") == "mate"
-                )
-                mate_type_matches = consistency["type_matches"] and (
-                    not oracle_top_is_mate or reported_top_is_mate
-                )
-                results.append({
-                    "name": position.name,
-                    "topic": position.topic,
-                    "oracle_best": board.san(oracle_best),
-                    "oracle_top": [board.san(move) for move in oracle_top],
-                    "reported_top": board.san(reported_top) if reported_top else None,
-                    "top_in_oracle_top3": reported_top in oracle_top,
-                    "oracle_best_recalled": oracle_best in candidate_moves,
-                    "rank_inversion_rate": round(inversion_rate(forced_scores), 4),
-                    "candidate_loss_mae_cp": (
-                        round(sum(loss_errors) / len(loss_errors), 1)
-                        if loss_errors
-                        else None
-                    ),
-                    "loss_errors_cp": loss_errors,
-                    "mate_type_matches": mate_type_matches,
-                    "loss_fields_complete": consistency["loss_fields_complete"],
-                    "oracle_only_move": oracle_only_move,
-                    "reported_criticality": teaching.get("criticality"),
-                    "only_move_matches": oracle_only_move == reported_only_move,
-                    "analysis_complete": teaching.get("analysis_complete"),
-                })
+            reported_top = candidate_moves[0] if candidate_moves else None
+            consistency = candidate_consistency(candidates, forced_scores)
+            loss_errors = consistency["loss_errors"]
+            oracle_gap = (
+                max(0, oracle_scores[0] - oracle_scores[1])
+                if len(oracle_scores) >= 2
+                else 100_000
+            )
+            oracle_only_move = oracle_gap >= 150
+            reported_only_move = teaching.get("criticality") == "only_move"
+            oracle_top_is_mate = abs(oracle_scores[0]) >= 90_000
+            reported_top_is_mate = bool(
+                candidates and candidates[0].get("score_type") == "mate"
+            )
+            mate_type_matches = consistency["type_matches"] and (
+                not oracle_top_is_mate or reported_top_is_mate
+            )
+            results.append({
+                "name": position.name,
+                "topic": position.topic,
+                "oracle_best": board.san(oracle_best),
+                "oracle_top": [board.san(move) for move in oracle_top],
+                "reported_top": board.san(reported_top) if reported_top else None,
+                "top_in_oracle_top3": reported_top in oracle_top,
+                "oracle_best_recalled": oracle_best in candidate_moves,
+                "rank_inversion_rate": round(inversion_rate(forced_scores), 4),
+                "candidate_loss_mae_cp": (
+                    round(sum(loss_errors) / len(loss_errors), 1)
+                    if loss_errors
+                    else None
+                ),
+                "loss_errors_cp": loss_errors,
+                "mate_type_matches": mate_type_matches,
+                "loss_fields_complete": consistency["loss_fields_complete"],
+                "oracle_only_move": oracle_only_move,
+                "reported_criticality": teaching.get("criticality"),
+                "only_move_matches": oracle_only_move == reported_only_move,
+                "analysis_complete": teaching.get("analysis_complete"),
+            })
     finally:
         activation.__exit__(None, None, None)
+        engine.close()
         cache.save()
 
     count = len(results)
@@ -675,7 +797,7 @@ def run(
         "profile": profile,
         "topics": sorted(set(topics or ())),
         "stockfish": stockfish_path,
-        "stockfish_signature": engine_identity,
+        "stockfish_signature": engine.identity or cache.source_engine,
         "nodes": nodes,
         "feature_weights": active_weights,
         "duration_seconds": round(perf_counter() - started_at, 3),
@@ -763,6 +885,24 @@ def main() -> int:
         help="override an evaluator feature weight; repeat to calibrate jointly",
     )
     parser.add_argument(
+        "--oracle-fixture",
+        help="read every oracle answer from this committed fixture instead of the"
+        " mutable cache",
+    )
+    parser.add_argument(
+        "--strict-oracle",
+        action="store_true",
+        help="fail on any oracle answer the fixture does not cover, instead of"
+        " recomputing it with whichever Stockfish build is installed"
+        f" (default fixture: {DEFAULT_SMOKE_ORACLE_FIXTURE.name})",
+    )
+    parser.add_argument(
+        "--write-oracle-fixture",
+        metavar="PATH",
+        help="run against a real Stockfish and write the answers to PATH as a"
+        " frozen fixture; commit the result",
+    )
+    parser.add_argument(
         "--refresh-cache",
         action="store_true",
         help="ignore matching reads and replace them with fresh Stockfish results",
@@ -789,8 +929,22 @@ def main() -> int:
         # zero and advertise release readiness the full set never earned.
         parser.error("--require-release-ready requires the full release corpus")
 
+    if args.write_oracle_fixture and args.strict_oracle:
+        parser.error("--write-oracle-fixture cannot be combined with --strict-oracle")
+
+    oracle_fixture = args.oracle_fixture
+    if args.strict_oracle and not oracle_fixture:
+        oracle_fixture = str(DEFAULT_SMOKE_ORACLE_FIXTURE)
+
+    # Writing a fixture is an ordinary run whose cache is the fixture itself,
+    # forced to recompute so every answer comes from the engine at hand.
+    cache_path = args.write_oracle_fixture or args.cache_path
+    refresh_cache = args.refresh_cache or bool(args.write_oracle_fixture)
+
     stockfish_path = find_stockfish(args.stockfish)
-    if not stockfish_path:
+    # A strict run answers every query from the committed fixture, so it must
+    # not require an engine the runner does not have.
+    if not stockfish_path and not args.strict_oracle:
         parser.error("Stockfish was not found; pass --stockfish or set STOCKFISH_PATH")
     nodes = args.nodes or (
         DEFAULT_SMOKE_NODES
@@ -814,11 +968,13 @@ def main() -> int:
         nodes=nodes,
         profile=args.profile,
         topics=args.topic,
-        cache_path=args.cache_path,
+        cache_path=cache_path,
         use_cache=not args.no_cache,
-        refresh_cache=args.refresh_cache,
+        refresh_cache=refresh_cache,
         feature_weights=feature_weights,
         positions=corpus_positions,
+        oracle_fixture=oracle_fixture,
+        strict_oracle=args.strict_oracle,
     )
     if args.output:
         output_path = Path(args.output)

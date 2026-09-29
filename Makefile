@@ -26,7 +26,7 @@ db-adopt:
 teaching-smoke:
 	mkdir -p .artifacts
 	PYTHONPATH=backend $(PYTHON) backend/teaching_accuracy_benchmark.py \
-		--profile smoke --output .artifacts/teaching-smoke.json
+		--profile smoke --strict-oracle --output .artifacts/teaching-smoke.json
 	PYTHONPATH=backend $(PYTHON) backend/validate_teaching_report.py \
 		.artifacts/teaching-smoke.json
 
