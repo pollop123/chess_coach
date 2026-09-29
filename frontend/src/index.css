@@ -1612,3 +1612,49 @@ button:disabled {
     transition-duration: 0.01ms !important;
   }
 }
+
+.import-card {
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel);
+}
+.import-card h3 { margin: 0 0 8px; }
+.import-help { color: var(--muted); font-size: 0.82rem; line-height: 1.6; }
+.import-search label, .import-month { display: block; font-size: 0.88rem; margin: 10px 0; }
+.import-search > div { display: flex; gap: 8px; margin-top: 6px; }
+.import-search input, .import-month select {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 9px;
+  background: var(--panel-soft);
+  color: var(--ink);
+}
+.import-search input { flex: 1; width: 100%; }
+.import-month select { margin-left: 8px; }
+.import-games { list-style: none; padding: 0; max-height: 280px; overflow-y: auto; }
+.import-games li { display: flex; align-items: center; gap: 10px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.import-games li > div { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.import-games strong { font-size: 0.85rem; }
+.import-games small { display: block; color: var(--muted); margin-top: 5px; }
+.import-games button { flex-shrink: 0; }
+.import-pages { display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; }
+.import-saved { margin-top: 12px; }
+.import-saved summary { cursor: pointer; }
+.import-saved ul { list-style: none; padding: 0; }
+.import-saved button { text-align: left; overflow-wrap: anywhere; }
+.import-active { border: 1px solid var(--line); background: var(--panel-soft); padding: 14px; border-radius: 10px; line-height: 1.6; }
+.import-active a { display: inline-block; margin-right: 12px; }
+@media (max-width: 480px) {
+  .import-search > div { flex-wrap: wrap; }
+  .import-games li { flex-wrap: wrap; }
+}
+
+.review-progress, .review-evidence-status {
+  border: 1px solid var(--line); border-radius: 10px; padding: 12px;
+  background: var(--panel-soft); font-size: 0.85rem;
+}
+.review-progress { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.review-progress progress { flex: 1; min-width: 100px; accent-color: var(--forest-dark); }
+.review-evidence-status p { margin: 6px 0; }
