@@ -38,6 +38,28 @@ class CoachGenerationTests(unittest.TestCase):
             self.assertIsNone(parse_natural_answer(bad, [source], "position"))
         self.assertIsNone(parse_natural_answer(draft("先走 e4。", source.id), [source], "hint"))
 
+    def test_a_cited_move_supports_naming_its_squares_but_not_other_moves(self):
+        threat = EvidenceSource("T1", "目前威脅檢查", "如果不處理，白方下一步可以走 Qxf7# 將死。", "position")
+        self.assertIsNotNone(parse_natural_answer(draft("白方瞄準 f7，下一步 Qxf7# 就將死。", "T1"), [threat], "position"))
+        for bad in ("白方也可以走 Qf6。", "要小心 f6 格。", "白方威脅 Qxf7#，接著 e5 也會丟。"):
+            self.assertIsNone(parse_natural_answer(draft(bad, "T1"), [threat], "position"))
+
+    def test_only_the_unsupported_paragraph_is_dropped(self):
+        last = EvidenceSource("L1", "上一手檢查", "白方上一手是 g4。這步之後，黑方可以走 Qh4# 直接將死。", "position")
+        rule = KNOWLEDGE_SOURCES[12]
+        raw = json.dumps({"insufficient_evidence": False, "paragraphs": [
+            {"text": "g4 讓黑方可以 Qh4# 直接將死。", "source_ids": ["L1"]},
+            {"text": "g4 沒有顧好王的安全。", "source_ids": [rule.id]},
+            {"text": "也可以考慮 Qxh7。", "source_ids": ["L1"]},
+        ]}, ensure_ascii=False)
+        parsed = parse_natural_answer(raw, [last, rule], "position")
+        self.assertEqual([p["text"] for p in parsed["paragraphs"]], ["g4 讓黑方可以 Qh4# 直接將死。"])
+        # Malformed output still rejects the whole answer.
+        broken = json.dumps({"insufficient_evidence": False, "paragraphs": [
+            {"text": "g4 讓黑方可以 Qh4# 直接將死。", "source_ids": ["L1"]}, {"text": "x", "source_ids": ["missing"]},
+        ]}, ensure_ascii=False)
+        self.assertIsNone(parse_natural_answer(broken, [last, rule], "position"))
+
     def test_successful_natural_answer_is_reviewed_and_not_followed_by_template(self):
         text = "控制中心可以增加子力的活動空間，同時限制對手。"
         self.rag.call_gemini_with_fallback = Mock(side_effect=[draft(text, "K15"), review()])

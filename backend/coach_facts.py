@@ -63,14 +63,14 @@ def _free_captures(board):
 
 
 def _threats_against(board, color):
-    """Mates the opponent of `color` would have if it were their move."""
+    """SAN of mates the opponent of `color` would have if it were their move."""
     if board.turn != color:
-        return mating_moves(board)
+        return [board.san(move) for move in mating_moves(board)]
     if board.is_check():
         return []
     probe = board.copy(stack=False)
     probe.push(chess.Move.null())
-    return mating_moves(probe)
+    return [probe.san(move) for move in mating_moves(probe)]
 
 
 def replay_history(history, board):
@@ -158,7 +158,7 @@ def threat_source(board):
             facts.append(f"{SIDES[side]}現在可以走 {board.san(free[0])} 吃掉沒有保護的{NAMES[target.piece_type]}。")
     threats = _threats_against(board, side)
     if threats:
-        facts.append(f"如果不處理，{SIDES[opponent]}有一步將死的威脅。")
+        facts.append(f"如果不處理，{SIDES[opponent]}下一步可以走 {threats[0]} 將死。")
     loose = loose_pieces(board, side)
     if loose:
         square, why = loose[0]

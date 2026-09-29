@@ -7,9 +7,12 @@ review is a fallible additional check, never proof of chess correctness.
 from dataclasses import dataclass, field
 from copy import deepcopy
 import json
+import logging
 import re
 
 from coach_evidence import EvidenceSource
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -60,6 +63,8 @@ brief 為 true 時只用一至兩句白話，整段最多 100 字，直接說重
 使用具體淺白的說明，避免誇張比喻；活動空間增加不代表能到任何地方，限制對手
 不代表對手完全無法移動，可能有利不代表保證獲勝。
 每段 text 配上真正支持它的 source_ids，來源編號由程式顯示，不要自己寫入 text。
+段落中提到的每個棋步或格子（例如 g4、f7、Qh4#），都必須出現在該段 source_ids 的來源裡；
+談上一手時引用 L1，談目前威脅或機會時引用 T1。
 不能把一般棋理當成當前局面的證明，不能把可能改成一定、未完成改成已確認。
 唯一可稱為引擎推薦的走法是 engine_recommendation；比較模式可討論其他已分析候選。
 僅使用來源中已有的棋步、評分與具體事實，不自行延伸變例或把合法手說成最佳手。
@@ -88,11 +93,20 @@ comparison 不假造未分析的候選結論，推薦手不違背 engine_recomme
 """
 
 CHESS_ATOM = re.compile(r"(?<![A-Za-z0-9])(?:[a-h][1-8][a-h][1-8][qrbn]?|[KQRBN]?[a-h]?[1-8]?x?[a-h][1-8](?:=[QRBN])?[+#]?|[O0]-[O0](?:-[O0])?)(?![A-Za-z0-9])")
+SQUARE = re.compile(r"[a-h][1-8]")
 SCORE = re.compile(r"[+-]?\d+(?:\.\d+)?\s*(?:cp|百分兵|%|步將[死殺])", re.I)
 
 
 def chess_atoms(text):
     return {token.replace("0", "O") for token in CHESS_ATOM.findall(text)}
+
+
+def supported_atoms(text):
+    """A cited move also supports naming the squares it touches (Qxf7# supports f7)."""
+    atoms = chess_atoms(text)
+    for atom in list(atoms):
+        atoms.update(SQUARE.findall(atom))
+    return atoms
 
 
 def parse_natural_answer(raw, sources, mode, brief=False):
@@ -115,6 +129,7 @@ def parse_natural_answer(raw, sources, mode, brief=False):
         return None
     known = {source.id: source for source in sources}
     total_length = 0
+    kept = []
     for paragraph in paragraphs:
         if not isinstance(paragraph, dict) or set(paragraph) != {"text", "source_ids"}:
             return None
@@ -129,15 +144,22 @@ def parse_natural_answer(raw, sources, mode, brief=False):
         if any(not isinstance(id_, str) or id_ not in known for id_ in ids) or len(set(ids)) != len(ids):
             return None
         support = " ".join(known[id_].text for id_ in ids)
-        if not chess_atoms(text).issubset(chess_atoms(support)):
-            return None
+        # A paragraph whose moves, squares or scores its own sources don't back is
+        # dropped, not the whole answer; the semantic review then sees only what is kept.
+        if not chess_atoms(text).issubset(supported_atoms(support)):
+            continue
         if mode == "hint" and chess_atoms(text):
-            return None
+            continue
         if not {re.sub(r"\s", "", value.lower()) for value in SCORE.findall(text)}.issubset(
             {re.sub(r"\s", "", value.lower()) for value in SCORE.findall(support)}
         ):
-            return None
-    return payload
+            continue
+        kept.append(paragraph)
+    if not kept:
+        return None
+    if len(kept) < len(paragraphs):
+        logger.info("Coach answer dropped %d unsupported paragraph(s)", len(paragraphs) - len(kept))
+    return {**payload, "paragraphs": kept}
 
 
 def review_passed(raw):

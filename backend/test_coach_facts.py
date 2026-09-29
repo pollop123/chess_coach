@@ -67,7 +67,7 @@ class CoachFactTests(unittest.TestCase):
         board = board_after("e4 e5 Bc4 Nc6 Qh5")
         board.push_san("a6")
         board.push_san("a3")
-        self.assertIn("有一步將死的威脅", threat_source(board).text)
+        self.assertIn("如果不處理，白方下一步可以走 Qxf7# 將死", threat_source(board).text)
 
     def test_loose_pieces_include_cheaper_attackers(self):
         board = chess.Board("4k3/8/8/3q4/4P3/8/8/4K3 b - - 0 1")
