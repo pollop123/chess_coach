@@ -236,6 +236,7 @@ function App() {
   // 只捲動聊天室本身，避免 scrollIntoView 帶著整個頁面跳到底部。
   const chatFeedRef = useRef(null);
   const coachControllerRef = useRef(null);
+  const coachFenRef = useRef(null);
 
   function resetCoach(messages = []) {
     coachControllerRef.current?.abort();
@@ -403,9 +404,12 @@ function App() {
   const displayFen = (currentMoveIndex !== -1 && analysisData.length > 0)
     ? analysisData[currentMoveIndex].fen
     : game.fen();
-  useEffect(() => () => {
-    coachControllerRef.current?.abort();
+  // Compare against the request's own position: effects can flush after a click
+  // that already asked about the new position, and must not cancel it.
+  useEffect(() => {
+    if (coachFenRef.current !== displayFen) coachControllerRef.current?.abort();
   }, [displayFen]);
+  useEffect(() => () => coachControllerRef.current?.abort(), []);
   const selectedReviewIndex = currentMoveIndex >= 0 ? currentMoveIndex : analysisData.length - 1;
   const selectedReviewPoint = selectedReviewIndex >= 0 ? analysisData[selectedReviewIndex] : null;
   const selectedWhiteScore = selectedReviewPoint?.rawScore ?? 0;
@@ -493,6 +497,7 @@ function App() {
     if (isCoachThinking || isAnalyzing || coachControllerRef.current) return;
     const controller = new AbortController();
     coachControllerRef.current = controller;
+    coachFenRef.current = displayFen;
 
     // 1. 決定顯示在聊天室的文字
     const questionText = manualQuestion || "請幫我分析目前的盤面局勢與優劣。";
