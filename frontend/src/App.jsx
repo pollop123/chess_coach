@@ -5,6 +5,7 @@ import axios from "axios";
 import { TRAINING_LESSONS, TRAINING_PHASES } from "./trainingLessons";
 import { LearningDashboard } from "./LearningDashboard";
 import { CoachMessage } from "./CoachMessage";
+import { GUIDE_COLORS, legalMoveStyles, lessonHintGuides, reviewArrows } from "./boardGuides";
 import { ChessComImport } from "./ChessComImport";
 import { streamReview } from "./reviewStream";
 import { buildCoachConversation } from "./coachConversation";
@@ -193,6 +194,7 @@ function App() {
   const [hintLevel, setHintLevel] = useState(0);
   const [trainingResultRecorded, setTrainingResultRecorded] = useState(false);
   const [selectedSquare, setSelectedSquare] = useState(null);
+  const [dragSquare, setDragSquare] = useState(null);
   const [status, setStatus] = useState("準備開始新棋局");
   const [isResigned, setIsResigned] = useState(false);
   const [history, setHistory] = useState([]);
@@ -451,6 +453,31 @@ function App() {
     : [];
   const boardFen = appMode === "training" ? trainingGame.fen() : displayFen;
   const boardOrientation = appMode === "training" ? selectedLesson.side : humanColor;
+  const canShowLegalMoves = appMode === "training"
+    ? !trainingStepSolved && !trainingComplete
+    : appMode === "play" && !importedGame && !isResigned && analysisData.length === 0
+      && !game.isGameOver() && game.turn() === (humanColor === "white" ? "w" : "b");
+  const guideSquare = selectedSquare || dragSquare;
+  const legalStyles = canShowLegalMoves
+    ? legalMoveStyles(appMode === "training" ? trainingGame : game, guideSquare)
+    : {};
+  const hintGuides = appMode === "training" && !trainingStepSolved
+    ? lessonHintGuides(currentTrainingChallenge, hintLevel)
+    : { squareStyles: {}, arrows: [] };
+  const reviewGuide = appMode === "play" && analysisData.length > 0
+    ? reviewArrows(analysisData, currentMoveIndex === -1 ? analysisData.length - 1 : currentMoveIndex)
+    : { arrows: [] };
+  const boardSquareStyles = { ...hintGuides.squareStyles };
+  for (const [square, style] of Object.entries(legalStyles)) {
+    boardSquareStyles[square] = { ...boardSquareStyles[square], ...style };
+  }
+  if (selectedSquare) {
+    boardSquareStyles[selectedSquare] = {
+      ...boardSquareStyles[selectedSquare],
+      boxShadow: `inset 0 0 0 4px ${GUIDE_COLORS.selected}`
+    };
+  }
+  const boardArrows = appMode === "training" ? hintGuides.arrows : reviewGuide.arrows;
   const selectedDifficulty = BOT_DIFFICULTIES.find((difficulty) => difficulty.id === botDifficulty) || BOT_DIFFICULTIES[2];
   const selectedStyle = BOT_STYLES.find((style) => style.id === botStyle) || BOT_STYLES[0];
   const practiceRecommendations = getPracticeRecommendations(
@@ -628,14 +655,17 @@ function App() {
 
   function revealTrainingHint() {
     if (trainingStepSolved || !currentTrainingChallenge) return;
-    const nextLevel = Math.min(2, hintLevel + 1);
+    if (hintLevel >= 3) return;
+    const nextLevel = hintLevel + 1;
     setHintLevel(nextLevel);
     setTrainingHints((count) => count + 1);
     setTrainingFeedback({
       tone: "neutral",
       text: nextLevel === 1
         ? `觀念提示：${currentTrainingChallenge.hints[0]}`
-        : `走法提示：${currentTrainingChallenge.hints[1]}`
+        : nextLevel === 2
+          ? "棋子提示：棋盤上亮起來的棋子可以走出好棋，想想它該去哪裡。"
+          : `走法提示：${currentTrainingChallenge.hints[1]}（棋盤上的箭頭）`
     });
   }
 
@@ -950,16 +980,25 @@ function App() {
               <Chessboard
                 position={boardFen}
                 onPieceDrop={onDrop}
+                onPieceDragBegin={(_piece, square) => setDragSquare(square)}
+                onPieceDragEnd={() => setDragSquare(null)}
                 onSquareClick={handleSquareClick}
                 boardOrientation={boardOrientation}
                 customLightSquareStyle={{ backgroundColor: "#dce7d0" }}
                 customDarkSquareStyle={{ backgroundColor: "#4f7f69" }}
                 customBoardStyle={{ borderRadius: "6px" }}
-                customSquareStyles={selectedSquare ? {
-                  [selectedSquare]: { boxShadow: "inset 0 0 0 4px rgba(255,209,102,0.92)" }
-                } : {}}
+                customSquareStyles={boardSquareStyles}
+                customArrows={boardArrows}
               />
             </div>
+            {reviewGuide.arrows.length > 0 && (
+              <div className="board-legend" aria-label="箭頭說明">
+                <span><i className="legend-swatch is-best" />推薦手</span>
+                {reviewGuide.sameMove
+                  ? <span>實際也走了這步</span>
+                  : <span><i className="legend-swatch is-played" />實際走法</span>}
+              </div>
+            )}
           </div>
 
           {analysisData.length > 0 && (
@@ -1339,7 +1378,7 @@ export function OpeningTrainingPanel({
                 ? attemptResult.grade
                 : stepSolved
                   ? "本題完成"
-                  : hintLevel >= 2
+                  : hintLevel >= 3
                     ? acceptedMoveLabel
                     : challenge?.prompt || (selectedLesson.type === "puzzle" ? "找出最佳手" : "運用本課觀念")}
             </strong>
@@ -1359,8 +1398,8 @@ export function OpeningTrainingPanel({
         </div>
 
         {!complete && !stepSolved && (
-          <button className="btn btn-secondary hint-button" onClick={onHint} disabled={hintLevel >= 2}>
-            {hintLevel === 0 ? "給我觀念提示" : hintLevel === 1 ? "顯示走法提示" : "提示已全部開啟"}
+          <button className="btn btn-secondary hint-button" onClick={onHint} disabled={hintLevel >= 3}>
+            {["給我觀念提示", "提示該動哪顆棋", "顯示走法箭頭", "提示已全部開啟"][Math.min(hintLevel, 3)]}
           </button>
         )}
 
