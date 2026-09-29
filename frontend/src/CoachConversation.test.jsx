@@ -53,6 +53,7 @@ describe("coach conversation", () => {
     await waitFor(() => expect(axios.post).toHaveBeenCalledTimes(2));
     const payload = axios.post.mock.calls[1][1];
     expect(payload.mode).toBe("auto");
+    expect(payload.player_color).toBe("white");
     expect(payload.conversation.map((turn) => turn.role)).toEqual(["user", "model"]);
     expect(payload.conversation[1].mode).toBe("knowledge");
     await waitFor(() => expect(input).toBeEnabled());

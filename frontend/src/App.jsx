@@ -516,6 +516,7 @@ function App() {
         question: manualQuestion,
         conversation,
         mode: manualQuestion ? "auto" : "overview",
+        ...(appMode === "play" ? { player_color: humanColor } : {}),
         ...(reviewMeta ? { review_id: reviewMeta.review_id, review_ply: selectedReviewIndex } : {})
       }, { signal: controller.signal });
 
