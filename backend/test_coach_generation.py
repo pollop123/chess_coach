@@ -107,6 +107,8 @@ class CoachGenerationTests(unittest.TestCase):
             "直接告訴我答案": "position", "這是什麼開局？": "position",
             "給我提示，不要告訴我答案": "hint", "不用提示，直接給我答案": "position",
             "怎麼下比較好？": "position",
+            "e4 是什麼意思？": "position", "exd5 好嗎？": "position",
+            "e8=Q 是什麼意思？": "position", "e4 和 d4 哪個好？": "comparison",
         }
         for question, expected in cases.items():
             self.assertEqual(question_mode(question), expected)
