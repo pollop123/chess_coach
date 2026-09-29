@@ -56,6 +56,7 @@ function EvalTooltip({ active, payload, label }) {
     <div className="chart-tooltip">
       <div className="chart-tooltip__label">第 {label} 步 · {sideLabel}</div>
       <div className="chart-tooltip__value">{point.evalLabel}</div>
+      {point.review_level && point.move && <div>{point.review_level === "deep" ? "此步已加深複核" : "此步為初評"}</div>}
       {point.classification && (
         <div className={`chart-tooltip__judgement is-${point.classification}`}>
           {classificationLabels[point.classification] || point.classification}

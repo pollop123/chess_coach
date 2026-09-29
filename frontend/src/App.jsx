@@ -5,6 +5,8 @@ import axios from "axios";
 import { TRAINING_LESSONS, TRAINING_PHASES } from "./trainingLessons";
 import { LearningDashboard } from "./LearningDashboard";
 import { CoachMessage } from "./CoachMessage";
+import { ChessComImport } from "./ChessComImport";
+import { streamReview } from "./reviewStream";
 import { buildCoachConversation } from "./coachConversation";
 import {
   buildLessonChallenges,
@@ -210,6 +212,26 @@ function App() {
   const [botDifficulty, setBotDifficulty] = useState("intermediate");
   const [botStyle, setBotStyle] = useState("balanced");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [importedGame, setImportedGame] = useState(null);
+  const [reviewMeta, setReviewMeta] = useState(null);
+  const [reviewProgress, setReviewProgress] = useState(null);
+  const analysisControllerRef = useRef(null);
+  const aiControllerRef = useRef(null);
+
+  function cancelGameRequests() {
+    analysisControllerRef.current?.abort();
+    analysisControllerRef.current = null;
+    aiControllerRef.current?.abort();
+    aiControllerRef.current = null;
+    setIsAnalyzing(false);
+    setReviewMeta(null);
+    setReviewProgress(null);
+  }
+
+  useEffect(() => () => {
+    analysisControllerRef.current?.abort();
+    aiControllerRef.current?.abort();
+  }, []);
 
   // 只捲動聊天室本身，避免 scrollIntoView 帶著整個頁面跳到底部。
   const chatFeedRef = useRef(null);
@@ -266,7 +288,7 @@ function App() {
   }
 
   function resignGame() {
-    if (appMode !== "play" || game.isGameOver() || isResigned || analysisData.length > 0) return;
+    if (appMode !== "play" || importedGame || game.isGameOver() || isResigned || analysisData.length > 0) return;
     const result = humanColor === "white" ? "0-1" : "1-0";
     setIsResigned(true);
     setStatus(`你已投降，遊戲結束：${result === "1-0" ? "白勝" : "黑勝"}`);
@@ -277,6 +299,9 @@ function App() {
     try {
       const newGame = new Chess();
       newGame.loadPgn(pgn);
+      cancelGameRequests();
+      setImportedGame(null);
+      setSelectedSquare(null);
       setGame(newGame);
       setStatus("已載入歷史賽局 (復盤模式)");
       setAnalysisData([]);
@@ -284,23 +309,46 @@ function App() {
       setIsResigned(false);
       // 載入新局時，重置聊天室，但保留歡迎訊息
       resetCoach([{ role: "model", text: "已切換賽局，請隨時問我問題！" }]);
+      return true;
     } catch (e) {
       console.error("PGN 載入失敗", e);
+      return false;
     }
   }
 
+  function importChessComGame(imported) {
+    if (!loadGame(imported.pgn)) return false;
+    setImportedGame(imported);
+    setHumanColor(imported.perspective);
+    setAppMode("play");
+    setStatus(`已匯入 ${imported.white} vs ${imported.black}。按「分析這局」開始復盤。`);
+    resetCoach([{ role: "model", text: "棋譜已載入。完成分析後，可選擇局面讓我講解。" }]);
+    return true;
+  }
+
   async function analyzeGame() {
-    if (game.pgn() === "" || isAnalyzing) return;
+    if (game.pgn() === "" || isAnalyzing || analysisControllerRef.current) return;
+    const controller = new AbortController();
+    analysisControllerRef.current = controller;
     setIsAnalyzing(true);
-    setStatus("📊 正在進行全盤深度分析...");
+    setReviewMeta(null);
+    setAnalysisData([]);
+    setCurrentMoveIndex(-1);
+    setReviewProgress({ phase: "quick", current: 0, total: game.history().length });
+    resetCoach([{ role: "model", text: "正在整理賽後分析依據，完成後可選擇局面提問。" }]);
+    setStatus("正在用 Stockfish 初評全局，接著會加深複核關鍵步…");
     try {
-      const res = await axios.post(`${API_URL}/analyze_full`, {
+      const result = await streamReview(`${API_URL}/review_game`, {
         pgn: game.pgn(),
         perspective: humanColor,
         depth: 2
+      }, controller.signal, (progress) => {
+        if (!controller.signal.aborted) setReviewProgress(progress);
       });
 
-      const processedData = res.data.map(d => {
+      if (controller.signal.aborted) return;
+
+      const processedData = result.rows.map(d => {
         const rawScore = d.score ?? 0;
         const playerScore = d.score_for ?? rawScore;
         const isMate = d.is_checkmate || d.mate_threat || Math.abs(rawScore) > 15000;
@@ -318,13 +366,27 @@ function App() {
       });
 
       setAnalysisData(processedData);
-      setCurrentMoveIndex(processedData.length > 0 ? processedData.length - 1 : -1);
-      setStatus("✅ 分析完成！");
+      setReviewMeta(result);
+      let selectedIndex = processedData.length - 1;
+      if (importedGame) {
+        const ownMoves = processedData.map((point, index) => ({ point, index }))
+          .filter(({ point, index }) => index > 0 && point.side_to_move === humanColor);
+        ownMoves.sort((a, b) => (b.point.cp_loss ?? 0) - (a.point.cp_loss ?? 0));
+        // Explain the decision position before the player's move, not the final board.
+        selectedIndex = ownMoves.length ? ownMoves[0].index - 1 : 0;
+      }
+      setCurrentMoveIndex(processedData.length ? selectedIndex : -1);
+      setStatus(importedGame ? "分析完成，已選好可回顧的局面。可以請教練講解，或切換其他步數。" : "✅ 分析完成！");
     } catch (err) {
+      if (controller.signal.aborted || axios.isCancel(err)) return;
       console.error("分析失敗", err);
-      setStatus("❌ 分析失敗");
+      setStatus(err.message || "分析暫時無法完成，請稍後重新按分析按鈕。");
     } finally {
-      setIsAnalyzing(false);
+      if (analysisControllerRef.current === controller) {
+        analysisControllerRef.current = null;
+        setIsAnalyzing(false);
+        setReviewProgress(null);
+      }
     }
   }
 
@@ -428,7 +490,7 @@ function App() {
   // 🔥 核心修改：發送訊息給 AI 教練
   // manualQuestion: 如果有的話，代表是玩家手動打字；如果沒有，代表是按「分析按鈕」
   async function askCoach(manualQuestion = null) {
-    if (isCoachThinking || coachControllerRef.current) return;
+    if (isCoachThinking || isAnalyzing || coachControllerRef.current) return;
     const controller = new AbortController();
     coachControllerRef.current = controller;
 
@@ -448,7 +510,8 @@ function App() {
         history: game.pgn(),
         question: manualQuestion,
         conversation,
-        mode: manualQuestion ? "auto" : "overview"
+        mode: manualQuestion ? "auto" : "overview",
+        ...(reviewMeta ? { review_id: reviewMeta.review_id, review_ply: selectedReviewIndex } : {})
       }, { signal: controller.signal });
 
       // 4. 顯示教練回應
@@ -461,7 +524,8 @@ function App() {
     } catch (err) {
       if (controller.signal.aborted || axios.isCancel(err)) return;
       console.error(err);
-      setChatHistory(prev => [...prev, { role: "model", text: "❌ 教練連線失敗，請檢查後端 API。", error: true }]);
+      const detail = err.response?.data?.detail;
+      setChatHistory(prev => [...prev, { role: "model", text: typeof detail === "string" ? detail : "❌ 教練連線失敗，請檢查後端 API。", error: true }]);
     } finally {
       if (coachControllerRef.current === controller) {
         coachControllerRef.current = null;
@@ -640,7 +704,7 @@ function App() {
       return playTrainingMove(sourceSquare, targetSquare);
     }
 
-    if (isResigned) return false;
+    if (isResigned || importedGame) return false;
 
     if (analysisData.length > 0) {
       setStatus("⚠️ 復盤模式下無法移動");
@@ -720,13 +784,17 @@ function App() {
   }
 
   async function makeAIMove(currentFen) {
+    aiControllerRef.current?.abort();
+    const controller = new AbortController();
+    aiControllerRef.current = controller;
     try {
       const response = await axios.post(`${API_URL}/make_move`, { 
         fen: currentFen, 
         time_limit: 1.5,
         difficulty: botDifficulty,
         bot_style: botStyle
-      });
+      }, { signal: controller.signal });
+      if (controller.signal.aborted) return;
       
       const bestMoveUci = response.data.best_move;
       
@@ -745,8 +813,11 @@ function App() {
         });
       }
     } catch (error) {
+      if (controller.signal.aborted || axios.isCancel(error)) return;
       console.error("Backend Error:", error);
       setStatus("連線錯誤");
+    } finally {
+      if (aiControllerRef.current === controller) aiControllerRef.current = null;
     }
   }
 
@@ -826,7 +897,7 @@ function App() {
         </div>
         <div className="session-card">
           <span>目前模式</span>
-          <strong>{appMode === "learning" ? "學習專區" : appMode === "training" ? "課程練習" : analysisData.length > 0 ? "復盤" : "對局"}</strong>
+          <strong>{appMode === "learning" ? "學習專區" : appMode === "training" ? "課程練習" : importedGame || analysisData.length > 0 ? "復盤" : "對局"}</strong>
         </div>
       </header>
 
@@ -897,31 +968,48 @@ function App() {
           <div className="status-strip" aria-live="polite">
             {appMode === "training" ? `課程練習：你執${selectedLesson.side === "black" ? "黑方" : "白方"}，先思考再使用提示` : status}
           </div>
+          {reviewProgress && <div className="review-progress" role="status">
+            <span>{reviewProgress.phase === "deep" ? "加深複核關鍵步" : "全局初評"}：{reviewProgress.current} / {reviewProgress.total}</span>
+            <progress value={reviewProgress.current} max={reviewProgress.total || 1} aria-label="賽後分析進度" />
+            <button className="btn btn-ghost btn-sm" onClick={() => { cancelGameRequests(); setStatus("已取消分析，可重新開始。"); }}>取消分析</button>
+          </div>}
+          {reviewMeta && <div className="review-evidence-status">
+            <strong>{reviewMeta.engine} · 初評 {reviewMeta.quick_nodes.toLocaleString()} 節點，複核 {reviewMeta.deep_nodes.toLocaleString()} 節點</strong>
+            <p>已複核 {reviewMeta.refined} / {reviewMeta.candidates} 個候選關鍵步。其餘保留初評；教練沿用本次分析依據。</p>
+            <span>目前局面：{selectedReviewPoint?.position_level === "deep" ? "已加深複核" : "初評"}</span>
+          </div>}
 
           <div className="control-bar">
             <button className={`btn ${appMode === "play" ? "btn-primary" : "btn-muted"}`} onClick={() => setAppMode("play")}>對局</button>
             <button className="btn btn-success" onClick={openLearningArea}>學習專區</button>
-            <button className="btn btn-primary" onClick={() => { const ng = new Chess(); setGame(ng); setStatus("新局開始"); setAnalysisData([]); setCurrentMoveIndex(-1); setIsResigned(false); resetCoach(); if (humanColor === "black") makeAIMove(ng.fen()); }}>新局</button>
+            <button className="btn btn-primary" onClick={() => { cancelGameRequests(); setImportedGame(null); const ng = new Chess(); setGame(ng); setStatus("新局開始"); setAnalysisData([]); setCurrentMoveIndex(-1); setIsResigned(false); resetCoach(); if (humanColor === "black") makeAIMove(ng.fen()); }}>新局</button>
             {appMode === "play" && (
               <button
                 className="btn btn-danger"
                 onClick={resignGame}
-                disabled={game.isGameOver() || isResigned || analysisData.length > 0}
+                disabled={Boolean(importedGame) || game.isGameOver() || isResigned || analysisData.length > 0}
               >
                 投降
               </button>
             )}
             <button className="btn btn-success" onClick={analyzeGame} disabled={isAnalyzing || game.pgn() === ""}>
-              {isAnalyzing ? "分析中..." : "賽後分析"}
+              {isAnalyzing ? "分析中..." : importedGame ? "分析這局" : "賽後分析"}
             </button>
             <button className="btn btn-secondary" onClick={downloadPGN}>匯出 PGN</button>
             <div className="segmented-control" aria-label="選擇玩家顏色">
-              <button className={humanColor === "white" ? "is-active" : ""} onClick={() => setHumanColor("white")}>白</button>
-              <button className={humanColor === "black" ? "is-active" : ""} onClick={() => setHumanColor("black")}>黑</button>
+              <button disabled={isAnalyzing} className={humanColor === "white" ? "is-active" : ""} onClick={() => setHumanColor("white")}>白</button>
+              <button disabled={isAnalyzing} className={humanColor === "black" ? "is-active" : ""} onClick={() => setHumanColor("black")}>黑</button>
             </div>
           </div>
 
-          {appMode === "play" && (
+          {appMode === "play" && importedGame && <div className="import-active">
+            <strong>{importedGame.white} vs {importedGame.black} · {importedGame.result}</strong>
+            <p>① 已匯入 → ② {analysisData.length ? "已分析" : "分析這局"} → ③ 教練講解</p>
+            <a href={importedGame.id} target="_blank" rel="noreferrer">查看 Chess.com 原局</a>
+            {analysisData.length > 0 && <button className="btn btn-primary" disabled={isCoachThinking} onClick={() => askCoach("這個局面我該注意什麼？請說明推薦走法與思考方向。")}>請教練講解這個局面</button>}
+          </div>}
+
+          {appMode === "play" && !importedGame && (
             <div className="bot-settings">
               <div className="setting-label">機器人難度</div>
               <div className="option-grid option-grid-four">
@@ -999,6 +1087,7 @@ function App() {
             />
           ) : (
           <>
+            {appMode === "play" && <ChessComImport onImport={importChessComGame} />}
             {/* 💬 AI 戰術聊天室 */}
             <div className="coach-card">
             <div className="panel-header">
@@ -1006,7 +1095,7 @@ function App() {
               <button
                 className="btn btn-inverse btn-sm"
                 onClick={() => askCoach()}
-                disabled={isCoachThinking}
+                disabled={isCoachThinking || isAnalyzing}
               >
                 分析目前局面
               </button>
@@ -1032,12 +1121,12 @@ function App() {
                 onChange={(e) => setUserInput(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder="問教練問題 (例如：為什麼這步不好？)"
-                disabled={isCoachThinking}
+                disabled={isCoachThinking || isAnalyzing}
               />
               <button
                 className="send-button"
                 onClick={() => { if (userInput.trim()) askCoach(userInput); }}
-                disabled={isCoachThinking || !userInput.trim()}
+                disabled={isCoachThinking || isAnalyzing || !userInput.trim()}
                 aria-label="送出問題"
               >
                 ➤

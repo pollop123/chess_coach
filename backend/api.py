@@ -1,4 +1,8 @@
-from fastapi import FastAPI, HTTPException, Depends, Query
+from fastapi import FastAPI, HTTPException, Depends, Query, Request
+from fastapi.responses import StreamingResponse
+import asyncio
+import json
+import queue
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -19,6 +23,8 @@ import time
 # 匯入你的核心引擎
 import chess_engine  # Import the new engine module
 from coach_conversation import current_conversation, question_mode
+from chesscom_import import router as chesscom_router
+import review_analysis
 # 匯入資料庫模組
 from database import SessionLocal, Game
 
@@ -32,6 +38,7 @@ except Exception as e:
 
 logger = logging.getLogger(__name__)
 app = FastAPI()
+app.include_router(chesscom_router)
 
 
 def _configured_cors_origins():
@@ -623,6 +630,53 @@ def analyze_full_game(request: AnalysisRequest):
 
             return _analyze_full_with_custom_engine(game, perspective, request.depth)
 
+@app.post("/review_game")
+async def review_game(request: AnalysisRequest, connection: Request):
+    game = review_analysis.parse_game(request.pgn)
+    path = _find_stockfish_path()
+    if not path:
+        raise HTTPException(503, "賽後複核需要 Stockfish，目前無法啟動；請檢查安裝設定。")
+    config = review_analysis.settings()
+
+    async def events():
+        output = queue.Queue()
+        cancelled = threading.Event()
+        def worker():
+            acquired = engine_search_lock.acquire(timeout=ENGINE_QUEUE_TIMEOUT_SECONDS)
+            try:
+                if not acquired:
+                    raise RuntimeError('busy')
+                review_analysis.run_review(game, path, request.perspective, output.put, cancelled, config)
+            except review_analysis.ReviewCancelled:
+                pass
+            except Exception as exc:
+                logger.warning('Review stopped (%s)', type(exc).__name__)
+                message = '分析超過時間預算，請縮短棋譜後重試。' if isinstance(exc, TimeoutError) else '分析暫時無法完成，請稍後重試。'
+                output.put({'type': 'error', 'message': message})
+            finally:
+                if acquired:
+                    engine_search_lock.release()
+                output.put(None)
+        thread = threading.Thread(target=worker, daemon=True)
+        thread.start()
+        try:
+            yield json.dumps({'type': 'progress', 'phase': 'quick', 'current': 0,
+                              'total': sum(1 for _ in game.mainline_moves())}) + '\n'
+            while not await connection.is_disconnected():
+                try:
+                    event = await asyncio.to_thread(output.get, True, 0.25)
+                except queue.Empty:
+                    continue
+                if event is None:
+                    break
+                yield json.dumps(event, ensure_ascii=False) + '\n'
+        finally:
+            cancelled.set()
+
+    return StreamingResponse(events(), media_type='application/x-ndjson',
+                             headers={'Cache-Control': 'no-store', 'X-Accel-Buffering': 'no'})
+
+
 # 3. 儲存比賽
 @app.post("/games", response_model=GameResponse)
 def save_game(game: GameCreate, db: Session = Depends(get_db)):
@@ -650,6 +704,8 @@ def read_games(
 
 # 5. 相容性 /explain 端點 (建議使用 /get_analysis 替代)
 class ExplainRequest(CoachContext):
+    review_id: Optional[str] = Field(default=None, min_length=20, max_length=64)
+    review_ply: Optional[int] = Field(default=None, ge=0, le=400)
     fen: str = Field(min_length=1, max_length=120)
     history: str = Field(default="", max_length=20_000)
     question: Optional[str] = Field(default=None, max_length=500)
@@ -674,18 +730,27 @@ def explain_position(request: ExplainRequest):
 
     conversation = [turn.model_dump() for turn in request.conversation]
     mode = question_mode(request.question, current_conversation(conversation, request.fen), request.mode)
+    review_sources = None
+    cached_analysis = None
+    review_history = request.history
+    if request.review_id is not None or request.review_ply is not None:
+        if request.review_id is None or request.review_ply is None:
+            raise HTTPException(422, '分析編號與步數必須一起提供。')
+        saved_review, position = review_analysis.get_review(request.review_id, request.review_ply, request.fen)
+        review_sources, cached_analysis = review_analysis.review_sources(saved_review, position)
+        review_history = saved_review.history
     
     # 計算引擎分析
     pv_line = None
     pv_score = None
-    analysis = None
+    analysis = cached_analysis
     teaching_analysis = None
     
     try:
         board = chess.Board(request.fen)
         if not board.is_valid():
             raise ValueError("Invalid board position")
-        if not board.is_game_over() and mode != "knowledge":
+        if not board.is_game_over() and mode != "knowledge" and cached_analysis is None:
             with engine_search_slot() as engine_session:
                 analysis = engine_session.analyze(
                     board,
@@ -719,7 +784,7 @@ def explain_position(request: ExplainRequest):
         rag_engine = get_rag_engine()
         reply = rag_engine.get_response(
             request.fen,
-            request.history,
+            review_history,
             user_question,
             pv_line=pv_line,
             pv_score=pv_score,
@@ -727,6 +792,7 @@ def explain_position(request: ExplainRequest):
             teaching_analysis=teaching_analysis,
             conversation=conversation,
             mode=mode if mode in {"overview", "hint"} else request.mode,
+            review_evidence=review_sources,
         )
     except Exception as e:
         logger.warning("RAG analysis failed: %s", e)

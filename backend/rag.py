@@ -666,6 +666,7 @@ class ChessRAG:
         teaching_analysis=None,
         conversation=None,
         mode="auto",
+        review_evidence=None,
     ):
         board = chess.Board(fen)
         if not board.is_valid():
@@ -726,6 +727,11 @@ class ChessRAG:
             "position",
         ))
 
+        if review_evidence is not None:
+            # Server-owned review evidence replaces the independent teaching
+            # search. Preserve only deterministic move/legality/opening facts.
+            sources = [*rules, *review_evidence, *[source for source in sources if source.id in {"P7", "P8", "P9"}]]
+
         if mode == "knowledge":
             sources = rules
         elif mode == "hint":
@@ -778,8 +784,12 @@ class ChessRAG:
                 advice = "目前無法可靠回答這些走法誰更好，不能據此給出確定排名。比較時可先檢查合法性，再計算對手的將軍、吃子與直接威脅。 [K17]"
                 cited = [source for source in KNOWLEDGE_SOURCES if source.id == "K17"]
             else:
-                advice = f"{opening_header}\n\n{grounded_advice}" if mode == "overview" else grounded_advice
-                cited = []
+                if review_evidence is not None:
+                    cited = review_evidence
+                    advice = "\n\n".join(source.text + f" [{source.id}]" for source in cited)
+                else:
+                    advice = f"{opening_header}\n\n{grounded_advice}" if mode == "overview" else grounded_advice
+                    cited = []
             answer = CoachReply(f"{advice}\n\n（{reason}，以上為基礎回覆。）", [source.as_dict() for source in cited], mode)
             logger.info("Coach answer mode=fallback")
         else:
