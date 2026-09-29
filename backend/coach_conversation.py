@@ -6,7 +6,7 @@ import chess
 
 MODES = {"knowledge", "position", "comparison", "hint", "overview"}
 FOLLOW_UP = re.compile(r"^(那|所以|再|可以.{0,4}(簡單|詳細)|講簡單|說簡單|換個|為什麼[？?]?$|why[?]?$|simpler|explain more)", re.I)
-MOVE_TOKEN = re.compile(r"(?<![A-Za-z0-9])(?:[a-h][1-8][a-h][1-8][qrbn]?|[KQRBN][a-h]?[1-8]?x?[a-h][1-8][+#]?|O-O(?:-O)?)(?![A-Za-z0-9])")
+MOVE_TOKEN = re.compile(r"(?<![A-Za-z0-9])(?:[a-h][1-8][a-h][1-8][qrbn]?|[KQRBN][a-h]?[1-8]?x?[a-h][1-8][+#]?|(?:[a-h]x)?[a-h][1-8](?:=[QRBN])?[+#]?|O-O(?:-O)?)(?![A-Za-z0-9])")
 
 
 def wants_brief_answer(question):

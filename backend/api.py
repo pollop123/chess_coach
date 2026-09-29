@@ -729,7 +729,13 @@ def explain_position(request: ExplainRequest):
         user_question = user_question[:request.max_question_length]
 
     conversation = [turn.model_dump() for turn in request.conversation]
-    mode = question_mode(request.question, current_conversation(conversation, request.fen), request.mode)
+    # Route on the same truncated text RAG receives, so both layers agree on
+    # whether an engine search is needed.
+    mode = question_mode(
+        user_question if request.question else None,
+        current_conversation(conversation, request.fen),
+        request.mode,
+    )
     review_sources = None
     cached_analysis = None
     review_history = request.history
