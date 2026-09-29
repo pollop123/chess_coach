@@ -780,13 +780,16 @@ class ChessRAG:
             elif mode == "knowledge":
                 advice = "\n\n".join(source.text + f" [{source.id}]" for source in rules[:2]) or "目前知識庫沒有足夠資料回答這個問題。"
                 cited = rules[:2]
-            elif mode == "comparison":
+            elif mode == "comparison" and review_evidence is None:
                 advice = "目前無法可靠回答這些走法誰更好，不能據此給出確定排名。比較時可先檢查合法性，再計算對手的將軍、吃子與直接威脅。 [K17]"
                 cited = [source for source in KNOWLEDGE_SOURCES if source.id == "K17"]
             else:
                 if review_evidence is not None:
                     cited = review_evidence
                     advice = "\n\n".join(source.text + f" [{source.id}]" for source in cited)
+                    if mode == "comparison":
+                        # The review only compared its recommendation with the move played.
+                        advice += "\n\n本次分析只比較推薦手與棋譜實際走法；其他走法未經比較，不能據此排名。"
                 else:
                     advice = f"{opening_header}\n\n{grounded_advice}" if mode == "overview" else grounded_advice
                     cited = []

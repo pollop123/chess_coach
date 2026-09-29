@@ -997,8 +997,9 @@ function App() {
             </button>
             <button className="btn btn-secondary" onClick={downloadPGN}>匯出 PGN</button>
             <div className="segmented-control" aria-label="選擇玩家顏色">
-              <button disabled={isAnalyzing} className={humanColor === "white" ? "is-active" : ""} onClick={() => setHumanColor("white")}>白</button>
-              <button disabled={isAnalyzing} className={humanColor === "black" ? "is-active" : ""} onClick={() => setHumanColor("black")}>黑</button>
+              {/* An imported review stays on the account's side; 新局 unlocks it. */}
+              <button disabled={isAnalyzing || Boolean(importedGame)} className={humanColor === "white" ? "is-active" : ""} onClick={() => setHumanColor("white")}>白</button>
+              <button disabled={isAnalyzing || Boolean(importedGame)} className={humanColor === "black" ? "is-active" : ""} onClick={() => setHumanColor("black")}>黑</button>
             </div>
           </div>
 

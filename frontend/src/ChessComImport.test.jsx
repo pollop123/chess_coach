@@ -41,6 +41,8 @@ describe("Chess.com import", () => {
     await searchAndImport();
     expect(screen.getByRole("button", { name: "棋盤 black" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "投降" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "白" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "黑" })).toBeDisabled();
     fireEvent.click(screen.getByRole("button", { name: "棋盤 black" }));
     expect(axios.post).not.toHaveBeenCalled();
     expect(loadImports()).toHaveLength(1);

@@ -127,6 +127,19 @@ class ReviewTests(unittest.TestCase):
         self.assertIn('Stockfish test', data['advice'])
         self.assertNotIn('尚未完成', data['advice'])
 
+    def test_review_comparison_fallback_cites_stored_evidence(self):
+        result = self.run_fake()[-1]
+        with patch.dict(os.environ, {'GOOGLE_API_KEY': '', 'ENABLE_CHROMA_RAG': '0'}): rag = ChessRAG()
+        request = {'fen': chess.STARTING_FEN, 'question': '實際走法和推薦手哪個好？',
+                   'review_id': result['review_id'], 'review_ply': 0}
+        with patch('api.get_rag_engine', return_value=rag), patch('api.engine_search_slot', side_effect=AssertionError('must not rescore')):
+            data = self.client.post('/explain', json=request).json()
+        self.assertEqual(data['mode'], 'comparison')
+        ids = {source['id'] for source in data['sources']}
+        self.assertIn('R1', ids)
+        self.assertNotIn('K17', ids)
+        self.assertIn('其他走法未經比較', data['advice'])
+
     def test_expired_or_wrong_position_never_falls_back_to_a_new_engine(self):
         result = self.run_fake()[-1]
         payload = {'fen': chess.STARTING_FEN, 'question': '這個局面怎麼下？', 'review_id': result['review_id'], 'review_ply': 1}
