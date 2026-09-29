@@ -18,6 +18,7 @@ import time
 
 # 匯入你的核心引擎
 import chess_engine  # Import the new engine module
+from coach_conversation import current_conversation, question_mode
 # 匯入資料庫模組
 from database import SessionLocal, Game
 
@@ -99,7 +100,19 @@ class MakeMoveRequest(BaseModel):
     difficulty: str = Field(default="intermediate", max_length=32)
     bot_style: str = Field(default="balanced", max_length=32)
 
-class GetAnalysisRequest(BaseModel):
+class CoachTurn(BaseModel):
+    role: Literal["user", "model"]
+    text: str = Field(min_length=1, max_length=1500)
+    fen: str = Field(min_length=1, max_length=120)
+    mode: Literal["knowledge", "position", "comparison", "hint", "overview"] = "position"
+
+
+class CoachContext(BaseModel):
+    conversation: List[CoachTurn] = Field(default_factory=list, max_length=8)
+    mode: Literal["auto", "overview", "hint"] = "auto"
+
+
+class GetAnalysisRequest(CoachContext):
     fen: str = Field(min_length=1, max_length=120)
     history: str = Field(default="", max_length=20_000)
     question: Optional[str] = Field(default=None, max_length=500)
@@ -281,6 +294,9 @@ def get_analysis_endpoint(request: GetAnalysisRequest):
 
     # 準備 AI 教練建議
     coach_advice = None
+    coach_sources = []
+    coach_mode = None
+    coach_status = "unavailable"
     if get_rag_engine:
         # 安全防禦：清洗用戶輸入
         user_question = request.question or "請評估目前局勢並給出建議"
@@ -291,7 +307,7 @@ def get_analysis_endpoint(request: GetAnalysisRequest):
         
         try:
             rag_engine = get_rag_engine()
-            coach_advice = rag_engine.get_advice(
+            reply = rag_engine.get_response(
                 request.fen,
                 request.history,
                 user_question,
@@ -299,7 +315,11 @@ def get_analysis_endpoint(request: GetAnalysisRequest):
                 pv_score=analysis['score'],
                 analysis_result=analysis,
                 teaching_analysis=teaching_analysis,
+                conversation=[turn.model_dump() for turn in request.conversation],
+                mode="overview" if not request.question and request.mode == "auto" else request.mode,
             )
+            coach_advice, coach_sources = reply.advice, reply.sources
+            coach_mode, coach_status = reply.mode, reply.status
         except Exception as e:
             logger.warning("RAG analysis failed: %s", e)
             coach_advice = "教練分析暫時無法使用"
@@ -324,7 +344,10 @@ def get_analysis_endpoint(request: GetAnalysisRequest):
         },
         "teaching_analysis": teaching_analysis,
         "game_state": game_phase,
-        "coach_advice": coach_advice
+        "coach_advice": coach_advice,
+        "coach_sources": coach_sources,
+        "coach_mode": coach_mode,
+        "coach_status": coach_status,
     }
 
 # 3. 相容性端點 (保留舊版 API)
@@ -626,7 +649,7 @@ def read_games(
     return games
 
 # 5. 相容性 /explain 端點 (建議使用 /get_analysis 替代)
-class ExplainRequest(BaseModel):
+class ExplainRequest(CoachContext):
     fen: str = Field(min_length=1, max_length=120)
     history: str = Field(default="", max_length=20_000)
     question: Optional[str] = Field(default=None, max_length=500)
@@ -648,6 +671,15 @@ def explain_position(request: ExplainRequest):
     # 限制問題長度
     if len(user_question) > request.max_question_length:
         user_question = user_question[:request.max_question_length]
+
+    conversation = [turn.model_dump() for turn in request.conversation]
+    # Route on the same truncated text RAG receives, so both layers agree on
+    # whether an engine search is needed.
+    mode = question_mode(
+        user_question if request.question else None,
+        current_conversation(conversation, request.fen),
+        request.mode,
+    )
     
     # 計算引擎分析
     pv_line = None
@@ -657,7 +689,9 @@ def explain_position(request: ExplainRequest):
     
     try:
         board = chess.Board(request.fen)
-        if not board.is_game_over():
+        if not board.is_valid():
+            raise ValueError("Invalid board position")
+        if not board.is_game_over() and mode != "knowledge":
             with engine_search_slot() as engine_session:
                 analysis = engine_session.analyze(
                     board,
@@ -689,7 +723,7 @@ def explain_position(request: ExplainRequest):
     # 傳遞給 RAG 教練
     try:
         rag_engine = get_rag_engine()
-        advice = rag_engine.get_advice(
+        reply = rag_engine.get_response(
             request.fen,
             request.history,
             user_question,
@@ -697,9 +731,11 @@ def explain_position(request: ExplainRequest):
             pv_score=pv_score,
             analysis_result=analysis,
             teaching_analysis=teaching_analysis,
+            conversation=conversation,
+            mode=mode if mode in {"overview", "hint"} else request.mode,
         )
     except Exception as e:
         logger.warning("RAG analysis failed: %s", e)
-        advice = "教練分析暫時無法使用"
-    
-    return {"advice": advice}
+        return {"advice": "教練分析暫時無法使用", "sources": [], "mode": mode, "status": "unavailable"}
+
+    return {"advice": reply.advice, "sources": reply.sources, "mode": reply.mode, "status": reply.status}

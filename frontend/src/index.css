@@ -473,6 +473,27 @@ button:disabled {
   background: #245c45;
 }
 
+.coach-sources {
+  margin-top: 10px;
+  border-top: 1px solid var(--line);
+  padding-top: 7px;
+  font-size: 0.84rem;
+  white-space: normal;
+}
+
+.coach-sources summary {
+  cursor: pointer;
+  color: var(--ink);
+}
+
+.coach-sources ul {
+  padding-left: 18px;
+}
+
+.coach-sources p {
+  margin: 4px 0 10px;
+}
+
 .chat-bubble.is-model {
   align-self: flex-start;
   border: 1px solid var(--line);

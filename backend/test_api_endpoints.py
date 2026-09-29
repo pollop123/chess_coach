@@ -5,6 +5,7 @@ import chess
 import chess.engine
 from fastapi.testclient import TestClient
 
+from coach_generation import CoachReply
 from api import _stockfish_wdl, app
 
 
@@ -83,7 +84,7 @@ class ApiEndpointTests(unittest.TestCase):
 
     def test_normal_question_containing_system_is_not_rejected(self):
         rag_engine = Mock()
-        rag_engine.get_advice.return_value = "請先完成子力發展。"
+        rag_engine.get_response.return_value = CoachReply("請先完成子力發展。")
         with patch("api.get_rag_engine", return_value=rag_engine):
             response = self.client.post(
                 "/get_analysis",
@@ -98,11 +99,11 @@ class ApiEndpointTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["coach_advice"], "請先完成子力發展。")
-        self.assertEqual(rag_engine.get_advice.call_args.args[2], "這個 system 性的弱點該怎麼守？")
+        self.assertEqual(rag_engine.get_response.call_args.args[2], "這個 system 性的弱點該怎麼守？")
 
     def test_explain_passes_verified_teaching_analysis_to_rag(self):
         rag_engine = Mock()
-        rag_engine.get_advice.return_value = "推薦手：Nf3"
+        rag_engine.get_response.return_value = CoachReply("推薦手：Nf3")
         analysis = {
             "best_move": None,
             "from_book": False,
@@ -130,16 +131,39 @@ class ApiEndpointTests(unittest.TestCase):
                 json={
                     "fen": self.analysis_fen,
                     "history": "1. e4 e5",
-                    "question": "為什麼要發展騎士？",
+                    "question": "這個局面為什麼要發展騎士？",
                     "depth": 2,
                 },
             )
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(
-            rag_engine.get_advice.call_args.kwargs["teaching_analysis"],
+            rag_engine.get_response.call_args.kwargs["teaching_analysis"],
             teaching_analysis,
         )
+
+    def test_explain_routes_on_the_truncated_question(self):
+        rag_engine = Mock()
+        rag_engine.get_response.return_value = CoachReply("推薦手：Nf3")
+        analysis = {"best_move": None, "from_book": False, "book_line": [], "pv": [],
+                    "score": 20, "eval_display": "+0.20", "winning_chance": 52.0}
+
+        with (
+            patch("api.get_rag_engine", return_value=rag_engine),
+            patch("api.chess_engine.get_analysis", return_value=analysis),
+            patch("api.chess_engine.get_teaching_analysis", return_value=None),
+        ):
+            # The full text is a knowledge question; the one character RAG
+            # receives is not, so the guarded search must run here.
+            response = self.client.post(
+                "/explain",
+                json={"fen": self.analysis_fen, "question": "規則是什麼？",
+                      "max_question_length": 1, "depth": 2},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(rag_engine.get_response.call_args.args[2], "規")
+        self.assertIsNotNone(rag_engine.get_response.call_args.kwargs["analysis_result"])
 
     @patch("api._find_stockfish_path", return_value=None)
     def test_analyze_full_after_make_move(self, _find_stockfish_path):
