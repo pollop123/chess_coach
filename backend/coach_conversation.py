@@ -54,8 +54,9 @@ def question_mode(question, conversation=None, mode="auto"):
         return "hint"
     if FOLLOW_UP.search(question) and conversation:
         return conversation[-1].get("mode", "position")
-    # "騎士怎麼走？" asks how a piece moves (a rule), not what to play here.
-    if re.search(PIECE_NAME, question, re.I) and re.search(r"怎麼走|如何走|走法|怎麼移動|怎麼動|可以走|能走|能不能走|可以後退|能後退|可以跳|能跳|怎麼吃|how .{0,12}move|can .{0,12}move", question, re.I) \
+    # "騎士怎麼走？" asks how a piece moves (a rule), not what to play here. A square
+    # or move in the question ("馬可以跳到 f7 嗎？") makes it about this position.
+    if not MOVE_TOKEN.search(question) and re.search(PIECE_NAME, question, re.I) and re.search(r"怎麼走|如何走|走法|怎麼移動|怎麼動|可以走|能走|能不能走|可以後退|能後退|可以跳|能跳|怎麼吃|how .{0,12}move|can .{0,12}move", question, re.I) \
             and not re.search(r"現在|目前|這[步手盤局個裡]|我的|哪|比較|該|應該|才好|最好|下一步|current|this|should", question, re.I):
         return "knowledge"
     if re.search(r"怎麼下|如何走|怎麼走", question) and not MOVE_TOKEN.search(question):
