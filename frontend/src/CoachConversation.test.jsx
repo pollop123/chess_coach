@@ -5,7 +5,7 @@ import axios from "axios";
 import { Chess } from "chess.js";
 import App from "./App";
 import { CoachMessage } from "./CoachMessage";
-import { buildCoachConversation } from "./coachConversation";
+import { buildCoachConversation, coachDisplayText } from "./coachConversation";
 
 vi.mock("axios", () => ({ default: { get: vi.fn(), post: vi.fn(), isCancel: vi.fn(() => false) } }));
 vi.mock("react-chessboard", () => ({ Chessboard: ({ onPieceDrop }) => <button aria-label="棋盤：走 e4" onClick={() => onPieceDrop("e2", "e4")} /> }));
@@ -23,11 +23,18 @@ describe("coach conversation", () => {
   it("keeps citations collapsed until the user asks to view evidence", async () => {
     const user = userEvent.setup();
     const { container } = render(<CoachMessage message={{ role: "model", text: "先爭取活動空間。 [K15]", sources }} />);
-    expect(screen.getByText("先爭取活動空間。 [K15]")).toBeVisible();
+    expect(screen.getByText("先爭取活動空間。")).toBeVisible();
+    expect(container.querySelector(".chat-bubble > div").textContent).toBe("先爭取活動空間。");
     expect(container.querySelector("details")).not.toHaveAttribute("open");
     await user.click(screen.getByText("查看依據（1）"));
     expect(container.querySelector("details")).toHaveAttribute("open");
     expect(screen.getByText(sources[0].text)).toBeVisible();
+  });
+
+  it("hides source tags only when sources are listed below", () => {
+    expect(coachDisplayText("g4 讓對手將死。 [L1][T1]\n\n下次先檢查。 [K17]", true)).toBe("g4 讓對手將死。\n\n下次先檢查。");
+    expect(coachDisplayText("參考 [K15]", false)).toBe("參考 [K15]");
+    expect(coachDisplayText("棋盤 a[1] 不是標籤", true)).toBe("棋盤 a[1] 不是標籤");
   });
 
   it("bounds context and excludes welcome, errors and other positions", () => {
@@ -46,7 +53,7 @@ describe("coach conversation", () => {
     const input = screen.getByPlaceholderText(/問教練問題/);
     await user.type(input, "為什麼要控制中心？");
     await user.click(screen.getByRole("button", { name: "送出問題" }));
-    await screen.findByText("中心讓棋子有更多空間。 [K15]");
+    await screen.findByText("中心讓棋子有更多空間。");
     expect(axios.post.mock.calls[0][1].conversation).toEqual([]);
     await user.type(input, "再講簡單一點");
     await user.click(screen.getByRole("button", { name: "送出問題" }));

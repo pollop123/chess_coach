@@ -188,3 +188,22 @@ def move_fact_summary(board, move):
     if after.is_check():
         parts.append("將軍")
     return f"{san} 會{'並'.join(parts)}。" if parts else None
+
+
+def threat_hint_source(board):
+    """The same checks as threat_source, worded without moves or squares for hint mode."""
+    if board.is_game_over():
+        return None
+    side = board.turn
+    hints = []
+    if board.is_check():
+        hints.append("你正被將軍，先想想有哪些方法能解除將軍。")
+    elif mating_moves(board):
+        hints.append("你現在有一步就能將死對手的走法，先從將軍的走法找起。")
+    if _threats_against(board, side):
+        hints.append("對手下一步有將死你的威脅，先找出對手想走哪一步，再想怎麼防守。")
+    if loose_pieces(board, side):
+        hints.append("你有棋子受到攻擊而且保護不夠，先檢查自己每枚棋子的安全。")
+    elif _free_captures(board):
+        hints.append("對手有棋子沒有保護，看看能不能安全吃掉它。")
+    return EvidenceSource("H2", "威脅提示", "".join(hints[:2]), "position") if hints else None

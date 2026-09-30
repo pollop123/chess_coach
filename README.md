@@ -132,6 +132,11 @@
 - 選填 `RAG_TIMEOUT_SECONDS=20` 設定生成與審核共用的時間預算（20–30 秒，較小設定自動提升至 20 秒）。單次請求與備援模型僅在剩餘預算至少 10 秒時啟動，沒有 SDK 自動重試。逾時或核對失敗時回退基礎回覆；此時間不包含引擎分析或向量庫初始化。
 - 回答保留原有 `/explain` 的 `advice` 與 `/get_analysis` 的 `coach_advice` 字串介面，另附 `sources`、`mode`、`status`（後者加上 `coach_` 前綴）；請求可傳 `conversation` 與 `mode`（`auto`、`overview`、`hint`）。
 
+回答品質可用真實模型抽查：`make coach-eval PYTHON=.venv/bin/python` 會把
+`backend/coach_eval_cases.json` 的初學者問題各跑兩次，統計是否先下結論、提到關鍵走法、
+給出下次的檢查習慣、視角是否正確與保留語氣次數。這會把局面與問題送到 Gemini 並使用 Key 的額度；
+分數是比較調整前後的粗略指標，仍需閱讀回答本身。
+
 離線回歸測試不需要 Key，也不會呼叫外部模型：
 
 ```bash

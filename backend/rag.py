@@ -13,7 +13,7 @@ from openings import identify_opening
 from coach_evidence import (
     EvidenceSource, KNOWLEDGE_SOURCES, rank_knowledge, render_sources,
 )
-from coach_facts import LAST_MOVE_QUESTION, last_move_source, move_fact_summary, threat_source
+from coach_facts import LAST_MOVE_QUESTION, last_move_source, move_fact_summary, threat_hint_source, threat_source
 from coach_conversation import current_conversation, question_mode, retrieval_question, wants_brief_answer
 from coach_generation import (
     CoachReply, NATURAL_INSTRUCTION, NATURAL_SCHEMA, VERIFY_INSTRUCTION,
@@ -751,6 +751,10 @@ class ChessRAG:
             sources = rules
         elif mode == "hint":
             sources = hint_sources(board, _principle_text(teaching_analysis))
+            # An urgent threat outranks the general principle, without revealing the move.
+            threat_hint = threat_hint_source(board)
+            if threat_hint:
+                sources.insert(0, threat_hint)
             sources += [source for source in rules if not chess_atoms(source.text)]
             # Previous answers can contain the solution: hints need only the
             # player's questions, and never the earlier model's concrete moves.
@@ -764,6 +768,10 @@ class ChessRAG:
                 "mode": mode,
                 "brief": wants_brief_answer(question),
                 "engine_recommendation": displayed_move if mode not in {"hint", "knowledge"} else None,
+                # The recommendation and T1 belong to the side to move, which is
+                # often the opponent right after the student's own move.
+                "student_side": {"white": "白方", "black": "黑方"}.get(player_color),
+                "side_to_move": "白方" if board.turn == chess.WHITE else "黑方",
                 "sources": [source.as_dict() for source in sources],
             }
             # Generation and semantic review share a single request budget.

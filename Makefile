@@ -1,7 +1,7 @@
 PYTHON ?= python3
 ALEMBIC_CONFIG ?= backend/alembic.ini
 
-.PHONY: backend-test frontend-check migration-check db-current db-upgrade db-adopt teaching-smoke verify
+.PHONY: backend-test frontend-check coach-eval migration-check db-current db-upgrade db-adopt teaching-smoke verify
 
 backend-test:
 	PYTHONPATH=backend $(PYTHON) -m unittest discover -s backend -p 'test_*.py'
@@ -31,3 +31,7 @@ teaching-smoke:
 		.artifacts/teaching-smoke.json
 
 verify: backend-test frontend-check
+
+# Live answers from the configured Gemini models; uses GOOGLE_API_KEY quota.
+coach-eval:
+	PYTHONPATH=backend $(PYTHON) backend/eval_coach.py --runs 2
