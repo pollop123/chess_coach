@@ -42,7 +42,7 @@ function EvalDot({ cx, cy, payload }) {
   );
 }
 
-function EvalTooltip({ active, payload, label }) {
+function EvalTooltip({ active, payload }) {
   if (!active || !payload || payload.length === 0) return null;
   const point = payload[0].payload;
   const classificationLabels = {
@@ -54,7 +54,7 @@ function EvalTooltip({ active, payload, label }) {
   const sideLabel = point.side_to_move === "black" ? "黑方走" : point.side_to_move === "white" ? "白方走" : "起始局面";
   return (
     <div className="chart-tooltip">
-      <div className="chart-tooltip__label">第 {label} 步 · {sideLabel}</div>
+      <div className="chart-tooltip__label">{point.label || "開局"} · {sideLabel}</div>
       <div className="chart-tooltip__value">{point.evalLabel}</div>
       {point.review_level && point.move && <div>{point.review_level === "deep" ? "此步已加深複核" : "此步為初評"}</div>}
       {point.classification && (
@@ -67,12 +67,13 @@ function EvalTooltip({ active, payload, label }) {
   );
 }
 
-export default function EvaluationChart({ analysisData, currentMoveIndex, onMoveSelect }) {
-  const chartData = analysisData.map((point) => {
+export default function EvaluationChart({ analysisData, labels = [], currentMoveIndex, onMoveSelect }) {
+  const chartData = analysisData.map((point, index) => {
     const trendScore = getTrendScore(point);
     const isCritical = point.move && ["mistake", "blunder"].includes(point.classification);
     return {
       ...point,
+      label: labels[index],
       trendScore,
       criticalScore: isCritical ? trendScore : null
     };
@@ -96,10 +97,10 @@ export default function EvaluationChart({ analysisData, currentMoveIndex, onMove
             : `${criticalPoints.length} 個關鍵轉折${blunderCount ? ` · ${blunderCount} 個大失誤` : ""}`}
         </div>
       </div>
-      <ResponsiveContainer width="100%" height={154}>
+      <ResponsiveContainer width="100%" height={190}>
         <ComposedChart
           data={chartData}
-          margin={{ top: 10, right: 12, bottom: 8, left: 12 }}
+          margin={{ top: 10, right: 12, bottom: 0, left: 12 }}
           onClick={(event) => {
             if (event?.activePayload) onMoveSelect(event.activePayload[0].payload.move_number);
           }}
@@ -111,7 +112,16 @@ export default function EvaluationChart({ analysisData, currentMoveIndex, onMove
               <stop offset="100%" stopColor="#2f7455" stopOpacity={0.2}/>
             </linearGradient>
           </defs>
-          <XAxis dataKey="move_number" hide />
+          {/* Ticks every five full moves, labelled with the move number players know. */}
+          <XAxis
+            dataKey="move_number"
+            ticks={chartData.map((point) => point.move_number).filter((ply) => ply > 0 && ply % 10 === 0)}
+            tickFormatter={(ply) => `${ply / 2}`}
+            tickLine={false}
+            axisLine={false}
+            tick={{ fontSize: 11, fill: "#7a817c" }}
+            height={18}
+          />
           <YAxis hide domain={[-TREND_LIMIT, TREND_LIMIT]} />
           <Tooltip
             cursor={{ stroke: "#8f8a83", strokeWidth: 1 }}
