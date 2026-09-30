@@ -49,7 +49,16 @@ def position(moves):
     return board.fen(), " ".join(pgn)
 
 
-def score(case, data, seconds):
+def wrong_side_avoid(text, fen, player_color):
+    """'避免 <move>' where the move belongs to the opponent, told to a student who is not to move."""
+    board = chess.Board(fen)
+    if player_color == ("white" if board.turn == chess.WHITE else "black"):
+        return False
+    opponent_moves = {board.san(move).rstrip("+#") for move in board.legal_moves}
+    return any(token.rstrip("+#") in opponent_moves for token in re.findall(r"避免[^。；]{0,12}?(" + MOVE.pattern + ")", text))
+
+
+def score(case, data, seconds, fen=None):
     text = TAGS.sub("", data.get("advice") or "")
     first = re.split(r"[。！？\n]", text.strip(), maxsplit=1)[0]
     must = case.get("must_mention") or []
@@ -66,6 +75,8 @@ def score(case, data, seconds):
     }
     if case.get("expect_mode"):
         result["mode_ok"] = data.get("mode") == case["expect_mode"]
+    if fen and case.get("player_color"):
+        result["avoid_side_ok"] = not wrong_side_avoid(text, fen, case["player_color"])
     if case.get("why_terms"):
         # Words that only appear when the answer explains the cause, e.g. the g3 block for 1.f3 e5 2.g4.
         result["explains_why"] = any(term in text for term in case["why_terms"])
@@ -101,7 +112,7 @@ def main():
             body = {"fen": fen, "history": history, "question": case["question"], "player_color": case["player_color"]}
             started = time.monotonic()
             data = client.post("/explain", json=body).json()
-            result, text = score(case, data, time.monotonic() - started)
+            result, text = score(case, data, time.monotonic() - started, fen)
             records.append({"run": run, "id": case["id"], **result, "answer": text})
             flags = " ".join(f"{key}={value}" for key, value in result.items() if key not in {"seconds", "chars"})
             print(f"\n[{run}] {case['id']} ({result['seconds']}s, {result['chars']} chars) {flags}\n{text}")
@@ -113,7 +124,8 @@ def main():
         return f"{sum(bool(r[key]) for r in rows)}/{len(rows)}" if rows else "-"
     print("\n=== summary ===")
     print(f"generated        {len(generated)}/{total}")
-    for key in ("mentions_all", "conclusion_first", "explains_why", "has_habit", "forbid_ok", "mode_ok", "no_moves_ok"):
+    for key in ("mentions_all", "conclusion_first", "explains_why", "has_habit", "forbid_ok", "avoid_side_ok",
+                "mode_ok", "no_moves_ok"):
         print(f"{key:<16} {rate(key, records)}")
     print(f"uses 您          {sum(r['uses_nin'] for r in records)}/{total}")
     print(f"hedges per answer {sum(r['hedges'] for r in records) / max(total, 1):.2f}")

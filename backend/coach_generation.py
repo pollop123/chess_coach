@@ -76,8 +76,8 @@ brief 為 true 時只用一至兩句白話，整段最多 100 字，直接說重
 每段 text 配上真正支持它的 source_ids，來源編號由程式顯示，不要自己寫入 text。
 段落中提到的每個棋步或格子（例如 g4、f7、Qh4#），都必須出現在該段 source_ids 的來源裡；
 談上一手時引用 L1，談目前威脅或機會時引用 T1。
-視角：「你」只能指 student_side 這一方。engine_recommendation 與 T1 說的是 side_to_move
-的走法；side_to_move 不是學生時，要說成「對手現在可以……」，絕不能叫學生走對手的棋，
+視角：「你」只能指 student_side 這一方。engine_recommendation、T1 與標明「白方／黑方」的
+推薦手、應避免等來源，說的都是該方的走法；side_to_move 不是學生時，要說成「對手現在可以……」，絕不能叫學生走對手的棋，
 也不能把對手的棋子說成「你的」。student_side 為 null 時，走法一律用「白方／黑方」稱呼。
 唯一可稱為引擎推薦的走法是 engine_recommendation；比較模式可討論其他已分析候選。
 僅使用來源中已有的棋步、評分與具體事實，不自行延伸變例或把合法手說成最佳手。
