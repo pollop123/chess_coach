@@ -301,6 +301,8 @@ function App() {
   }
 
   const levelSettings = LEVELS[onboarding?.level] || LEVELS.player;
+  // Bot strength is fixed once a game is under way; the level picker follows the same rule.
+  const botSettingsLocked = game.history().length > 0 || isResigned || analysisData.length > 0;
 
   function chooseLevel(level) {
     const next = { level, tipsDismissed: false };
@@ -1114,7 +1116,14 @@ function App() {
             <div className="bot-settings">
               <div className="setting-label">
                 機器人難度
-                <button className="btn btn-ghost btn-sm level-reset" onClick={() => setShowOnboarding(true)}>重新選擇程度</button>
+                <button
+                  className="btn btn-ghost btn-sm level-reset"
+                  disabled={botSettingsLocked}
+                  title={botSettingsLocked ? "按「新局」後才能換程度" : undefined}
+                  onClick={() => setShowOnboarding(true)}
+                >
+                  重新選擇程度
+                </button>
               </div>
               <div className="option-grid option-grid-four">
                 {BOT_DIFFICULTIES.map((difficulty) => (
@@ -1122,7 +1131,7 @@ function App() {
                     key={difficulty.id}
                     className={`option-tile ${botDifficulty === difficulty.id ? "is-selected" : ""}`}
                     onClick={() => setBotDifficulty(difficulty.id)}
-                    disabled={game.history().length > 0 || isResigned || analysisData.length > 0}
+                    disabled={botSettingsLocked}
                     title={difficulty.description}
                   >
                     {difficulty.label}
@@ -1137,7 +1146,7 @@ function App() {
                     key={style.id}
                     className={`option-tile ${botStyle === style.id ? "is-selected is-earth" : ""}`}
                     onClick={() => setBotStyle(style.id)}
-                    disabled={game.history().length > 0 || isResigned || analysisData.length > 0}
+                    disabled={botSettingsLocked}
                     title={style.description}
                   >
                     {style.label}

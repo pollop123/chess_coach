@@ -1,11 +1,17 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import axios from "axios";
 import App from "./App";
 import { ONBOARDING_KEY } from "./onboardingStorage";
 
 vi.mock("axios", () => ({ default: { get: vi.fn(), post: vi.fn(), isCancel: vi.fn(() => false) } }));
-vi.mock("react-chessboard", () => ({ Chessboard: () => <div aria-label="棋盤" /> }));
+const boardProps = vi.hoisted(() => ({ current: null }));
+vi.mock("react-chessboard", () => ({
+  Chessboard: (props) => {
+    boardProps.current = props;
+    return <div aria-label="棋盤" />;
+  }
+}));
 vi.mock("./EvaluationChart", () => ({ default: () => <div>評分圖</div> }));
 
 let store;
@@ -97,6 +103,17 @@ describe("first-visit onboarding", () => {
     expect(dialog()).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "先不用，維持目前設定" }));
     expect(dialog()).not.toBeInTheDocument();
+    expect(selectedDifficulty()).toContain("中階");
+  });
+
+  it("cannot change the level in the middle of a game", async () => {
+    store.set(ONBOARDING_KEY, JSON.stringify({ level: "player", tipsDismissed: false }));
+    axios.post.mockResolvedValue({ data: { best_move: "e7e5" } });
+    render(<App />);
+    const reset = screen.getByRole("button", { name: "重新選擇程度" });
+    expect(reset).toBeEnabled();
+    await act(async () => { boardProps.current.onPieceDrop("e2", "e4"); });
+    expect(reset).toBeDisabled();
     expect(selectedDifficulty()).toContain("中階");
   });
 
