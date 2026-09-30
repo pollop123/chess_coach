@@ -1658,3 +1658,12 @@ button:disabled {
 .review-progress { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .review-progress progress { flex: 1; min-width: 100px; accent-color: var(--forest-dark); }
 .review-evidence-status p { margin: 6px 0; }
+
+.board-legend {
+  display: flex; flex-wrap: wrap; gap: 14px;
+  margin-top: 8px; font-size: 0.82rem; color: var(--muted);
+}
+.board-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend-swatch { display: inline-block; width: 18px; height: 4px; border-radius: 2px; }
+.legend-swatch.is-best { background: rgb(46, 160, 90); }
+.legend-swatch.is-played { background: rgb(214, 69, 65); }
