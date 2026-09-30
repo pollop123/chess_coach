@@ -97,6 +97,11 @@ class CoachFactTests(unittest.TestCase):
         self.assertIn("對手下一步有將死你的威脅", hint.text)
         self.assertEqual(chess_atoms(hint.text), set())
         self.assertIn("一步就能將死對手", threat_hint_source(chess.Board(FOOLS_MATE_FEN)).text)
+        # White just played g4 and asks for a hint: Black is to move and has the mate.
+        as_white = threat_hint_source(chess.Board(FOOLS_MATE_FEN), chess.WHITE).text
+        self.assertIn("對手現在有一步將死你的走法", as_white)
+        self.assertNotIn("你現在有一步就能將死", as_white)
+        self.assertEqual(chess_atoms(as_white), set())
         self.assertIsNone(threat_hint_source(chess.Board()))
 
     def test_hint_mode_leads_with_the_threat(self):
