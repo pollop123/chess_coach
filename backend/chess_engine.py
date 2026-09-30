@@ -1273,6 +1273,111 @@ def _teaching_score_type(score):
     return "mate" if abs(score) >= MATE_THRESHOLD else "centipawn"
 
 
+def teaching_candidate(board, move, score, pv, best_move=None):
+    """One scored candidate with the board-derived reason, themes and warnings.
+
+    `score` uses this engine's white-perspective convention (mates beyond
+    MATE_THRESHOLD); any engine that can score a move can feed this.
+    """
+    warnings = []
+    if major_piece_loss_after_move(board, move):
+        warnings.append("hangs_major_piece")
+    if _move_allows_immediate_mate(board, move):
+        warnings.append("allows_mate_threat")
+    reason = _move_reason(board, move, warnings)
+    themes = _move_themes(board, move, reason)
+    return {
+        "move_obj": move,
+        "move": move.uci(),
+        "san": board.san(move),
+        "score_cp": int(score),
+        "score_type": _teaching_score_type(score),
+        "score_status": "complete",
+        "display": format_evaluation(score),
+        "perspective_score": score if board.turn == chess.WHITE else -score,
+        "base_engine_choice": bool(best_move and move == best_move),
+        "pv": pv,
+        "warnings": warnings,
+        "themes": themes,
+        "theme_evidence": {theme: _theme_evidence(theme, reason) for theme in themes},
+        "reason": reason,
+        "reason_evidence": _reason_evidence(reason),
+    }
+
+
+def finalize_teaching_analysis(board, candidates, planned_count, analysis_complete, original_fen=None):
+    """Rank ordered candidates and derive losses, criticality and position themes."""
+    original_fen = original_fen or board.fen()
+    best_perspective = candidates[0]["perspective_score"] if candidates else 0
+    best_score_type = candidates[0]["score_type"] if candidates else "centipawn"
+    for index, item in enumerate(candidates, start=1):
+        item["rank"] = index
+        comparison_loss = int(max(0, best_perspective - item["perspective_score"]))
+        item["comparison_loss"] = comparison_loss
+        comparable_cp = best_score_type == "centipawn" and item["score_type"] == "centipawn"
+        item["loss_cp"] = comparison_loss if comparable_cp else None
+        item["near_equal"] = comparable_cp and comparison_loss <= NEAR_EQUAL_CP
+        if comparison_loss >= 150 and "large_eval_drop" not in item["warnings"]:
+            item["warnings"].append("large_eval_drop")
+
+    if candidates and candidates[0]["reason"] == "checkmate":
+        for item in candidates[1:]:
+            if item["reason"] != "checkmate" and "misses_mate" not in item["warnings"]:
+                item["warnings"].append("misses_mate")
+
+    all_candidate_themes = set()
+    mistake_warnings = set()
+    for item in candidates:
+        all_candidate_themes.update(item["themes"])
+        mistake_warnings.update(item["warnings"])
+    position_themes = set(candidates[0]["themes"] if candidates else [])
+
+    comparison_complete = analysis_complete and len(candidates) == planned_count
+    if not comparison_complete:
+        criticality = "partial"
+    elif len(candidates) >= 2 and candidates[1]["comparison_loss"] >= ONLY_MOVE_LOSS_CP:
+        criticality = "only_move"
+        position_themes.add("only_move")
+    elif mistake_warnings or (len(candidates) >= 2 and candidates[-1]["comparison_loss"] >= 150):
+        criticality = "sharp"
+    else:
+        criticality = "normal"
+
+    best_reason = candidates[0]["reason"] if candidates else "best_engine_score"
+    position_theme_evidence = dict(
+        candidates[0].get("theme_evidence", {}) if candidates else {}
+    )
+    if "only_move" in position_themes:
+        position_theme_evidence["only_move"] = "supported"
+    public_candidates = []
+    for item in candidates:
+        public_item = dict(item)
+        public_item.pop("move_obj", None)
+        public_item.pop("perspective_score", None)
+        public_item.pop("comparison_loss", None)
+        public_candidates.append(public_item)
+
+    if board.fen() != original_fen:
+        raise RuntimeError("teaching analysis mutated the board")
+
+    return {
+        "candidates": public_candidates,
+        "criticality": criticality,
+        "position_themes": sorted(position_themes),
+        "candidate_themes": sorted(all_candidate_themes),
+        "best_move_reason": best_reason,
+        "best_move_evidence": _reason_evidence(best_reason),
+        "position_theme_evidence": position_theme_evidence,
+        "mistake_warnings": sorted(mistake_warnings),
+        "analysis_complete": comparison_complete,
+        "evaluated_candidate_count": sum(
+            item.get("score_status") == "complete" for item in candidates
+        ),
+        "returned_candidate_count": len(candidates),
+        "requested_candidate_count": planned_count,
+    }
+
+
 def get_teaching_analysis(
     board,
     base_analysis,
@@ -1297,13 +1402,6 @@ def get_teaching_analysis(
             analysis_complete = False
             break
 
-        san = board.san(move)
-        warnings = []
-        if major_piece_loss_after_move(board, move):
-            warnings.append("hangs_major_piece")
-        if _move_allows_immediate_mate(board, move):
-            warnings.append("allows_mate_threat")
-
         search_board = board.copy()
         search_board.push(move)
         try:
@@ -1312,28 +1410,8 @@ def get_teaching_analysis(
             analysis_complete = False
             break
 
-        reason = _move_reason(board, move, warnings)
-        themes = _move_themes(board, move, reason)
-        theme_evidence = {theme: _theme_evidence(theme, reason) for theme in themes}
         pv = [move.uci(), *get_pv_line(search_board, base_depth)]
-        perspective_score = score if mover == chess.WHITE else -score
-        candidates.append({
-            "move_obj": move,
-            "move": move.uci(),
-            "san": san,
-            "score_cp": int(score),
-            "score_type": _teaching_score_type(score),
-            "score_status": "complete",
-            "display": format_evaluation(score),
-            "perspective_score": perspective_score,
-            "base_engine_choice": bool(best_move and move == best_move),
-            "pv": pv,
-            "warnings": warnings,
-            "themes": themes,
-            "theme_evidence": theme_evidence,
-            "reason": reason,
-            "reason_evidence": _reason_evidence(reason),
-        })
+        candidates.append(teaching_candidate(board, move, score, pv, best_move))
 
     candidates.sort(key=lambda item: item["perspective_score"], reverse=True)
     # _candidate_score rescores each move with a plain minimax from the child
@@ -1379,74 +1457,7 @@ def get_teaching_analysis(
             for theme in candidates[0]["themes"]
         }
 
-    best_perspective = candidates[0]["perspective_score"] if candidates else 0
-    best_score_type = candidates[0]["score_type"] if candidates else "centipawn"
-    for index, item in enumerate(candidates, start=1):
-        item["rank"] = index
-        comparison_loss = int(max(0, best_perspective - item["perspective_score"]))
-        item["comparison_loss"] = comparison_loss
-        comparable_cp = best_score_type == "centipawn" and item["score_type"] == "centipawn"
-        item["loss_cp"] = comparison_loss if comparable_cp else None
-        item["near_equal"] = comparable_cp and comparison_loss <= NEAR_EQUAL_CP
-        if comparison_loss >= 150 and "large_eval_drop" not in item["warnings"]:
-            item["warnings"].append("large_eval_drop")
-
-    if candidates and candidates[0]["reason"] == "checkmate":
-        for item in candidates[1:]:
-            if item["reason"] != "checkmate" and "misses_mate" not in item["warnings"]:
-                item["warnings"].append("misses_mate")
-
-    all_candidate_themes = set()
-    mistake_warnings = set()
-    for item in candidates:
-        all_candidate_themes.update(item["themes"])
-        mistake_warnings.update(item["warnings"])
-    position_themes = set(candidates[0]["themes"] if candidates else [])
-
-    comparison_complete = analysis_complete and len(candidates) == len(planned_moves)
-    if not comparison_complete:
-        criticality = "partial"
-    elif len(candidates) >= 2 and candidates[1]["comparison_loss"] >= ONLY_MOVE_LOSS_CP:
-        criticality = "only_move"
-        position_themes.add("only_move")
-    elif mistake_warnings or (len(candidates) >= 2 and candidates[-1]["comparison_loss"] >= 150):
-        criticality = "sharp"
-    else:
-        criticality = "normal"
-
-    best_reason = candidates[0]["reason"] if candidates else "best_engine_score"
-    position_theme_evidence = dict(
-        candidates[0].get("theme_evidence", {}) if candidates else {}
-    )
-    if "only_move" in position_themes:
-        position_theme_evidence["only_move"] = "supported"
-    public_candidates = []
-    for item in candidates:
-        public_item = dict(item)
-        public_item.pop("move_obj", None)
-        public_item.pop("perspective_score", None)
-        public_item.pop("comparison_loss", None)
-        public_candidates.append(public_item)
-
-    if board.fen() != original_fen:
-        raise RuntimeError("teaching analysis mutated the board")
-
-    return {
-        "candidates": public_candidates,
-        "criticality": criticality,
-        "position_themes": sorted(position_themes),
-        "candidate_themes": sorted(all_candidate_themes),
-        "best_move_reason": best_reason,
-        "best_move_evidence": _reason_evidence(best_reason),
-        "position_theme_evidence": position_theme_evidence,
-        "mistake_warnings": sorted(mistake_warnings),
-        "analysis_complete": comparison_complete,
-        "evaluated_candidate_count": sum(
-            item.get("score_status") == "complete" for item in candidates
-        ),
-        "returned_candidate_count": len(candidates),
-        "requested_candidate_count": len(planned_moves),
-    }
+    return finalize_teaching_analysis(board, candidates, len(planned_moves), analysis_complete, original_fen)
 
 
 def get_analysis(

@@ -25,6 +25,7 @@ import chess_engine  # Import the new engine module
 from coach_conversation import current_conversation, question_mode
 from chesscom_import import router as chesscom_router
 import review_analysis
+import stockfish_coach
 # 匯入資料庫模組
 from database import SessionLocal, Game
 
@@ -286,18 +287,9 @@ def get_analysis_endpoint(request: GetAnalysisRequest):
         }
 
     # 深度分析
-    with engine_search_slot() as engine_session:
-        analysis = engine_session.analyze(
-            board,
-            depth=request.depth,
-            time_limit=request.time_limit
-        )
-        teaching_time_limit = min(1.0, max(0.2, request.time_limit * 0.25))
-        teaching_analysis = engine_session.teaching_analysis(
-            board,
-            analysis,
-            time_limit=teaching_time_limit,
-        )
+    analysis, teaching_analysis = coach_engine_analysis(
+        board, request.depth, request.time_limit, min(1.0, max(0.2, request.time_limit * 0.25)),
+    )
     
     game_phase = chess_engine.detect_game_phase(board)
 
@@ -351,6 +343,7 @@ def get_analysis_endpoint(request: GetAnalysisRequest):
             "candidate_cache_hits": analysis.get('candidate_cache_hits', 0),
             "candidate_bound_skips": analysis.get('candidate_bound_skips', 0),
             "timed_out": analysis.get('timed_out', False),
+            "analysis_source": analysis.get('analysis_source', 'builtin'),
         },
         "teaching_analysis": teaching_analysis,
         "game_state": game_phase,
@@ -680,6 +673,24 @@ async def review_game(request: AnalysisRequest, connection: Request):
                              headers={'Cache-Control': 'no-store', 'X-Accel-Buffering': 'no'})
 
 
+def coach_engine_analysis(board, depth, time_limit, teaching_time_limit):
+    """(analysis, teaching_analysis) for the coach: Stockfish when available, else the built-in engine.
+
+    COACH_ENGINE=builtin forces the built-in engine. Both run under the same
+    concurrency slot as every other search.
+    """
+    path = _find_stockfish_path() if os.getenv("COACH_ENGINE", "stockfish") != "builtin" else None
+    with engine_search_slot() as engine_session:
+        if path:
+            try:
+                return stockfish_coach.coach_analysis(board, path)
+            except Exception as exc:
+                logger.warning("Stockfish coach analysis failed (%s); using the built-in engine", type(exc).__name__)
+        analysis = engine_session.analyze(board, depth=depth, time_limit=time_limit)
+        teaching = engine_session.teaching_analysis(board, analysis, time_limit=teaching_time_limit)
+        return analysis, teaching
+
+
 # 3. 儲存比賽
 @app.post("/games", response_model=GameResponse)
 def save_game(game: GameCreate, db: Session = Depends(get_db)):
@@ -760,19 +771,9 @@ def explain_position(request: ExplainRequest):
         if not board.is_valid():
             raise ValueError("Invalid board position")
         if not board.is_game_over() and mode != "knowledge" and cached_analysis is None:
-            with engine_search_slot() as engine_session:
-                analysis = engine_session.analyze(
-                    board,
-                    depth=request.depth,
-                    time_limit=4.0
-                )
-                pv_line = analysis['pv']
-                pv_score = analysis['score']
-                teaching_analysis = engine_session.teaching_analysis(
-                    board,
-                    analysis,
-                    time_limit=0.8,
-                )
+            analysis, teaching_analysis = coach_engine_analysis(board, request.depth, 4.0, 0.8)
+            pv_line = analysis['pv']
+            pv_score = analysis['score']
             logger.debug(
                 "PV=%s score=%s win=%s from_book=%s",
                 pv_line,
