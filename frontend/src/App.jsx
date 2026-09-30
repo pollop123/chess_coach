@@ -5,6 +5,8 @@ import axios from "axios";
 import { TRAINING_LESSONS, TRAINING_PHASES } from "./trainingLessons";
 import { LearningDashboard } from "./LearningDashboard";
 import { CoachMessage } from "./CoachMessage";
+import { ReviewPanel } from "./ReviewPanel";
+import { reviewMoveList } from "./reviewMoves";
 import { GUIDE_COLORS, legalMoveStyles, lessonHintGuides, reviewArrows } from "./boardGuides";
 import { ChessComImport } from "./ChessComImport";
 import { BeginnerTips, Onboarding } from "./Onboarding";
@@ -435,15 +437,34 @@ function App() {
     }
   }
 
+  function selectReviewPosition(index) {
+    if (analysisData.length === 0) return;
+    setCurrentMoveIndex(Math.max(0, Math.min(analysisData.length - 1, index)));
+  }
+
   function navigateMove(direction) {
     if (analysisData.length === 0) return;
-    let newIndex = currentMoveIndex;
-    if (newIndex === -1) newIndex = analysisData.length - 1;
-    newIndex += direction;
-    if (newIndex < 0) newIndex = 0;
-    if (newIndex >= analysisData.length) newIndex = analysisData.length - 1;
-    setCurrentMoveIndex(newIndex);
+    const from = currentMoveIndex === -1 ? analysisData.length - 1 : currentMoveIndex;
+    selectReviewPosition(from + direction);
   }
+
+  // ← → step through a review, Home/End jump to either end; typing in a field is left alone.
+  useEffect(() => {
+    if (appMode !== "play" || analysisData.length === 0) return undefined;
+    function onKeyDown(event) {
+      if (event.target.closest?.("input, textarea, select, [contenteditable='true']")) return;
+      const step = { ArrowLeft: -1, ArrowRight: 1 }[event.key];
+      if (step) navigateMove(step);
+      else if (event.key === "Home") selectReviewPosition(0);
+      else if (event.key === "End") selectReviewPosition(analysisData.length - 1);
+      else return;
+      event.preventDefault();
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  // navigateMove and selectReviewPosition only read state that is in the deps.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [appMode, analysisData, currentMoveIndex]);
 
   const displayFen = (currentMoveIndex !== -1 && analysisData.length > 0)
     ? analysisData[currentMoveIndex].fen
@@ -455,6 +476,10 @@ function App() {
   }, [displayFen]);
   useEffect(() => () => coachControllerRef.current?.abort(), []);
   const selectedReviewIndex = currentMoveIndex >= 0 ? currentMoveIndex : analysisData.length - 1;
+  const reviewMoves = useMemo(
+    () => (analysisData.length > 0 ? reviewMoveList(analysisData, game.history()) : []),
+    [analysisData, game]
+  );
   const selectedReviewPoint = selectedReviewIndex >= 0 ? analysisData[selectedReviewIndex] : null;
   const selectedWhiteScore = selectedReviewPoint?.rawScore ?? 0;
   const selectedWdl = selectedReviewPoint?.wdl ?? null;
@@ -1005,10 +1030,10 @@ function App() {
           onReturnToGame={() => setAppMode("play")}
         />
       ) : (
-      <main className={`coach-workspace ${analysisData.length > 0 ? "has-evaluation" : ""}`}>
+      <main className={`coach-workspace ${appMode === "play" && analysisData.length > 0 ? "has-evaluation" : ""}`}>
 
         {/* 勝率條 - 只在賽後分析時顯示 */}
-        {analysisData.length > 0 && (
+        {appMode === "play" && analysisData.length > 0 && (
           <EvaluationBar 
             whiteShare={selectedEvaluationShare}
             evalDisplay={formatEvaluationScore(selectedWhiteScore)}
@@ -1059,12 +1084,22 @@ function App() {
             )}
           </div>
 
-          {analysisData.length > 0 && (
-            <div className="review-nav">
-              <button className="btn btn-ghost btn-sm" onClick={() => navigateMove(-1)}>上一步</button>
-              <span>{currentMoveIndex === -1 ? "最終局" : `第 ${currentMoveIndex} 步`}</span>
-              <button className="btn btn-ghost btn-sm" onClick={() => navigateMove(1)}>下一步</button>
-            </div>
+          {appMode === "play" && analysisData.length > 0 && (
+            <ReviewPanel
+              moves={reviewMoves}
+              selectedIndex={selectedReviewIndex}
+              onSelect={selectReviewPosition}
+              chart={
+                <Suspense fallback={<div className="analysis-card chart-loading" role="status">正在載入局勢圖表…</div>}>
+                  <EvaluationChart
+                    analysisData={analysisData}
+                    labels={["開局", ...reviewMoves.map((move) => `${move.label}${move.mark}`)]}
+                    currentMoveIndex={selectedReviewIndex}
+                    onMoveSelect={selectReviewPosition}
+                  />
+                </Suspense>
+              }
+            />
           )}
 
           <div className="status-strip" aria-live="polite">
@@ -1075,7 +1110,7 @@ function App() {
             <progress value={reviewProgress.current} max={reviewProgress.total || 1} aria-label="賽後分析進度" />
             <button className="btn btn-ghost btn-sm" onClick={() => { cancelGameRequests(); setStatus("已取消分析，可重新開始。"); resetCoach([{ role: "model", text: "已取消分析。想看時再按一次「賽後分析」。" }]); }}>取消分析</button>
           </div>}
-          {reviewMeta && <div className="review-evidence-status">
+          {appMode === "play" && reviewMeta && <div className="review-evidence-status">
             <strong>{reviewMeta.engine} · 初評 {reviewMeta.quick_nodes.toLocaleString()} 節點，複核 {reviewMeta.deep_nodes.toLocaleString()} 節點</strong>
             <p>已複核 {reviewMeta.refined} / {reviewMeta.candidates} 個候選關鍵步。其餘保留初評；教練沿用本次分析依據。</p>
             <span>目前局面：{selectedReviewPoint?.position_level === "deep" ? "已加深複核" : "初評"}</span>
@@ -1254,16 +1289,6 @@ function App() {
           </>
           )}
 
-          {/* 📊 分析圖表 (如果有數據) */}
-          {appMode === "play" && analysisData.length > 0 && (
-            <Suspense fallback={<div className="analysis-card chart-loading" role="status">正在載入局勢圖表…</div>}>
-              <EvaluationChart
-                analysisData={analysisData}
-                currentMoveIndex={currentMoveIndex}
-                onMoveSelect={setCurrentMoveIndex}
-              />
-            </Suspense>
-          )}
 
           {appMode === "play" && analysisData.length > 0 && (
             <div className="practice-card">
