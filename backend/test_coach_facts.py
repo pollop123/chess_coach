@@ -49,6 +49,27 @@ class CoachFactTests(unittest.TestCase):
         self.assertIn("沒有讓對手一步將死", text)
         self.assertIn("是否為最佳手需另看引擎評估", text)
 
+    def test_repeated_position_uses_the_latest_occurrence(self):
+        # Knights go out and back: the board equals the start, but four moves were played.
+        source = last_move_source("1. Nf3 Nf6 2. Ng1 Ng8", chess.Board())
+        self.assertIn("黑方上一手是 Ng8", source.text)
+
+    def test_en_passant_counts_as_a_capture(self):
+        text = last_move_source("1. e4 a6 2. e5 d5 3. exd6", board_after("e4 a6 e5 d5 exd6")).text
+        self.assertIn("吃掉兵", text)
+        self.assertNotIn("原本可以走", text)
+
+    def test_pinned_attackers_do_not_make_a_piece_loose(self):
+        # The e2 knight attacks d4 but is pinned to its king by the e8 rook.
+        for turn in ("w", "b"):
+            board = chess.Board(f"k3r3/8/8/8/3q4/8/4N3/4K3 {turn} - - 0 1")
+            self.assertEqual(loose_pieces(board, chess.BLACK), [], turn)
+
+    def test_english_last_move_questions_are_position_questions(self):
+        from coach_conversation import question_mode
+        for question in ("Why was my last move bad?", "Was my previous move a mistake?"):
+            self.assertEqual(question_mode(question), "position")
+
     def test_history_that_does_not_reach_the_board_is_ignored(self):
         self.assertIsNone(last_move_source("1. d4", chess.Board(FOOLS_MATE_FEN)))
         self.assertIsNone(last_move_source("", chess.Board(FOOLS_MATE_FEN)))
@@ -76,6 +97,11 @@ class CoachFactTests(unittest.TestCase):
         self.assertIn("對手下一步有將死你的威脅", hint.text)
         self.assertEqual(chess_atoms(hint.text), set())
         self.assertIn("一步就能將死對手", threat_hint_source(chess.Board(FOOLS_MATE_FEN)).text)
+        # White just played g4 and asks for a hint: Black is to move and has the mate.
+        as_white = threat_hint_source(chess.Board(FOOLS_MATE_FEN), chess.WHITE).text
+        self.assertIn("對手現在有一步將死你的走法", as_white)
+        self.assertNotIn("你現在有一步就能將死", as_white)
+        self.assertEqual(chess_atoms(as_white), set())
         self.assertIsNone(threat_hint_source(chess.Board()))
 
     def test_hint_mode_leads_with_the_threat(self):

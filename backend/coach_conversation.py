@@ -57,7 +57,7 @@ def question_mode(question, conversation=None, mode="auto"):
         return "position"
     if re.search(r"比較|哪個|哪一[手步個]|還是|compare|versus|\bvs\b", question, re.I) or len(MOVE_TOKEN.findall(question)) >= 2:
         return "comparison"
-    if re.search(r"目前|現在|這[步手盤局個是]|我[的上]|剛才|局面|盤面|這裡|current|this (move|position)|can i", question, re.I) or MOVE_TOKEN.search(question):
+    if re.search(r"目前|現在|這[步手盤局個是]|我[的上]|剛才|局面|盤面|這裡|current|this (move|position)|can i|last move|previous move|my move", question, re.I) or MOVE_TOKEN.search(question):
         return "position"
     if re.search(r"是什麼|什麼是|規則|條件|意思|原理|為什麼要|如何|怎麼|what is|what are|why|how", question, re.I):
         if re.search(r"怎麼下|如何走|怎麼走", question):

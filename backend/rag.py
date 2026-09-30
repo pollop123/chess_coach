@@ -752,7 +752,7 @@ class ChessRAG:
         elif mode == "hint":
             sources = hint_sources(board, _principle_text(teaching_analysis))
             # An urgent threat outranks the general principle, without revealing the move.
-            threat_hint = threat_hint_source(board)
+            threat_hint = threat_hint_source(board, {"white": chess.WHITE, "black": chess.BLACK}.get(player_color))
             if threat_hint:
                 sources.insert(0, threat_hint)
             sources += [source for source in rules if not chess_atoms(source.text)]
