@@ -250,6 +250,47 @@ def _parse_advice_sections(advice):
     return sections
 
 
+# The six-section template speaks for the side to move. As evidence, name that
+# side so "應避免 Qg4" cannot read as advice to a student who just moved.
+SIDE_NAMES = {chess.WHITE: "白方", chess.BLACK: "黑方"}
+
+
+def _sided_section(label, text, side_to_move):
+    if label == "應避免" and not chess_atoms(text):
+        return label, text  # general advice with no move in it applies to either side
+    side, other = SIDE_NAMES[side_to_move], SIDE_NAMES[not side_to_move]
+    sided = {
+        "推薦手": f"{side}的推薦手",
+        "選這步的原因": f"{side}選這步的原因",
+        "對手最強回應": f"{other}最強的回應",
+        "應避免": f"{side}應避免",
+    }.get(label)
+    return (sided, f"{sided}：{text}") if sided else (label, text)
+
+
+# When the student just moved, the side to move is the opponent: relabel the
+# shown template from the student's view instead of the engine's.
+OPPONENT_TO_MOVE_LABELS = {
+    "推薦手": "對手（{side}）的最佳手",
+    "選這步的原因": "對手這步的理由",
+    "對手最強回應": "你接著的最佳回應",
+    "應避免": "對手若走這些會吃虧",
+}
+
+
+def _student_view(advice, side_to_move, student_color):
+    if student_color is None or student_color == side_to_move:
+        return advice
+    lines = []
+    for line in advice.splitlines():
+        for label, relabel in OPPONENT_TO_MOVE_LABELS.items():
+            if line.startswith(f"{label}：") and not (label == "應避免" and not chess_atoms(line)):
+                line = relabel.format(side=SIDE_NAMES[side_to_move]) + line[len(label):]
+                break
+        lines.append(line)
+    return "\n".join(lines)
+
+
 def _reason_text(teaching_analysis):
     teaching_analysis = teaching_analysis or {}
     if teaching_analysis.get("analysis_complete") is False:
@@ -721,7 +762,8 @@ class ChessRAG:
         rules = [source for source in rules if source in KNOWLEDGE_SOURCES][:4]
         sources = list(rules)
         for index, (label, text) in enumerate(_parse_advice_sections(grounded_advice).items(), start=1):
-            sources.append(EvidenceSource(f"P{index}", label, text, "position"))
+            title, text = _sided_section(label, text, board.turn)
+            sources.append(EvidenceSource(f"P{index}", title, text, "position"))
         if best_move:
             sources.append(EvidenceSource("P7", "推薦手盤面事實", build_move_facts(board, best_move), "position"))
         if opening_result:
@@ -820,7 +862,9 @@ class ChessRAG:
                              if source.id == "T1" or re.search(LAST_MOVE_QUESTION, question, re.I)]
                     facts = "\n".join(f"{source.text} [{source.id}]" for source in cited)
                     parts = [opening_header] if mode == "overview" else []
-                    advice = "\n\n".join([*parts, *([facts] if facts else []), grounded_advice])
+                    student = {"white": chess.WHITE, "black": chess.BLACK}.get(player_color)
+                    shown = _student_view(grounded_advice, board.turn, student)
+                    advice = "\n\n".join([*parts, *([facts] if facts else []), shown])
             answer = CoachReply(f"{advice}\n\n（{reason}，以上為基礎回覆。）", [source.as_dict() for source in cited], mode)
             logger.info("Coach answer mode=fallback")
         else:

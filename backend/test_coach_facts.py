@@ -174,7 +174,9 @@ class CoachFactAnswerTests(unittest.TestCase):
                                       analysis_result={"best_move": mate, "pv": [mate.uci()]}, player_color="white")
         self.assertTrue(reply.advice.startswith("白方上一手是 g4"))
         self.assertIn("直接將死", reply.advice)
-        self.assertIn("選這步的原因：盤面可直接確認：Qh4# 直接將死。", reply.advice)
+        # White asked, Black is to move: the template speaks from White's side.
+        self.assertIn("對手這步的理由：盤面可直接確認：Qh4# 直接將死。", reply.advice)
+        self.assertIn("應避免：避免只看單一步威脅", reply.advice)  # general advice keeps its label
         self.assertEqual([source["id"] for source in reply.sources], ["L1", "T1"])
 
     def test_last_move_check_only_leads_when_asked_about(self):
@@ -202,6 +204,51 @@ class CoachFactAnswerTests(unittest.TestCase):
         self.assertIn('"id": "T1"', captured[0])
         self.rag.get_response(FOOLS_MATE_FEN, FOOLS_MATE_PGN, "王車易位的條件是什麼？")
         self.assertNotIn('"id": "L1"', captured[1])
+
+    def test_template_sources_name_the_side_to_move(self):
+        captured = []
+
+        def fake_call(prompt, **_kwargs):
+            captured.append(prompt)
+            raise RuntimeError("stop after capturing the prompt")
+
+        self.rag.client = object()
+        self.rag.call_gemini_with_fallback = fake_call
+        mate = chess.Board(FOOLS_MATE_FEN).parse_san("Qh4#")
+        teaching = {"analysis_complete": True, "best_move_reason": "checkmate", "candidates": [
+            {"move": "d8h4", "san": "Qh4#", "rank": 1, "score_status": "complete", "warnings": []},
+            {"move": "h7h5", "san": "h5", "rank": 2, "score_status": "complete", "loss_cp": None,
+             "warnings": ["misses_mate"]},
+        ]}
+        self.rag.get_response(FOOLS_MATE_FEN, FOOLS_MATE_PGN, "我剛才那步為什麼不好？", player_color="white",
+                              analysis_result={"best_move": mate, "pv": [mate.uci()]}, teaching_analysis=teaching)
+        self.assertIn("黑方應避免：h5", captured[0])
+        self.assertIn("黑方的推薦手：Qh4#", captured[0])
+        self.assertIn("白方最強的回應", captured[0])
+        self.assertNotIn('"title": "應避免"', captured[0])
+
+    def test_fallback_template_speaks_from_the_students_side(self):
+        mate = chess.Board(FOOLS_MATE_FEN).parse_san("Qh4#")
+        analysis = {"best_move": mate, "pv": [mate.uci()]}
+        white = self.rag.get_response(FOOLS_MATE_FEN, FOOLS_MATE_PGN, "現在該注意什麼？",
+                                      analysis_result=analysis, player_color="white").advice
+        self.assertIn("對手（黑方）的最佳手：Qh4#", white)
+        self.assertIn("你接著的最佳回應：", white)
+        self.assertNotIn("\n推薦手：", white)
+        self.assertIn("\n應避免：避免只看單一步威脅", white)  # general advice, no move named
+        teaching = {"analysis_complete": True, "best_move_reason": "checkmate", "candidates": [
+            {"move": "d8h4", "san": "Qh4#", "rank": 1, "score_status": "complete", "warnings": []},
+            {"move": "h7h5", "san": "h5", "rank": 2, "score_status": "complete", "loss_cp": None,
+             "warnings": ["misses_mate"]},
+        ]}
+        named = self.rag.get_response(FOOLS_MATE_FEN, FOOLS_MATE_PGN, "現在該注意什麼？", analysis_result=analysis,
+                                      teaching_analysis=teaching, player_color="white").advice
+        self.assertIn("對手若走這些會吃虧：h5（錯失將殺）", named)
+        self.assertNotIn("\n應避免：h5", named)
+        black = self.rag.get_response(FOOLS_MATE_FEN, FOOLS_MATE_PGN, "現在該注意什麼？",
+                                      analysis_result=analysis, player_color="black").advice
+        self.assertIn("推薦手：Qh4#", black)
+        self.assertNotIn("對手（黑方）", black)
 
     def test_explain_accepts_player_colour(self):
         client = TestClient(app)
