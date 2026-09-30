@@ -7,6 +7,8 @@ import { LearningDashboard } from "./LearningDashboard";
 import { CoachMessage } from "./CoachMessage";
 import { GUIDE_COLORS, legalMoveStyles, lessonHintGuides, reviewArrows } from "./boardGuides";
 import { ChessComImport } from "./ChessComImport";
+import { BeginnerTips, Onboarding } from "./Onboarding";
+import { LEVELS, loadOnboarding, saveOnboarding } from "./onboardingStorage";
 import { streamReview } from "./reviewStream";
 import { buildCoachConversation } from "./coachConversation";
 import {
@@ -211,7 +213,12 @@ function App() {
   const [analysisData, setAnalysisData] = useState([]);
   const [currentMoveIndex, setCurrentMoveIndex] = useState(-1);
   const [humanColor, setHumanColor] = useState("white");
-  const [botDifficulty, setBotDifficulty] = useState("intermediate");
+  const [onboarding, setOnboarding] = useState(() => loadOnboarding());
+  // First visit (nothing saved yet) asks the player's level before anything else.
+  const [showOnboarding, setShowOnboarding] = useState(() => loadOnboarding() === null);
+  const [botDifficulty, setBotDifficulty] = useState(
+    () => LEVELS[loadOnboarding()?.level]?.botDifficulty || "intermediate"
+  );
   const [botStyle, setBotStyle] = useState("balanced");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [importedGame, setImportedGame] = useState(null);
@@ -290,6 +297,27 @@ function App() {
     } catch (err) {
       console.error("存檔失敗", err);
     }
+  }
+
+  const levelSettings = LEVELS[onboarding?.level] || LEVELS.player;
+
+  function chooseLevel(level) {
+    const next = { level, tipsDismissed: false };
+    saveOnboarding(next);
+    setOnboarding(next);
+    setShowOnboarding(false);
+    setBotDifficulty(LEVELS[level].botDifficulty);
+    setAppMode("play");
+    if (LEVELS[level].importFirst) {
+      // The import card renders first after this update; focus its username box.
+      setTimeout(() => document.getElementById("chesscom-username")?.focus(), 0);
+    }
+  }
+
+  function dismissBeginnerTips() {
+    const next = { ...onboarding, tipsDismissed: true };
+    saveOnboarding(next);
+    setOnboarding(next);
   }
 
   function resignGame() {
@@ -940,6 +968,9 @@ function App() {
 
   return (
     <div className="app-shell">
+      {showOnboarding && (
+        <Onboarding onChoose={chooseLevel} onClose={() => setShowOnboarding(false)} />
+      )}
       <header className="app-header">
         <div>
           <div className="app-header__eyebrow">棋局分析工作台</div>
@@ -1072,7 +1103,10 @@ function App() {
 
           {appMode === "play" && !importedGame && (
             <div className="bot-settings">
-              <div className="setting-label">機器人難度</div>
+              <div className="setting-label">
+                機器人難度
+                <button className="btn btn-ghost btn-sm level-reset" onClick={() => setShowOnboarding(true)}>重新選擇程度</button>
+              </div>
               <div className="option-grid option-grid-four">
                 {BOT_DIFFICULTIES.map((difficulty) => (
                   <button
@@ -1148,7 +1182,11 @@ function App() {
             />
           ) : (
           <>
-            {appMode === "play" && <ChessComImport onImport={importChessComGame} />}
+            {/* Chess.com players see import first; everyone else starts with the coach. */}
+            {appMode === "play" && levelSettings.importFirst && <ChessComImport onImport={importChessComGame} />}
+            {appMode === "play" && levelSettings.tips && !onboarding?.tipsDismissed && (
+              <BeginnerTips onDismiss={dismissBeginnerTips} />
+            )}
             {/* 💬 AI 戰術聊天室 */}
             <div className="coach-card">
             <div className="panel-header">
@@ -1194,6 +1232,7 @@ function App() {
               </button>
             </div>
           </div>
+          {appMode === "play" && !levelSettings.importFirst && <ChessComImport onImport={importChessComGame} />}
           </>
           )}
 
