@@ -41,7 +41,7 @@ def loose_pieces(board, color):
     for square, piece in board.piece_map().items():
         if piece.color != color or piece.piece_type == chess.KING:
             continue
-        attackers = board.attackers(not color, square)
+        attackers = _legal_attackers(board, not color, square)
         if not attackers:
             continue
         cheapest = min(VALUES[board.piece_at(s).piece_type] or 100 for s in attackers)
@@ -50,6 +50,19 @@ def loose_pieces(board, color):
         elif cheapest < VALUES[piece.piece_type]:
             loose.append((VALUES[piece.piece_type], square, "會被價值較低的棋子吃掉"))
     return [(square, why) for _value, square, why in sorted(loose, key=lambda item: -item[0])]
+
+
+def _legal_attackers(board, color, square):
+    """Squares of `color` pieces that could legally capture on `square` (pinned pieces cannot)."""
+    if board.turn == color:
+        probe = board
+    elif board.is_check():
+        # No null move while in check; the side to move must answer the check first anyway.
+        return set(board.attackers(color, square))
+    else:
+        probe = board.copy(stack=False)
+        probe.push(chess.Move.null())
+    return {move.from_square for move in probe.legal_moves if move.to_square == square}
 
 
 def _free_captures(board):
@@ -85,15 +98,16 @@ def replay_history(history, board):
         return None
     replay = game.board()
     target = _position_key(board)
-    played = []
+    played, reached = [], None
     if _position_key(replay) == target:
-        return played
+        reached = 0
+    # A repeated position must resolve to its latest occurrence, not the first.
     for move in game.mainline_moves():
         played.append((replay.copy(stack=False), move))
         replay.push(move)
         if _position_key(replay) == target:
-            return played
-    return None
+            reached = len(played)
+    return None if reached is None else played[:reached]
 
 
 def last_move_source(history, board, player_color=None):
@@ -113,6 +127,8 @@ def last_move_source(history, board, player_color=None):
     after.push(move)
 
     captured = before.piece_at(move.to_square)
+    if before.is_en_passant(move):
+        captured = chess.Piece(chess.PAWN, not before.turn)
     facts = [f"{SIDES[mover]}上一手是 {san}：{NAMES[before.piece_at(move.from_square).piece_type]}從 "
              f"{chess.square_name(move.from_square)} 走到 {chess.square_name(move.to_square)}"
              + (f"，吃掉{NAMES[captured.piece_type]}" if captured else "") + "。"]
