@@ -55,7 +55,15 @@ def wrong_side_avoid(text, fen, player_color):
     if player_color == ("white" if board.turn == chess.WHITE else "black"):
         return False
     opponent_moves = {board.san(move).rstrip("+#") for move in board.legal_moves}
-    return any(token.rstrip("+#") in opponent_moves for token in re.findall(r"避免[^。；]{0,12}?(" + MOVE.pattern + ")", text))
+    opponent_names = ("對手", "白方" if board.turn == chess.WHITE else "黑方")
+    for found in re.finditer(r"避免[^。；]{0,12}?(" + MOVE.pattern + ")", text):
+        if found.group(1).rstrip("+#") not in opponent_moves:
+            continue
+        # "黑方應避免 h5" / "對手應避免 h5" name the opponent as the subject: correct, not advice to the student.
+        if any(name in text[max(0, found.start() - 6):found.start()] for name in opponent_names):
+            continue
+        return True
+    return False
 
 
 def score(case, data, seconds, fen=None):
