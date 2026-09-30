@@ -17,3 +17,11 @@ export function buildCoachConversation(messages, fen) {
       mode: message.mode || "position"
     }));
 }
+
+// Source tags such as [L1][T1] stay in the API text for other clients, but
+// beginners read the answer without them; "查看依據" lists the sources instead.
+const SOURCE_TAGS = /[ \t]*\[[A-Z]\d{1,2}\]/g;
+
+export function coachDisplayText(text, hasSources) {
+  return hasSources && typeof text === "string" ? text.replace(SOURCE_TAGS, "") : text;
+}

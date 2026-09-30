@@ -6,7 +6,8 @@ import chess
 from fastapi.testclient import TestClient
 
 from api import app
-from coach_facts import last_move_source, loose_pieces, move_fact_summary, replay_history, threat_source
+from coach_facts import last_move_source, loose_pieces, move_fact_summary, replay_history, threat_hint_source, threat_source
+from coach_generation import chess_atoms
 from rag import ChessRAG
 
 FOOLS_MATE_FEN = "rnbqkbnr/pppp1ppp/8/4p3/6P1/5P2/PPPPP2P/RNBQKBNR b KQkq - 0 2"
@@ -90,6 +91,29 @@ class CoachFactTests(unittest.TestCase):
         board.push_san("a3")
         self.assertIn("如果不處理，白方下一步可以走 Qxf7# 將死", threat_source(board).text)
 
+    def test_threat_hint_points_at_the_danger_without_moves(self):
+        board = board_after("e4 e5 Bc4 Nc6 Qh5 a6 a3")
+        hint = threat_hint_source(board)
+        self.assertIn("對手下一步有將死你的威脅", hint.text)
+        self.assertEqual(chess_atoms(hint.text), set())
+        self.assertIn("一步就能將死對手", threat_hint_source(chess.Board(FOOLS_MATE_FEN)).text)
+        # White just played g4 and asks for a hint: Black is to move and has the mate.
+        as_white = threat_hint_source(chess.Board(FOOLS_MATE_FEN), chess.WHITE).text
+        self.assertIn("對手現在有一步將死你的走法", as_white)
+        self.assertNotIn("你現在有一步就能將死", as_white)
+        self.assertEqual(chess_atoms(as_white), set())
+        self.assertIsNone(threat_hint_source(chess.Board()))
+
+    def test_hint_mode_leads_with_the_threat(self):
+        with patch.dict(os.environ, {"GOOGLE_API_KEY": "", "ENABLE_CHROMA_RAG": "0"}):
+            rag = ChessRAG()
+        board = board_after("e4 e5 Bc4 Nc6 Qh5 a6 a3")
+        reply = rag.get_response(board.fen(), "", "給我提示，不要告訴我答案",
+                                 analysis_result={"best_move": board.parse_san("Qe7"), "pv": []})
+        self.assertEqual(reply.mode, "hint")
+        self.assertIn("對手下一步有將死你的威脅", reply.advice)
+        self.assertEqual(chess_atoms(reply.advice.split("（")[0]), set())
+
     def test_loose_pieces_include_cheaper_attackers(self):
         board = chess.Board("4k3/8/8/3q4/4P3/8/8/4K3 b - - 0 1")
         self.assertEqual(loose_pieces(board, chess.BLACK), [(chess.D5, "沒有保護")])
@@ -137,8 +161,11 @@ class CoachFactAnswerTests(unittest.TestCase):
         self.rag.call_gemini_with_fallback = fake_call
         mate = chess.Board(FOOLS_MATE_FEN).parse_san("Qh4#")
         self.rag.get_response(FOOLS_MATE_FEN, FOOLS_MATE_PGN, "我剛才那步為什麼不好？",
-                              analysis_result={"best_move": mate, "pv": [mate.uci()]})
+                              analysis_result={"best_move": mate, "pv": [mate.uci()]}, player_color="white")
         self.assertIn('"id": "L1"', captured[0])
+        # The student is White but Black is to move, so the model must not say "you" for Qh4#.
+        self.assertIn('"student_side": "白方"', captured[0])
+        self.assertIn('"side_to_move": "黑方"', captured[0])
         self.assertIn('"id": "T1"', captured[0])
         self.rag.get_response(FOOLS_MATE_FEN, FOOLS_MATE_PGN, "王車易位的條件是什麼？")
         self.assertNotIn('"id": "L1"', captured[1])

@@ -1,8 +1,10 @@
+import { coachDisplayText } from "./coachConversation";
+
 export function CoachMessage({ message }) {
   const sources = Array.isArray(message.sources) ? message.sources : [];
   return (
     <div className={`chat-bubble ${message.role === "user" ? "is-user" : "is-model"}`}>
-      <div>{message.text}</div>
+      <div>{coachDisplayText(message.text, sources.length > 0)}</div>
       {sources.length > 0 ? (
         <details className="coach-sources">
           <summary>查看依據（{sources.length}）</summary>

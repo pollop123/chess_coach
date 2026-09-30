@@ -1,0 +1,107 @@
+[
+  {
+    "id": "fools-mate-g4",
+    "moves": "f3 e5 g4",
+    "player_color": "white",
+    "question": "我剛才那步 g4 為什麼不好？",
+    "must_mention": [
+      "g4",
+      "Qh4"
+    ],
+    "forbid": [
+      "你可以走 Qh4",
+      "你應該走 Qh4"
+    ]
+  },
+  {
+    "id": "early-queen-qh5",
+    "moves": "e4 e5 Qh5 Nc6",
+    "player_color": "white",
+    "question": "我剛才那步有問題嗎？",
+    "must_mention": [
+      "Qh5"
+    ],
+    "forbid": [
+      "你應該走 Qe7",
+      "你走 Qe7"
+    ]
+  },
+  {
+    "id": "mate-threat-f7",
+    "moves": "e4 e5 Bc4 Nc6 Qh5 a6 a3",
+    "player_color": "black",
+    "question": "對手想幹嘛？我該注意什麼？",
+    "must_mention": [
+      "Qxf7"
+    ]
+  },
+  {
+    "id": "hung-knight-nh4",
+    "moves": "e4 e5 Nf3 Nc6 Nh4",
+    "player_color": "white",
+    "question": "我剛剛那步好嗎？",
+    "must_mention": [
+      "Nh4"
+    ],
+    "forbid": [
+      "你應該走 Qxh4",
+      "你走 Qxh4",
+      "你可以走 Qxh4"
+    ]
+  },
+  {
+    "id": "missed-free-queen",
+    "moves": "e4 e5 Nf3 Qh4 d3",
+    "player_color": "white",
+    "question": "我剛剛是不是錯過了什麼？",
+    "must_mention": [
+      "Nxh4"
+    ],
+    "forbid": [
+      "你的后",
+      "你走 Qe7",
+      "你應該走 Qe7",
+      "建議你走 Qe7"
+    ]
+  },
+  {
+    "id": "what-now-opening",
+    "moves": "e4 e5",
+    "player_color": "white",
+    "question": "現在該怎麼走？",
+    "must_mention": []
+  },
+  {
+    "id": "rule-castling",
+    "moves": "e4",
+    "player_color": "black",
+    "question": "王車易位的條件是什麼？",
+    "must_mention": [],
+    "expect_mode": "knowledge"
+  },
+  {
+    "id": "rule-fork",
+    "moves": "e4",
+    "player_color": "black",
+    "question": "什麼是捉雙？",
+    "must_mention": [],
+    "expect_mode": "knowledge"
+  },
+  {
+    "id": "rule-knight-moves",
+    "moves": "",
+    "player_color": "white",
+    "question": "騎士怎麼走？",
+    "must_mention": [],
+    "note": "The knowledge base has no piece-movement entries; an honest 'not enough evidence' is the correct answer today."
+  },
+  {
+    "id": "hint-no-answer",
+    "moves": "e4 e5 Bc4 Nc6 Qh5 a6 a3",
+    "player_color": "black",
+    "question": "給我提示，不要告訴我答案",
+    "must_mention": [],
+    "expect_mode": "hint",
+    "no_moves": true
+  }
+]
