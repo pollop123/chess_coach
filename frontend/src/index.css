@@ -529,7 +529,8 @@ button:disabled {
 }
 
 .analysis-card {
-  height: 200px;
+  /* Grows with the chart (header + 190px plot and move ticks) instead of clipping it. */
+  min-height: 200px;
   overflow: hidden;
   background: #f7f8f4;
 }
