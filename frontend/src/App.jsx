@@ -277,12 +277,14 @@ function App() {
     }
   }
 
-  async function saveGameToDB(result) {
+  // Save the finished game itself: the `game` in this closure can be one move
+  // behind (it missed the mating move) when called right after a move.
+  async function saveGameToDB(result, finished = game) {
     try {
       await axios.post(`${API_URL}/games`, {
-        pgn: game.pgn(),
+        pgn: finished.pgn(),
         result: result,
-        fen: game.fen()
+        fen: finished.fen()
       });
       fetchHistory();
     } catch (err) {
@@ -380,10 +382,13 @@ function App() {
       }
       setCurrentMoveIndex(processedData.length ? selectedIndex : -1);
       setStatus(importedGame ? "分析完成，已選好可回顧的局面。可以請教練講解，或切換其他步數。" : "✅ 分析完成！");
+      // Replace the "analysing…" placeholder, or it stays in the chat after the review is ready.
+      resetCoach([{ role: "model", text: "分析完成了。用「上一步／下一步」或點圖表選一個局面：綠色箭頭是推薦手，紅色是實際走法。想知道為什麼，直接問我。" }]);
     } catch (err) {
       if (controller.signal.aborted || axios.isCancel(err)) return;
       console.error("分析失敗", err);
       setStatus(err.message || "分析暫時無法完成，請稍後重新按分析按鈕。");
+      resetCoach([{ role: "model", text: "這次分析沒有完成，可以再按一次「賽後分析」。", error: true }]);
     } finally {
       if (analysisControllerRef.current === controller) {
         analysisControllerRef.current = null;
@@ -578,6 +583,10 @@ function App() {
     }
   };
 
+  // Set when a real move (player or bot) is applied; the effect below consumes it
+  // so a finished game is saved once, and loading an old finished game saves nothing.
+  const liveMoveRef = useRef(false);
+
   function safeGameMutate(modify) {
     setGame((g) => {
       const update = new Chess();
@@ -759,6 +768,7 @@ function App() {
     } catch { return false; }
     if (move === null) return false;
 
+    liveMoveRef.current = true;
     safeGameMutate((g) => {
       g.move({ from: sourceSquare, to: targetSquare, promotion: "q" });
     });
@@ -768,11 +778,7 @@ function App() {
     // 但可以加一行分隔線或提示
     // setChatHistory(prev => [...prev, { role: "system", text: "--- 棋局已更新 ---" }]); 
 
-    if (tempGame.isGameOver()) {
-      handleGameOver(tempGame);
-    } else {
-      makeAIMove(tempGame.fen());
-    }
+    if (!tempGame.isGameOver()) makeAIMove(tempGame.fen());
     return true;
   }
 
@@ -817,8 +823,16 @@ function App() {
       result = "1/2-1/2";
       setStatus("遊戲結束：和局");
     }
-    saveGameToDB(result);
+    saveGameToDB(result, chessInstance);
   }
+
+  useEffect(() => {
+    if (!liveMoveRef.current) return;
+    liveMoveRef.current = false;
+    if (game.isGameOver()) handleGameOver(game);
+  // handleGameOver only reads setters and the game passed in.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [game]);
 
   async function makeAIMove(currentFen) {
     aiControllerRef.current?.abort();
@@ -839,15 +853,15 @@ function App() {
         const from = bestMoveUci.substring(0, 2);
         const to = bestMoveUci.substring(2, 4);
         const promotion = bestMoveUci.length > 4 ? bestMoveUci[4] : undefined;
-        safeGameMutate((g) => {
-          g.move({ from, to, promotion });
-          if (g.isGameOver()) handleGameOver(g);
-          else if (response.data.bot_style === "trickster" && response.data.style_bonus > 0) {
-            setStatus(`輪到你了。陷阱型 AI 剛製造了威脅，先檢查將軍、吃子和被攻擊的子。`);
-          } else {
-            setStatus(`輪到你了（${response.data.difficulty_label || selectedDifficulty.label}／${selectedStyle.label}）`);
-          }
-        });
+        // State updaters must stay pure (StrictMode runs them twice), so the
+        // game-over save happens in the effect after this update commits.
+        liveMoveRef.current = true;
+        safeGameMutate((g) => { g.move({ from, to, promotion }); });
+        if (response.data.bot_style === "trickster" && response.data.style_bonus > 0) {
+          setStatus(`輪到你了。陷阱型 AI 剛製造了威脅，先檢查將軍、吃子和被攻擊的子。`);
+        } else {
+          setStatus(`輪到你了（${response.data.difficulty_label || selectedDifficulty.label}／${selectedStyle.label}）`);
+        }
       }
     } catch (error) {
       if (controller.signal.aborted || axios.isCancel(error)) return;
@@ -1017,7 +1031,7 @@ function App() {
           {reviewProgress && <div className="review-progress" role="status">
             <span>{reviewProgress.phase === "deep" ? "加深複核關鍵步" : "全局初評"}：{reviewProgress.current} / {reviewProgress.total}</span>
             <progress value={reviewProgress.current} max={reviewProgress.total || 1} aria-label="賽後分析進度" />
-            <button className="btn btn-ghost btn-sm" onClick={() => { cancelGameRequests(); setStatus("已取消分析，可重新開始。"); }}>取消分析</button>
+            <button className="btn btn-ghost btn-sm" onClick={() => { cancelGameRequests(); setStatus("已取消分析，可重新開始。"); resetCoach([{ role: "model", text: "已取消分析。想看時再按一次「賽後分析」。" }]); }}>取消分析</button>
           </div>}
           {reviewMeta && <div className="review-evidence-status">
             <strong>{reviewMeta.engine} · 初評 {reviewMeta.quick_nodes.toLocaleString()} 節點，複核 {reviewMeta.deep_nodes.toLocaleString()} 節點</strong>
