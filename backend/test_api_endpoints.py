@@ -1,3 +1,4 @@
+import os
 import unittest
 from unittest.mock import Mock, patch
 
@@ -101,6 +102,7 @@ class ApiEndpointTests(unittest.TestCase):
         self.assertEqual(response.json()["coach_advice"], "請先完成子力發展。")
         self.assertEqual(rag_engine.get_response.call_args.args[2], "這個 system 性的弱點該怎麼守？")
 
+    @patch.dict(os.environ, {"COACH_ENGINE": "builtin"})
     def test_explain_passes_verified_teaching_analysis_to_rag(self):
         rag_engine = Mock()
         rag_engine.get_response.return_value = CoachReply("推薦手：Nf3")

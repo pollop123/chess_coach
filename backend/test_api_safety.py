@@ -113,6 +113,7 @@ class ApiSafetyTests(unittest.TestCase):
                 ["https://app.example.com", "https://admin.example.com"],
             )
 
+    @patch.dict(os.environ, {"COACH_ENGINE": "builtin"})
     def test_permitted_parallel_requests_receive_distinct_engine_sessions(self):
         barrier = threading.Barrier(2)
         seen_sessions = []
