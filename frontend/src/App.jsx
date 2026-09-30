@@ -69,6 +69,7 @@ const WEAKNESS_LABELS = {
 };
 
 const LESSON_TYPE_LABELS = {
+  rules: "規則課",
   opening: "主線課",
   puzzle: "局面題",
   guided: "引導課",
@@ -309,6 +310,12 @@ function App() {
     setOnboarding(next);
     setShowOnboarding(false);
     setBotDifficulty(LEVELS[level].botDifficulty);
+    if (LEVELS[level].startLesson) {
+      // Beginners learn how the pieces move before their first game.
+      resetTraining(LEVELS[level].startLesson);
+      setAppMode("training");
+      return;
+    }
     setAppMode("play");
     if (LEVELS[level].importFirst) {
       // The import card renders first after this update; focus its username box.
@@ -526,7 +533,9 @@ function App() {
   const learningPlan = buildLearningPlan(
     TRAINING_LESSONS,
     learningProgress,
-    analysisData.length > 0 ? practiceRecommendations.recommendations : []
+    analysisData.length > 0 ? practiceRecommendations.recommendations : [],
+    undefined,
+    { preferBasics: onboarding?.level === "beginner" }
   );
   const nextLesson = getNextLesson(TRAINING_LESSONS, selectedLesson.id, learningProgress);
 
@@ -1018,7 +1027,7 @@ function App() {
               </div>
               <div>
                 <span>難度</span>
-                <strong>{appMode === "training" ? selectedLesson.phase : selectedDifficulty.label}</strong>
+                <strong>{appMode === "training" ? (TRAINING_PHASES.find((phase) => phase.id === selectedLesson.phase)?.label || selectedLesson.phase) : selectedDifficulty.label}</strong>
               </div>
               <div>
                 <span>風格</span>

@@ -2,7 +2,7 @@ export const ONBOARDING_KEY = "chess-coach.onboarding.v1";
 
 // What each answer to "你目前的程度是？" changes on the play screen.
 export const LEVELS = {
-  beginner: { botDifficulty: "newbie", importFirst: false, tips: true },
+  beginner: { botDifficulty: "newbie", importFirst: false, tips: true, startLesson: "rules-rook-bishop-queen" },
   player: { botDifficulty: "intermediate", importFirst: false, tips: false },
   chesscom: { botDifficulty: "intermediate", importFirst: true, tips: false },
 };

@@ -130,6 +130,10 @@ class CoachGenerationTests(unittest.TestCase):
             "給我提示，不要告訴我答案": "hint", "不用提示，直接給我答案": "position",
             "怎麼下比較好？": "position",
             "e4 是什麼意思？": "position", "exd5 好嗎？": "position",
+            "騎士怎麼走？": "knowledge", "兵的走法是什麼？": "knowledge", "How does the knight move?": "knowledge",
+            "象可以走直線嗎？": "knowledge", "兵可以後退嗎？": "knowledge", "兵怎麼吃子？": "knowledge",
+            "我的馬現在怎麼走比較好？": "position", "這隻車該怎麼走？": "position", "現在這個兵可以走嗎？": "position",
+            "馬可以跳到 f7 嗎？": "position", "王能走到 e2 嗎？": "position",
             "e8=Q 是什麼意思？": "position", "e4 和 d4 哪個好？": "comparison",
         }
         for question, expected in cases.items():

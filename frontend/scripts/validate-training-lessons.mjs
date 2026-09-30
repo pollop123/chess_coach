@@ -2,8 +2,8 @@ import { Chess } from "chess.js";
 import { buildLessonChallenges } from "../src/lessonEngine.js";
 import { TRAINING_LESSONS } from "../src/trainingLessons.js";
 
-const REQUIRED_PHASES = new Set(["opening", "middlegame", "endgame"]);
-const ALLOWED_TYPES = new Set(["opening", "puzzle", "guided", "endgame"]);
+const REQUIRED_PHASES = new Set(["basics", "opening", "middlegame", "endgame"]);
+const ALLOWED_TYPES = new Set(["opening", "puzzle", "guided", "endgame", "rules"]);
 const ALLOWED_SIDES = new Set(["white", "black"]);
 const seenIds = new Set();
 const phaseCounts = new Map();
@@ -78,7 +78,13 @@ for (const lesson of TRAINING_LESSONS) {
 
   const board = lesson.startFen ? new Chess(lesson.startFen) : new Chess();
   validatePositionSemantics(board, lesson.id, lesson.startFen || board.fen());
-  assert(lesson.recommendationVerified, `${lesson.id} changed since its accuracy verification`);
+  // Rules lessons teach how pieces move, not the best move, so they skip the engine
+  // accuracy gate; they are also never recommended from a review's weaknesses.
+  assert(
+    lesson.type === "rules" || lesson.recommendationVerified,
+    `${lesson.id} changed since its accuracy verification`
+  );
+  assert(lesson.type !== "rules" || lesson.phase === "basics", `${lesson.id}: rules lessons belong to basics`);
   for (const san of lesson.moves) {
     const move = board.move(san);
     assert(move, `${lesson.id} has illegal SAN ${san} from ${board.fen()}`);

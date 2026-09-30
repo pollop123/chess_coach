@@ -1,10 +1,208 @@
 export const TRAINING_PHASES = [
+  { id: "basics", label: "基礎規則" },
   { id: "opening", label: "開局" },
   { id: "middlegame", label: "中局" },
   { id: "endgame", label: "殘局" }
 ];
 
 const LESSON_CATALOG = [
+  // 基礎規則課：教棋子怎麼走與基本規則，不是教最佳手，所以不走引擎正確性閘門。
+  {
+    id: "rules-rook-bishop-queen",
+    phase: "basics",
+    type: "rules",
+    tags: ["rules", "piece_movement"],
+    opening: "基礎規則",
+    variation: "車、象、后怎麼走",
+    goal: "認識三種走長距離的棋子：車走直線橫線，象走斜線，后兩種都可以。",
+    startFen: "7k/8/8/8/8/8/8/R1BQK3 w - - 0 1",
+    moves: ["Ra7", "Kg8", "Bf4", "Kf8", "Qd3", "Ke8"],
+    challengeSteps: {
+      0: {
+        prompt: "車沿著直線或橫線走，一次可以走好幾格。把 a1 的車往上走到 a7。",
+        hints: ["車只能沿著同一條直線或同一條橫線移動，中間不能有棋子擋住。", "把車從 a1 一路往上推，停在 a7。"],
+        acceptedMoves: [{ san: "Ra7", explanation: "車沿著 a 直線走了六格。只要中間沒有棋子，車可以一次走很遠。" }]
+      },
+      1: {
+        prompt: "象只能走斜線。把 c1 的象斜著走到 f4。",
+        hints: ["象永遠斜著走，所以它會一直停在同一種顏色的格子上。", "從 c1 往右上斜走：d2、e3，停在 f4。"],
+        acceptedMoves: [{ san: "Bf4", explanation: "象沿著斜線走了三格。c1 是黑格，f4 也是黑格：象永遠待在同一種顏色。" }]
+      },
+      2: {
+        prompt: "后最靈活：可以像車走直線，也可以像象走斜線。把 d1 的后往上走到 d3。",
+        hints: ["后結合了車和象的走法，任何直線、橫線、斜線都可以走。", "讓后沿著 d 直線往上走兩格，停在 d3。"],
+        acceptedMoves: [{ san: "Qd3", explanation: "后這次像車一樣走直線。下一次它也可以改走斜線。" }]
+      }
+    },
+    ideas: [
+      "車：直線、橫線，任意格數。",
+      "象：斜線，任意格數，永遠停在同色格。",
+      "后：直線、橫線、斜線都可以，是最強的棋子。",
+      "這三種棋子都不能跳過其他棋子。"
+    ]
+  },
+  {
+    id: "rules-knight",
+    phase: "basics",
+    type: "rules",
+    tags: ["rules", "piece_movement"],
+    opening: "基礎規則",
+    variation: "騎士（馬）怎麼走",
+    goal: "學會騎士的「日」字走法，以及它是唯一能跳過其他棋子的棋子。",
+    startFen: "7k/8/8/8/8/8/PPP5/1N2K3 w - - 0 1",
+    moves: ["Nc3", "Kg8", "Nd5", "Kf8", "Nf6", "Kg7"],
+    challengeSteps: {
+      0: {
+        prompt: "騎士走「日」字：先直走兩格，再往旁邊一格。它可以跳過前面的兵。把 b1 的騎士跳到 c3。",
+        hints: ["騎士的落點和起點會形成一個「日」字（2 格 × 1 格）。前面有兵擋著也沒關係，騎士會跳過去。", "從 b1 往上兩格、往右一格，就是 c3。"],
+        acceptedMoves: [{ san: "Nc3", explanation: "騎士跳過了 b2 的兵，落在 c3。只有騎士能這樣跳。" }]
+      },
+      1: {
+        prompt: "再跳一次，把騎士跳到 d5。",
+        hints: ["每次跳躍一樣是「兩格加一格」，方向可以任意。", "從 c3 往上兩格、往右一格，就是 d5。"],
+        acceptedMoves: [{ san: "Nd5", explanation: "又是一個「日」字：兩格往上、一格往右。" }]
+      },
+      2: {
+        prompt: "最後把騎士跳到 f6。",
+        hints: ["也可以先橫走兩格、再直走一格，一樣是「日」字。", "從 d5 往右兩格、往上一格，就是 f6。"],
+        acceptedMoves: [{ san: "Nf6", explanation: "這次是橫走兩格、再往上一格。騎士每跳一次，格子顏色都會換一次。" }]
+      }
+    },
+    ideas: [
+      "騎士走「日」字：兩格加一格，方向不限。",
+      "騎士是唯一可以跳過其他棋子的棋子。",
+      "騎士每跳一次都會換到另一種顏色的格子。"
+    ]
+  },
+  {
+    id: "rules-pawn",
+    phase: "basics",
+    type: "rules",
+    tags: ["rules", "piece_movement", "promotion"],
+    opening: "基礎規則",
+    variation: "兵怎麼走、怎麼吃、升變",
+    goal: "兵往前走、斜著吃；走到最後一排可以升變成更強的棋子。",
+    startFen: "8/1P5k/8/3p4/8/8/4P3/4K3 w - - 0 1",
+    moves: ["e4", "Kg6", "exd5", "Kf5", "b8=Q"],
+    challengeSteps: {
+      0: {
+        prompt: "兵只能往前走一格，但還沒走過的兵可以一次走兩格。把 e2 的兵走兩格到 e4。",
+        hints: ["兵只能往前，不能後退，也不能橫走。第一次走的時候可以選擇走一格或兩格。", "把 e2 的兵往前推兩格，停在 e4。"],
+        acceptedMoves: [
+          { san: "e4", explanation: "兵第一次移動可以走兩格，很快就能佔到中間。" },
+          { san: "e3", explanation: "走一格也是合法的；只是第一次移動時，兵可以選擇直接走兩格。" }
+        ]
+      },
+      1: {
+        prompt: "兵吃子的方式和走路不同：它只能吃斜前方一格的棋子。吃掉 d5 的黑兵。",
+        hints: ["兵往前走，但吃子時要斜著吃。正前方有棋子的話，兵反而會被擋住。", "你的兵在 e4，斜前方的 d5 有黑兵，可以吃它。"],
+        acceptedMoves: [{ san: "exd5", explanation: "兵斜著吃掉了 d5 的黑兵。記住：兵直走、斜吃。" }]
+      },
+      2: {
+        prompt: "兵走到對方的最後一排時會「升變」，可以變成后、車、象或騎士，通常選后。把 b7 的兵走到 b8 升變成后。",
+        hints: ["兵到達最後一排一定要升變，選最強的后最常見。", "把 b7 的兵往前走一格到 b8，升變成后。"],
+        acceptedMoves: [{ san: "b8=Q", explanation: "兵升變成后，一下子從最弱的棋子變成最強的棋子。" }]
+      }
+    },
+    ideas: [
+      "兵只能往前走一格，第一次可以走兩格。",
+      "兵斜著吃子，正前方有棋子時會被擋住。",
+      "兵走到最後一排要升變，通常變成后。"
+    ]
+  },
+  {
+    id: "rules-check",
+    phase: "basics",
+    type: "rules",
+    tags: ["rules", "check", "king_safety"],
+    opening: "基礎規則",
+    variation: "王與將軍",
+    goal: "王一次走一格；被將軍時一定要馬上解除，可以把王移開，或用其他棋子擋住。",
+    startFen: "4r2k/8/8/8/R7/8/8/4K3 w - - 0 1",
+    moves: ["Kd2", "Rd8+", "Rd4"],
+    challengeSteps: {
+      0: {
+        prompt: "黑車沿著 e 直線攻擊你的王，這叫「將軍」。被將軍時一定要先解除。把王移到安全的格子。",
+        hints: ["王一次只能往任何方向走一格，而且不能走到還會被攻擊的格子。", "把王往左或往右移一格，離開 e 直線（例如 d2）。"],
+        acceptedMoves: [
+          { san: "Kd2", explanation: "王離開了 e 直線，不再被黑車攻擊。" },
+          { san: "Kd1", explanation: "王往左移一格，離開了 e 直線。" },
+          { san: "Kf1", explanation: "王往右移一格，離開了 e 直線。" },
+          { san: "Kf2", explanation: "王往右上移一格，離開了 e 直線。" },
+          { san: "Re4", explanation: "你沒有移動王，而是用車擋在中間。這也是解除將軍的方法！" }
+        ]
+      },
+      1: {
+        prompt: "黑車換到 d 直線，又將軍了。這次試試看另一種方法：用你的車擋在中間。",
+        hints: ["解除將軍有三種方法：移動王、擋住攻擊的線、吃掉攻擊的棋子。", "你的車在 a4，可以橫走到 d4，擋在黑車和你的王中間。"],
+        acceptedMoves: [
+          { san: "Rd4", explanation: "車擋在 d4，黑車就攻擊不到你的王了。" },
+          { san: "Kc2", explanation: "移動王也能解除將軍。下次也可以試試用車擋住（Rd4）。" },
+          { san: "Kc1", explanation: "移動王也能解除將軍。下次也可以試試用車擋住（Rd4）。" },
+          { san: "Kc3", explanation: "移動王也能解除將軍。下次也可以試試用車擋住（Rd4）。" },
+          { san: "Ke1", explanation: "移動王也能解除將軍。下次也可以試試用車擋住（Rd4）。" },
+          { san: "Ke2", explanation: "移動王也能解除將軍。下次也可以試試用車擋住（Rd4）。" },
+          { san: "Ke3", explanation: "移動王也能解除將軍。下次也可以試試用車擋住（Rd4）。" }
+        ]
+      }
+    },
+    ideas: [
+      "王一次走一格，不能走到會被攻擊的格子。",
+      "被將軍時一定要解除：移動王、擋住攻擊線，或吃掉攻擊的棋子。",
+      "不能走一步讓自己的王被將軍。"
+    ]
+  },
+  {
+    id: "rules-mate-stalemate",
+    phase: "basics",
+    type: "rules",
+    tags: ["rules", "checkmate"],
+    opening: "基礎規則",
+    variation: "將死與逼和",
+    goal: "將死才會贏；對手沒被將軍又無路可走是逼和，算和棋。",
+    startFen: "7k/8/5K2/8/8/8/8/6Q1 w - - 0 1",
+    moves: ["Qg7#"],
+    challengeSteps: {
+      0: {
+        prompt: "找出將死黑王的一步。小心：如果黑王沒被將軍、卻哪裡都不能走，那是「逼和」，會變成和棋。",
+        hints: ["將死要同時做到兩件事：正在將軍，而且黑王逃不掉、也吃不掉攻擊它的棋子。", "把后走到 g7，貼著黑王將軍；你的王在 f6 保護著后，黑王吃不掉它。"],
+        acceptedMoves: [{ san: "Qg7#", explanation: "后在 g7 將軍，你的王保護著后，黑王沒有地方可逃：將死！如果走 Qg6，黑王沒被將軍又不能動，就會變成逼和。" }]
+      }
+    },
+    ideas: [
+      "將死：正在被將軍，而且沒有任何方法解除。",
+      "逼和：沒有被將軍，但輪到走的一方沒有任何合法棋步，算和棋。",
+      "快贏的時候要特別小心別走成逼和。"
+    ]
+  },
+  {
+    id: "rules-special-moves",
+    phase: "basics",
+    type: "rules",
+    tags: ["rules", "castling", "en_passant"],
+    opening: "基礎規則",
+    variation: "王車易位與吃過路兵",
+    goal: "認識兩個特殊規則：王車易位能保護王，吃過路兵是兵的特別吃法。",
+    startFen: "4k3/3p4/8/4P3/8/8/5PPP/4K2R w K - 0 1",
+    moves: ["O-O", "d5", "exd6"],
+    challengeSteps: {
+      0: {
+        prompt: "王車易位：王往車的方向走兩格，車跳到王的另一邊。條件是王和車都還沒動過、中間沒有棋子、王沒有被將軍，也不會經過被攻擊的格子。現在來易位！",
+        hints: ["易位是唯一一次可以同時移動兩個棋子的走法，常用來讓王躲到角落更安全。", "把王從 e1 往右走兩格到 g1，車會自動跳到 f1。"],
+        acceptedMoves: [{ san: "O-O", explanation: "王到了 g1、車到了 f1。王躲在兵後面，比留在中間安全。" }]
+      },
+      1: {
+        prompt: "黑兵從 d7 一次走兩格到 d5，剛好停在你的 e5 兵旁邊。這時你可以「吃過路兵」：把它當成只走了一格那樣斜吃掉。",
+        hints: ["吃過路兵只能在對方的兵剛走兩格、停在你的兵旁邊時的下一步使用，錯過就不能吃了。", "把你的 e5 兵斜走到 d6，就能吃掉 d5 的黑兵。"],
+        acceptedMoves: [{ san: "exd6", explanation: "你的兵走到 d6，d5 的黑兵被吃掉了。這就是吃過路兵。" }]
+      }
+    },
+    ideas: [
+      "王車易位：王走兩格，車跳到另一邊；王和車都不能動過。",
+      "王被將軍、或要經過被攻擊的格子時，不能易位。",
+      "吃過路兵：對方的兵走兩格停在你的兵旁邊，下一步可以斜吃它。"
+    ]
+  },
   {
     id: "italian-giuoco-piano",
     phase: "opening",
