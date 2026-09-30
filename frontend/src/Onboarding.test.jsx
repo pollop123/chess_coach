@@ -27,12 +27,16 @@ const coachBeforeImport = () => {
 };
 
 describe("first-visit onboarding", () => {
-  it("asks once, and a beginner gets the easiest bot, tips and the coach first", () => {
+  it("asks once; a beginner starts the first rules lesson, then plays the easiest bot with tips", () => {
     const { unmount } = render(<App />);
     expect(dialog()).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /我是新手/ }));
 
     expect(dialog()).not.toBeInTheDocument();
+    expect(screen.getAllByText("車、象、后怎麼走").length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/把 a1 的車往上走到 a7/).length).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getByRole("button", { name: "對局" }));
     expect(selectedDifficulty()).toContain("新手");
     expect(screen.getByRole("region", { name: "新手提示" })).toBeInTheDocument();
     expect(coachBeforeImport()).toBe(true);
@@ -42,6 +46,22 @@ describe("first-visit onboarding", () => {
     render(<App />);
     expect(dialog()).not.toBeInTheDocument();
     expect(selectedDifficulty()).toContain("新手");
+  });
+
+  it("recommends rules lessons first to beginners but not to players", () => {
+    store.set(ONBOARDING_KEY, JSON.stringify({ level: "beginner", tipsDismissed: true }));
+    const { unmount } = render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "學習專區" }));
+    const plan = () => [...document.querySelectorAll(".lesson-card h4")].map((node) => node.textContent);
+    expect(plan()[0]).toBe("車、象、后怎麼走");
+    expect(screen.getAllByText("新手先學會棋子怎麼走").length).toBeGreaterThan(0);
+    unmount();
+
+    store.set(ONBOARDING_KEY, JSON.stringify({ level: "player", tipsDismissed: false }));
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "學習專區" }));
+    expect(plan().some((title) => title.includes("怎麼走") || title.includes("將死與逼和"))).toBe(false);
+    expect(screen.getByText("王與將軍")).toBeInTheDocument(); // still listed in the curriculum map
   });
 
   it("remembers when the beginner tips are dismissed", () => {
@@ -88,6 +108,7 @@ describe("first-visit onboarding", () => {
     render(<App />);
     fireEvent.click(screen.getByRole("button", { name: /我是新手/ }));
     expect(dialog()).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "對局" }));
     expect(selectedDifficulty()).toContain("新手");
   });
 });

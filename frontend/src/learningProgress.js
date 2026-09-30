@@ -171,23 +171,35 @@ export function getLearningStats(progress, lessons, now = new Date()) {
   };
 }
 
-export function buildLearningPlan(lessons, progress, reviewRecommendations = [], now = new Date()) {
+export function buildLearningPlan(
+  lessons,
+  progress,
+  reviewRecommendations = [],
+  now = new Date(),
+  { preferBasics = false } = {}
+) {
   const recommendationIds = new Set(reviewRecommendations.map((lesson) => lesson.id));
   const ranked = lessons
     .filter((lesson) => isLessonUnlocked(lesson, lessons, progress))
+    // Players who know the rules are not pushed into rules lessons they never opened;
+    // the curriculum map still lists them.
+    .filter((lesson) => preferBasics || lesson.phase !== "basics" || getLessonProgress(progress, lesson.id).attempts > 0)
     .map((lesson, index) => {
       const lessonProgress = getLessonProgress(progress, lesson.id);
       const due = isLessonDue(progress, lesson.id, now);
       const reviewMatch = recommendationIds.has(lesson.id);
       const unseen = lessonProgress.attempts === 0;
-      const score = (due ? 100 : 0)
+      const learningRules = preferBasics && lesson.phase === "basics" && lessonProgress.completions === 0;
+      const score = (learningRules ? 200 : 0)
+        + (due ? 100 : 0)
         + (reviewMatch ? 70 : 0)
         + (unseen ? 25 : 0)
         + (5 - lessonProgress.mastery) * 4
         - index / 100;
 
       let reason = "繼續建立完整棋局觀念";
-      if (due && reviewMatch) reason = "這盤暴露的弱點，而且已到複習時間";
+      if (learningRules) reason = "新手先學會棋子怎麼走";
+      else if (due && reviewMatch) reason = "這盤暴露的弱點，而且已到複習時間";
       else if (due) reason = "已到間隔複習時間";
       else if (reviewMatch) reason = "根據最近一盤的失誤推薦";
       else if (unseen) reason = "尚未完成的新課程";

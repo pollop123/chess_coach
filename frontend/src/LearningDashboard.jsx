@@ -4,7 +4,8 @@ const LESSON_TYPE_LABELS = {
   opening: "主線課",
   puzzle: "局面題",
   guided: "引導課",
-  endgame: "殘局課"
+  endgame: "殘局課",
+  rules: "規則課"
 };
 
 export function LearningDashboard({ phases, lessons, progress, stats, plan, onStartLesson, onReturnToGame }) {

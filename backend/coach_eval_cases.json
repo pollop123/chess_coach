@@ -115,8 +115,10 @@
     "moves": "",
     "player_color": "white",
     "question": "騎士怎麼走？",
-    "must_mention": [],
-    "note": "The knowledge base has no piece-movement entries; an honest 'not enough evidence' is the correct answer today."
+    "must_mention": [
+      "日"
+    ],
+    "expect_mode": "knowledge"
   },
   {
     "id": "hint-no-answer",

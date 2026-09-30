@@ -189,6 +189,10 @@ def _rejected_mainline_keys(lesson: dict) -> set[tuple[str, str]]:
 def iter_engine_move_cases(lesson: dict) -> list[tuple[int | None, chess.Board, str]]:
     """Return legacy first-move and V2 override cases without duplicates."""
     cases: list[tuple[int | None, chess.Board, str]] = []
+    # Rules lessons teach how pieces move (e.g. "move the rook to a7"), not the best
+    # move, so the Stockfish accuracy gate does not apply; legality still does.
+    if lesson.get("type") == "rules":
+        return cases
     seen: set[tuple[str, str]] = set()
     # 陷阱課刻意標成錯誤答案的主線不送進引擎閘門，否則會被當成大失誤擋下來。
     rejected = _rejected_mainline_keys(lesson)
