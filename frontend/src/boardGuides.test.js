@@ -61,6 +61,13 @@ describe("reviewArrows", () => {
     expect(guide.sameMove).toBe(false);
   });
 
+  it("treats a different promotion piece as a different move", () => {
+    const promotion = [{ fen: "x" }, { move: "e7e8n", best_move: "e7e8q" }];
+    const guide = reviewArrows(promotion, 0);
+    expect(guide.sameMove).toBe(false);
+    expect(guide.arrows).toHaveLength(2);
+  });
+
   it("draws one arrow when the player found the recommendation, none at the end", () => {
     const guide = reviewArrows(rows, 1);
     expect(guide.arrows).toEqual([["e7", "e5", GUIDE_COLORS.bestArrow]]);

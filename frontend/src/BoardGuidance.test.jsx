@@ -34,7 +34,15 @@ describe("board guidance", () => {
     act(() => { board.props.onPieceDragBegin("wP", "e2"); });
     expect(Object.keys(board.props.customSquareStyles).sort()).toEqual(["e3", "e4"]);
     act(() => { board.props.onPieceDragEnd("wP", "e2"); });
-    expect(board.props.customSquareStyles).toEqual({});
+
+    // Dragging another piece while one is click-selected shows the dragged piece's moves.
+    act(() => { board.props.onSquareClick("g1"); });
+    act(() => { board.props.onPieceDragBegin("wP", "d2"); });
+    expect(board.props.customSquareStyles.d4).toBeTruthy();
+    expect(board.props.customSquareStyles.f3).toBeUndefined();
+    // When the drag ends without a move, the click-selected knight's guidance returns.
+    act(() => { board.props.onPieceDragEnd("wP", "d2"); });
+    expect(Object.keys(board.props.customSquareStyles).sort()).toEqual(["f3", "g1", "h3"]);
   });
 
   it("does not show moves for the opponent's pieces", () => {

@@ -457,7 +457,8 @@ function App() {
     ? !trainingStepSolved && !trainingComplete
     : appMode === "play" && !importedGame && !isResigned && analysisData.length === 0
       && !game.isGameOver() && game.turn() === (humanColor === "white" ? "w" : "b");
-  const guideSquare = selectedSquare || dragSquare;
+  // An active drag wins over an earlier click selection.
+  const guideSquare = dragSquare || selectedSquare;
   const legalStyles = canShowLegalMoves
     ? legalMoveStyles(appMode === "training" ? trainingGame : game, guideSquare)
     : {};

@@ -71,8 +71,10 @@ export function reviewArrows(analysisData, index) {
   const played = uciToSquares(next.move);
   const arrows = [];
   if (best) arrows.push([best.from, best.to, GUIDE_COLORS.bestArrow]);
-  if (played && !(best && best.from === played.from && best.to === played.to)) {
+  // Compare full UCI so e7e8q and e7e8n (same squares, different promotion) differ.
+  const sameMove = Boolean(best && played && next.best_move === next.move);
+  if (played && !sameMove) {
     arrows.push([played.from, played.to, GUIDE_COLORS.playedArrow]);
   }
-  return { arrows, best, played, sameMove: Boolean(best && played && arrows.length === 1) };
+  return { arrows, best, played, sameMove };
 }
