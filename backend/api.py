@@ -117,6 +117,8 @@ class CoachTurn(BaseModel):
 class CoachContext(BaseModel):
     conversation: List[CoachTurn] = Field(default_factory=list, max_length=8)
     mode: Literal["auto", "overview", "hint"] = "auto"
+    # Which side the asker plays, so "my last move" skips the opponent's reply.
+    player_color: Optional[Literal["white", "black"]] = None
 
 
 class GetAnalysisRequest(CoachContext):
@@ -324,6 +326,7 @@ def get_analysis_endpoint(request: GetAnalysisRequest):
                 teaching_analysis=teaching_analysis,
                 conversation=[turn.model_dump() for turn in request.conversation],
                 mode="overview" if not request.question and request.mode == "auto" else request.mode,
+                player_color=request.player_color,
             )
             coach_advice, coach_sources = reply.advice, reply.sources
             coach_mode, coach_status = reply.mode, reply.status
@@ -799,6 +802,7 @@ def explain_position(request: ExplainRequest):
             conversation=conversation,
             mode=mode if mode in {"overview", "hint"} else request.mode,
             review_evidence=review_sources,
+            player_color=request.player_color,
         )
     except Exception as e:
         logger.warning("RAG analysis failed: %s", e)

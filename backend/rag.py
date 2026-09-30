@@ -13,6 +13,7 @@ from openings import identify_opening
 from coach_evidence import (
     EvidenceSource, KNOWLEDGE_SOURCES, rank_knowledge, render_sources,
 )
+from coach_facts import LAST_MOVE_QUESTION, last_move_source, move_fact_summary, threat_source
 from coach_conversation import current_conversation, question_mode, retrieval_question, wants_brief_answer
 from coach_generation import (
     CoachReply, NATURAL_INSTRUCTION, NATURAL_SCHEMA, VERIFY_INSTRUCTION,
@@ -382,13 +383,18 @@ def _avoid_text(teaching_analysis, displayed_move=None):
     return "避免只看單一步威脅；走棋前先檢查將軍、吃子與對手反擊。"
 
 
-def format_grounded_advice(_generated_advice, engine_best_move, teaching_analysis=None, verified_reply=None):
+def format_grounded_advice(_generated_advice, engine_best_move, teaching_analysis=None, verified_reply=None,
+                           move_fact=None):
     """Build the stable advice contract entirely from verified move fields."""
     # Keep the first argument for compatibility with existing callers. Model
     # prose is deliberately ignored because none of its claims are verified.
     aligned_teaching = align_teaching_analysis(teaching_analysis, engine_best_move)
     summary = _summary_text(aligned_teaching)
     reason = _reason_text(aligned_teaching)
+    if move_fact and (aligned_teaching or {}).get("analysis_complete") is not True:
+        # A mate or capture is certain from the board even when the slower
+        # candidate comparison did not finish.
+        reason = f"盤面可直接確認：{move_fact}"
     reply = verified_reply or "目前沒有已驗證的後續回應。"
     avoid = _avoid_text(aligned_teaching, engine_best_move)
     principle = _principle_text(aligned_teaching)
@@ -667,6 +673,7 @@ class ChessRAG:
         conversation=None,
         mode="auto",
         review_evidence=None,
+        player_color=None,
     ):
         board = chess.Board(fen)
         if not board.is_valid():
@@ -694,8 +701,9 @@ class ChessRAG:
         displayed_move = board.san(best_move) if best_move else None
         teaching_analysis = align_teaching_analysis(teaching_analysis, displayed_move)
         reply = _verified_reply(board, best_move, analysis_result, pv_line or analysis_result.get("pv"))
+        move_fact = move_fact_summary(board, best_move) if best_move else None
         grounded_advice = format_grounded_advice(
-            "", displayed_move, teaching_analysis=teaching_analysis, verified_reply=reply,
+            "", displayed_move, teaching_analysis=teaching_analysis, verified_reply=reply, move_fact=move_fact,
         )
         opening_result = identify_opening(_history_at_position(move_history, board)) if mode != "knowledge" else None
         opening_header = (
@@ -726,6 +734,13 @@ class ChessRAG:
             if castles else "目前走棋方沒有合法的王車易位走法。",
             "position",
         ))
+        board_facts = []
+        if review_evidence is None and mode != "knowledge":
+            player = {"white": chess.WHITE, "black": chess.BLACK}.get(player_color)
+            board_facts = [source for source in (
+                last_move_source(move_history, board, player), threat_source(board),
+            ) if source]
+            sources.extend(board_facts)
 
         if review_evidence is not None:
             # Server-owned review evidence replaces the independent teaching
@@ -791,8 +806,13 @@ class ChessRAG:
                         # The review only compared its recommendation with the move played.
                         advice += "\n\n本次分析只比較推薦手與棋譜實際走法；其他走法未經比較，不能據此排名。"
                 else:
-                    advice = f"{opening_header}\n\n{grounded_advice}" if mode == "overview" else grounded_advice
-                    cited = []
+                    # Exact board facts come before the engine summary (after the
+                    # opening line in an overview); the last-move check only when asked.
+                    cited = [source for source in board_facts
+                             if source.id == "T1" or re.search(LAST_MOVE_QUESTION, question, re.I)]
+                    facts = "\n".join(f"{source.text} [{source.id}]" for source in cited)
+                    parts = [opening_header] if mode == "overview" else []
+                    advice = "\n\n".join([*parts, *([facts] if facts else []), grounded_advice])
             answer = CoachReply(f"{advice}\n\n（{reason}，以上為基礎回覆。）", [source.as_dict() for source in cited], mode)
             logger.info("Coach answer mode=fallback")
         else:
