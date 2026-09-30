@@ -6,7 +6,7 @@ import chess
 from fastapi.testclient import TestClient
 
 from api import app
-from coach_facts import last_move_source, loose_pieces, move_fact_summary, replay_history, threat_hint_source, threat_source
+from coach_facts import explain_mate, last_move_source, loose_pieces, move_fact_summary, replay_history, threat_hint_source, threat_source
 from coach_generation import chess_atoms
 from rag import ChessRAG
 
@@ -38,7 +38,7 @@ class CoachFactTests(unittest.TestCase):
 
     def test_last_move_that_hangs_a_piece_or_misses_a_capture(self):
         hang = board_after("e4 e5 Nf3 Nc6 Nh4")
-        self.assertIn("馬（h4）受到攻擊且沒有保護", last_move_source("1. e4 e5 2. Nf3 Nc6 3. Nh4", hang).text)
+        self.assertIn("馬走到 h4，這格被后（d8）攻擊，而且沒有保護", last_move_source("1. e4 e5 2. Nf3 Nc6 3. Nh4", hang).text)
 
         # 2...Qh4 left the queen undefended in front of the f3 knight; 3.d3 missed Nxh4.
         text = last_move_source("1. e4 e5 2. Nf3 Qh4 3. d3", board_after("e4 e5 Nf3 Qh4 d3")).text
@@ -48,6 +48,39 @@ class CoachFactTests(unittest.TestCase):
         text = last_move_source("1. e4", board_after("e4")).text
         self.assertIn("沒有讓對手一步將死", text)
         self.assertIn("是否為最佳手需另看引擎評估", text)
+
+    def test_mate_explains_the_line_the_blockers_and_what_the_move_took_away(self):
+        text = last_move_source(FOOLS_MATE_PGN, chess.Board(FOOLS_MATE_FEN), chess.WHITE).text
+        self.assertIn("沿著 h4–e1 的斜線將軍，中間的 f2、g3 沒有白方的棋子能擋", text)
+        self.assertIn("王旁邊的 d1、f1、d2、e2 被自己的棋子堵住", text)
+        self.assertIn("走 g4 之前，就算對手走 Qh4+，兵還能走到 g3 擋住將軍", text)
+
+    def test_protected_contact_mate_and_an_ignored_threat(self):
+        board = board_after("e4 e5 Bc4 Nc6 Qh5 a6")
+        text = last_move_source("1. e4 e5 2. Bc4 Nc6 3. Qh5 a6", board, chess.BLACK).text
+        self.assertIn("王不能吃掉它，因為有象（c4）保護", text)
+        self.assertIn("e7 被后（f7）控制", text)
+        self.assertNotIn("f7 被", text)  # the checking square is covered by the capture sentence
+        self.assertIn("這個將死威脅在 a6 之前就已經存在，a6 沒有處理它", text)
+        self.assertIn("王不能吃掉它", threat_source(board).text)
+
+    def test_knight_mate_and_a_defender_that_walked_away(self):
+        moves = "e4 e5 Nf3 Nc6 Bc4 Nd4 Nxe5 Qg5 Nxf7 Qxg2 Rf1 Qxe4+ Be2"
+        text = last_move_source("1. e4 e5 2. Nf3 Nc6 3. Bc4 Nd4 4. Nxe5 Qg5 5. Nxf7 Qxg2 6. Rf1 Qxe4+ 7. Be2",
+                                board_after(moves), chess.WHITE).text
+        self.assertIn("Nf3# 之後，黑方的馬在 f3，將軍，馬的將軍不能被擋", text)
+        self.assertIn("原本保護馬（f7）的象走開了", text)
+        # e2 is covered by the e4 queen anyway, so the bishop did not take an escape square.
+        self.assertNotIn("堵住王可以逃的格子", text)
+
+    def test_winning_a_queen_is_not_reported_as_hanging_the_bishop(self):
+        moves = "e4 e5 Nf3 d6 Bc4 Bg4 Nc3 g6 Nxe5 Bxd1"
+        text = last_move_source("1. e4 e5 2. Nf3 d6 3. Bc4 Bg4 4. Nc3 g6 5. Nxe5 Bxd1", board_after(moves), chess.BLACK).text
+        self.assertIn("吃掉后", text)
+        self.assertNotIn("這格被", text)
+
+    def test_explain_mate_ignores_moves_that_do_not_mate(self):
+        self.assertIsNone(explain_mate(chess.Board(), chess.Move.from_uci("e2e4")))
 
     def test_repeated_position_uses_the_latest_occurrence(self):
         # Knights go out and back: the board equals the start, but four moves were played.

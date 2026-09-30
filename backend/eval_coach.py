@@ -66,6 +66,9 @@ def score(case, data, seconds):
     }
     if case.get("expect_mode"):
         result["mode_ok"] = data.get("mode") == case["expect_mode"]
+    if case.get("why_terms"):
+        # Words that only appear when the answer explains the cause, e.g. the g3 block for 1.f3 e5 2.g4.
+        result["explains_why"] = any(term in text for term in case["why_terms"])
     if case.get("forbid"):
         # Phrases that would mean the coach took the wrong side, e.g. telling White to play Black's move.
         result["forbid_ok"] = not any(phrase in text for phrase in case["forbid"])
@@ -110,7 +113,7 @@ def main():
         return f"{sum(bool(r[key]) for r in rows)}/{len(rows)}" if rows else "-"
     print("\n=== summary ===")
     print(f"generated        {len(generated)}/{total}")
-    for key in ("mentions_all", "conclusion_first", "has_habit", "forbid_ok", "mode_ok", "no_moves_ok"):
+    for key in ("mentions_all", "conclusion_first", "explains_why", "has_habit", "forbid_ok", "mode_ok", "no_moves_ok"):
         print(f"{key:<16} {rate(key, records)}")
     print(f"uses 您          {sum(r['uses_nin'] for r in records)}/{total}")
     print(f"hedges per answer {sum(r['hedges'] for r in records) / max(total, 1):.2f}")
