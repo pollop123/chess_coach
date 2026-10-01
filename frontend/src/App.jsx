@@ -1331,7 +1331,11 @@ function App() {
                 {history.map((h) => {
                   const outcome = outcomeForPlayer(h);
                   return (
-                    <li key={h.id} onClick={() => loadGame(h.pgn)}>
+                    <li
+                      key={h.id}
+                      // Restore the side the player had, so the board and any review face them.
+                      onClick={() => { if (loadGame(h.pgn)) setHumanColor(h.playerColor || "white"); }}
+                    >
                       <div className="history-meta">
                         <span>{h.playerColor === "black" ? "你執黑" : "你執白"}</span>
                         <small>{new Date(h.date).toLocaleString("zh-TW")}</small>

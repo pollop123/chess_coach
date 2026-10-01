@@ -84,7 +84,9 @@ describe("finishing a game", () => {
     store.set(GAMES_KEY, JSON.stringify([{ id: "g7", pgn: FINISHED_PGN, result: "0-1", date: "2026-01-01T00:00:00Z", playerColor: "black" }]));
     render(<StrictMode><App /></StrictMode>);
     expect(screen.getByText("勝")).toBeInTheDocument();  // Black won the saved game
+    expect(board.props.boardOrientation).toBe("white");
     fireEvent.click(screen.getByText("你執黑"));
+    expect(board.props.boardOrientation).toBe("black");
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect(savedGames()).toHaveLength(1);
   });
