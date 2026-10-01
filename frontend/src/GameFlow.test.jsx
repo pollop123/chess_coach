@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import axios from "axios";
 import App from "./App";
 import { streamReview } from "./reviewStream";
+import { GAMES_KEY } from "./gameHistoryStorage";
 
 vi.mock("axios", () => ({ default: { get: vi.fn(), post: vi.fn(), isCancel: vi.fn(() => false) } }));
 vi.mock("./reviewStream", () => ({ streamReview: vi.fn() }));
@@ -26,7 +27,9 @@ function botReplies(...moves) {
   });
 }
 
-const savedGames = () => axios.post.mock.calls.filter(([url]) => url.endsWith("/games"));
+let store;
+// Finished games now live in this browser's storage, never on the shared server.
+const savedGames = () => JSON.parse(store.get(GAMES_KEY) || "[]");
 
 async function play(from, to) {
   await act(async () => { board.props.onPieceDrop(from, to); });
@@ -34,8 +37,8 @@ async function play(from, to) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  const data = new Map();
-  vi.stubGlobal("localStorage", { getItem: (key) => data.get(key) || null, setItem: (key, value) => data.set(key, value) });
+  store = new Map();
+  vi.stubGlobal("localStorage", { getItem: (key) => store.get(key) || null, setItem: (key, value) => store.set(key, value) });
   HTMLElement.prototype.scrollTo = vi.fn();
   axios.get.mockResolvedValue({ data: [] });
 });
@@ -48,10 +51,14 @@ describe("finishing a game", () => {
     await waitFor(() => expect(board.props.position).toContain("4p3"));
     await play("g2", "g4");
     await waitFor(() => expect(savedGames()).toHaveLength(1));
-    expect(savedGames()[0][1].pgn).toContain("Qh4#");
-    expect(savedGames()[0][1].result).toBe("0-1");
+    expect(savedGames()[0].pgn).toContain("Qh4#");
+    expect(savedGames()[0].result).toBe("0-1");
+    expect(savedGames()[0].playerColor).toBe("white");
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect(savedGames()).toHaveLength(1);
+    expect(axios.post.mock.calls.some(([url]) => url.endsWith("/games"))).toBe(false);
+    // Shown from the player's side: White was mated, so 負.
+    expect(screen.getByText("負")).toBeInTheDocument();
   });
 
   it("saves once, with the player's own mating move", async () => {
@@ -65,16 +72,23 @@ describe("finishing a game", () => {
     await waitFor(() => expect(axios.post).toHaveBeenCalledTimes(3));
     await play("h5", "f7");
     await waitFor(() => expect(savedGames()).toHaveLength(1));
-    expect(savedGames()[0][1].pgn).toContain("Qxf7#");
-    expect(savedGames()[0][1].result).toBe("1-0");
+    expect(savedGames()[0].pgn).toContain("Qxf7#");
+    expect(savedGames()[0].result).toBe("1-0");
+    expect(screen.getByText("勝")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "清除紀錄" }));
+    expect(savedGames()).toHaveLength(0);
+    expect(screen.getByText(/尚無紀錄/)).toBeInTheDocument();
   });
 
   it("does not save again when an old finished game is opened", async () => {
-    axios.get.mockResolvedValue({ data: [{ id: 7, pgn: FINISHED_PGN, result: "0-1", date: "2026-01-01T00:00:00Z" }] });
+    store.set(GAMES_KEY, JSON.stringify([{ id: "g7", pgn: FINISHED_PGN, result: "0-1", date: "2026-01-01T00:00:00Z", playerColor: "black" }]));
     render(<StrictMode><App /></StrictMode>);
-    fireEvent.click(await screen.findByText("#7"));
+    expect(screen.getByText("勝")).toBeInTheDocument();  // Black won the saved game
+    expect(board.props.boardOrientation).toBe("white");
+    fireEvent.click(screen.getByText("你執黑"));
+    expect(board.props.boardOrientation).toBe("black");
     await new Promise((resolve) => setTimeout(resolve, 50));
-    expect(savedGames()).toHaveLength(0);
+    expect(savedGames()).toHaveLength(1);
   });
 });
 

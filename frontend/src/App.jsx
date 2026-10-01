@@ -9,6 +9,7 @@ import { ReviewPanel } from "./ReviewPanel";
 import { reviewMoveList } from "./reviewMoves";
 import { GUIDE_COLORS, legalMoveStyles, lessonHintGuides, reviewArrows } from "./boardGuides";
 import { ChessComImport } from "./ChessComImport";
+import { addGame, loadGames, outcomeForPlayer, saveGames } from "./gameHistoryStorage";
 import { BeginnerTips, Onboarding } from "./Onboarding";
 import { LEVELS, loadOnboarding, saveOnboarding } from "./onboardingStorage";
 import { streamReview } from "./reviewStream";
@@ -202,8 +203,7 @@ function App() {
   const [dragSquare, setDragSquare] = useState(null);
   const [status, setStatus] = useState("準備開始新棋局");
   const [isResigned, setIsResigned] = useState(false);
-  const [history, setHistory] = useState([]);
-  const [historyStatus, setHistoryStatus] = useState("loading");
+  const [history, setHistory] = useState(() => loadGames());
 
   // --- 新增/修改狀態 ---
   // chatHistory: 儲存對話紀錄 { role: 'user' | 'model', text: string }
@@ -257,13 +257,6 @@ function App() {
     setChatHistory(messages);
   }
 
-  // 1. 初始化載入歷史
-  useEffect(() => {
-    const controller = new AbortController();
-    fetchHistory(controller.signal);
-    return () => controller.abort();
-  }, []);
-
   // 聊天室自動捲動到底部
   useEffect(() => {
     const chatFeed = chatFeedRef.current;
@@ -275,31 +268,25 @@ function App() {
     saveLearningProgress(learningProgress);
   }, [learningProgress]);
 
-  async function fetchHistory(signal) {
-    try {
-      const res = await axios.get(`${API_URL}/games`, { signal });
-      setHistory(res.data);
-      setHistoryStatus("ready");
-    } catch (err) {
-      if (axios.isCancel(err) || err?.code === "ERR_CANCELED") return;
-      setHistory([]);
-      setHistoryStatus("unavailable");
-    }
+  // Finished games are kept in this browser (newest first, up to 30), never on the
+  // shared server, so one player's games are not listed to everyone else.
+  // `finished` is the game that just ended: `game` here can be one move behind.
+  function recordFinishedGame(result, finished = game) {
+    const entry = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      pgn: finished.pgn(),
+      result,
+      date: new Date().toISOString(),
+      playerColor: humanColor,
+    };
+    const next = addGame(history, entry);
+    setHistory(next);
+    if (!saveGames(next)) setStatus("這盤棋無法存進這個瀏覽器（可能是私密瀏覽或空間不足），重新整理後會消失。");
   }
 
-  // Save the finished game itself: the `game` in this closure can be one move
-  // behind (it missed the mating move) when called right after a move.
-  async function saveGameToDB(result, finished = game) {
-    try {
-      await axios.post(`${API_URL}/games`, {
-        pgn: finished.pgn(),
-        result: result,
-        fen: finished.fen()
-      });
-      fetchHistory();
-    } catch (err) {
-      console.error("存檔失敗", err);
-    }
+  function clearGameHistory() {
+    setHistory([]);
+    saveGames([]);
   }
 
   const levelSettings = LEVELS[onboarding?.level] || LEVELS.player;
@@ -336,7 +323,7 @@ function App() {
     const result = humanColor === "white" ? "0-1" : "1-0";
     setIsResigned(true);
     setStatus(`你已投降，遊戲結束：${result === "1-0" ? "白勝" : "黑勝"}`);
-    saveGameToDB(result);
+    recordFinishedGame(result);
   }
 
   function loadGame(pgn) {
@@ -887,7 +874,7 @@ function App() {
       result = "1/2-1/2";
       setStatus("遊戲結束：和局");
     }
-    saveGameToDB(result, chessInstance);
+    recordFinishedGame(result, chessInstance);
   }
 
   useEffect(() => {
@@ -1330,36 +1317,35 @@ function App() {
           {/* 歷史戰績 */}
           {appMode === "play" && (
           <div className="history-card">
-            <h3>
-              最近棋局
-            </h3>
-            {historyStatus !== "ready" || history.length === 0 ? (
-              <p className="empty-state" aria-live="polite">
-                {historyStatus === "loading"
-                  ? "讀取紀錄中…"
-                  : historyStatus === "unavailable"
-                    ? "後端未連線，歷史紀錄暫不可用"
-                    : "尚無紀錄"}
-              </p>
+            <div className="history-card__head">
+              <h3>最近棋局</h3>
+              {history.length > 0 && (
+                <button className="btn btn-ghost btn-sm" onClick={clearGameHistory}>清除紀錄</button>
+              )}
+            </div>
+            <p className="history-card__note">只存在這個瀏覽器，最多 30 盤；其他人看不到。</p>
+            {history.length === 0 ? (
+              <p className="empty-state" aria-live="polite">尚無紀錄。下完一盤棋會自動存在這裡。</p>
             ) : (
               <ul className="history-list">
-                {history.map((h) => (
-                  <li key={h.id} onClick={() => loadGame(h.pgn)}
-                  >
-                    <div className="history-meta">
-                      <span>
-                        #{h.id ? h.id : "?"}
+                {history.map((h) => {
+                  const outcome = outcomeForPlayer(h);
+                  return (
+                    <li
+                      key={h.id}
+                      // Restore the side the player had, so the board and any review face them.
+                      onClick={() => { if (loadGame(h.pgn)) setHumanColor(h.playerColor || "white"); }}
+                    >
+                      <div className="history-meta">
+                        <span>{h.playerColor === "black" ? "你執黑" : "你執白"}</span>
+                        <small>{new Date(h.date).toLocaleString("zh-TW")}</small>
+                      </div>
+                      <span className={`result-badge is-${outcome}`}>
+                        {{ win: "勝", loss: "負", draw: "和" }[outcome]}
                       </span>
-                      <small>
-                        {h.date ? new Date(h.date).toLocaleString("zh-TW") : "無日期"}
-                      </small>
-                    </div>
-
-                    <span className={`result-badge ${h.result === "1-0" ? "is-win" : h.result === "0-1" ? "is-loss" : "is-draw"}`}>
-                      {h.result}
-                    </span>
-                  </li>
-                ))}
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </div>
